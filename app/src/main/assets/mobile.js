@@ -2963,6 +2963,61 @@
     openTrackMenu(t);
   }, true);
 
+  // ==== どのボトムシートも、下にスワイプしたら閉じる（公式アプリと同じ） ====
+  var SWIPE_SHEETS = [
+    ['#m-tm', function () { closeTrackMenu(); }],
+    ['#m-devices', function () { closeDevices(); }],
+    ['#m-vis', function () { closeVisibility(); }],
+    ['#m-invite', function () { closeInvite(); }],
+    ['[data-tippy-root]', function (el) {
+      // Spotify のメニューは Esc と外側のタップで閉じる
+      var t = el.querySelector('[role="menu"], [role="dialog"]') || el;
+      t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    }]
+  ];
+  var sw = null;
+  document.addEventListener('touchstart', function (e) {
+    sw = null;
+    if (e.touches.length !== 1 || !e.target.closest) return;
+    if (e.target.closest('input, textarea, [role="slider"]')) return;
+    for (var i = 0; i < SWIPE_SHEETS.length; i++) {
+      var el = e.target.closest(SWIPE_SHEETS[i][0]);
+      if (!el) continue;
+      // 中の一覧がスクロールされているときは、まずスクロールを戻すのを優先
+      for (var n = e.target; n && n !== el.parentElement; n = n.parentElement) if (n.scrollTop > 0) return;
+      var box = el.matches('[data-tippy-root]') ? el.firstElementChild || el : el;
+      sw = { el: box, root: el, close: SWIPE_SHEETS[i][1], y0: e.touches[0].clientY, t0: Date.now(), dy: 0 };
+      return;
+    }
+  }, { capture: true, passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!sw) return;
+    sw.dy = e.touches[0].clientY - sw.y0;
+    if (sw.dy < 0) { sw.dy = 0; }
+    sw.el.style.setProperty('transition', 'none', 'important');
+    sw.el.style.setProperty('transform', 'translateY(' + sw.dy + 'px)', 'important');
+  }, { capture: true, passive: true });
+  document.addEventListener('touchend', function () {
+    if (!sw) return;
+    var s0 = sw; sw = null;
+    var fast = s0.dy > 40 && s0.dy / Math.max(1, Date.now() - s0.t0) > 0.5;
+    s0.el.style.setProperty('transition', 'transform .22s ease-out', 'important');
+    if (s0.dy > 100 || fast) {
+      // 下まで滑らせてから閉じ、位置の指定を戻す
+      s0.el.style.setProperty('transform', 'translateY(100%)', 'important');
+      setTimeout(function () {
+        s0.el.style.setProperty('transition', 'none', 'important');
+        s0.close(s0.root);
+        setTimeout(function () { s0.el.style.removeProperty('transform'); s0.el.style.removeProperty('transition'); }, 50);
+      }, 220);
+    } else {
+      setTimeout(function () { s0.el.style.removeProperty('transition'); }, 250);
+      s0.el.style.removeProperty('transform');
+    }
+  }, { capture: true, passive: true });
+
   // ==== 「保存先」シート（公式アプリと同じ：お気に入りの曲＋自分のプレイリストにチェック、完了で反映） ====
   function nowTrack() {
     var st = playState(), it = st && st.item;
