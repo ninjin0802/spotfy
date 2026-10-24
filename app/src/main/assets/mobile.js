@@ -35,7 +35,10 @@
     html.m-lib #Desktop_LeftSidebar_Id { padding-top: var(--m-top, 0px) !important; }
     #m-settings { padding-top: 0 !important; }
     [data-overlayscrollbars-viewport] { overflow-x: hidden !important; overscroll-behavior-x: none !important; }
-    .os-scrollbar-horizontal { display: none !important; }
+    /* スクロールバーは公式アプリと同じく出さない */
+    .os-scrollbar, .os-scrollbar-horizontal, .os-scrollbar-vertical { display: none !important; }
+    *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+    * { scrollbar-width: none !important; }
 
     /* 3 カラムのグリッドを、メインビューだけの 1 カラムに */
     .Root > div:first-child {
