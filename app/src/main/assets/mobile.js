@@ -741,6 +741,12 @@
     var sec = function (name, rows) { settingsSection(box, name, rows); };
     if (id === 'account') {
       var a = account();
+      if (!a.name) {
+        sec(null, [row('ログインしていません', 'Spotify アカウントでログインしてください', linkButton('ログイン', function () {
+          location.href = 'https://accounts.spotify.com/ja/login?continue=' + encodeURIComponent('https://open.spotify.com/');
+        }))]);
+        return;
+      }
       sec(null, [
         row('ユーザー名', a.name || '—', null),
         row('ログアウト', 'このアプリからログアウトします', linkButton('ログアウト', function () {
