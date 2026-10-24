@@ -1244,7 +1244,8 @@
     var a = account();
     var d = document.getElementById('m-drawer');
     setPic(d.querySelector('.pic'), a);
-    d.querySelector('b').textContent = a.name;
+    d.querySelector('b').textContent = a.name || 'ログインしていません';
+    d.querySelector('small').textContent = a.name ? 'プロフィールを表示' : 'タップしてログイン';
     document.documentElement.classList.add('m-drawer');
   }
 
@@ -1265,6 +1266,7 @@
     d.innerHTML = '<button class="me item"><div class="pic"></div><div><b></b><small>プロフィールを表示</small></div></button>';
     d.querySelector('.me').addEventListener('click', function () {
       closeDrawer();
+      if (!account().name) { if (!click('[data-testid="login-button"]')) location.href = 'https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F'; return; }
       setTab('home');
       userMenu(function (e) { return /^\/user\//.test(e.getAttribute('href') || ''); });
     });
