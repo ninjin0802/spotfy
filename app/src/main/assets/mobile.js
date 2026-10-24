@@ -472,6 +472,10 @@
     main [data-testid="tracklist-row"] [aria-colindex="1"] button { display: none !important; }
     main [data-testid="tracklist-row"] [aria-colindex="1"] span[data-encore-id="text"] { display: inline !important; visibility: visible !important; }
 
+    /* 曲一覧の見出し行（# タイトル ⏱）は公式アプリにないので消す */
+    main div:has(> [role="presentation"] > [role="row"] > [role="columnheader"]) { display: none !important; }
+    main [data-testid="playlist-page"] [data-testid="entity-header"] p:not(:has(a)), main [data-testid="playlist-page"] [data-testid="entity-header"] [data-encore-id="text"]:not(h1) { font-size: 13px !important; }
+
     /* 詳細ページ左上の戻るボタン */
     #m-back {
       position: fixed; top: calc(var(--m-top, 0px) + 12px); left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
