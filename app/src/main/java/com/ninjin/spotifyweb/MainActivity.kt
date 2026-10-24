@@ -111,6 +111,14 @@ class MainActivity : Activity() {
                 return true
             }
 
+            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                pageHost = url?.let { Uri.parse(it).host }
+            }
+
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                pageHost = url?.let { Uri.parse(it).host }
+            }
+
             override fun onPageCommitVisible(view: WebView, url: String?) = injectMobileUi(view)
             override fun onPageFinished(view: WebView, url: String?) = injectMobileUi(view)
         }
@@ -150,6 +158,18 @@ class MainActivity : Activity() {
 
     private fun isSpotifyUrl(uri: Uri) = uri.scheme == "https" && uri.host == "open.spotify.com"
 
+
+    // ブリッジは open.spotify.com のページからの呼び出しだけ受け付ける（ログイン中の他サイトなどは不可）
+    @Volatile private var pageHost: String? = null
+
+    private fun onSpotifyPage() = pageHost == "open.spotify.com"
+
+    private fun isRelayable(url: String, method: String): Boolean {
+        if (method !in RELAY_METHODS || !RELAY_URL.matches(url)) return false
+        val parsed = runCatching { URL(url) }.getOrNull() ?: return false
+        return parsed.protocol == "https" && parsed.userInfo == null &&
+            (parsed.host == "spotify.com" || parsed.host.endsWith(".spotify.com"))
+    }
 
     private fun sendRelayed(url: String, method: String, headers: JSONObject, body: String?): Triple<Int, String?, String> {
         val conn = URL(url).openConnection() as HttpURLConnection
@@ -216,11 +236,12 @@ class MainActivity : Activity() {
     private inner class Bridge {
         /** 設定画面のうちアプリ側で扱う項目（画面の向き・バックグラウンド再生） */
         @JavascriptInterface
-        fun getSetting(name: String, fallback: String): String = settings.getString(name, fallback) ?: fallback
+        fun getSetting(name: String, fallback: String): String =
+            if (onSpotifyPage()) settings.getString(name, fallback) ?: fallback else fallback
 
         @JavascriptInterface
         fun setSetting(name: String, value: String) = runOnUiThread {
-            if (name !in setOf("orientation", "background")) return@runOnUiThread
+            if (!onSpotifyPage() || name !in setOf("orientation", "background")) return@runOnUiThread
             settings.edit().putString(name, value).apply()
             if (name == "orientation") applyOrientation()
         }
@@ -228,9 +249,7 @@ class MainActivity : Activity() {
         /** ページの fetch から渡された Connect 操作を、X-Requested-With を付けずに端末から直接送る */
         @JavascriptInterface
         fun relay(id: Int, url: String, method: String, headersJson: String, body: String?) {
-            if (!url.startsWith("https://") || !Uri.parse(url).host.orEmpty().endsWith(".spotify.com")) {
-                return finishRelay(id, 0, null, "")
-            }
+            if (!onSpotifyPage() || !isRelayable(url, method)) return finishRelay(id, 0, null, "")
             relayExecutor.execute {
                 val (status, type, text) = try {
                     sendRelayed(url, method, JSONObject(headersJson), body)
@@ -243,6 +262,7 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun setPlaying(playing: Boolean) = runOnUiThread {
+            if (!onSpotifyPage()) return@runOnUiThread
             if (playing == serviceRunning) return@runOnUiThread
             serviceRunning = playing
             if (playing && backgroundPlayback) {
@@ -280,6 +300,8 @@ class MainActivity : Activity() {
 
     companion object {
         private const val HOME_URL = "https://open.spotify.com/"
+        private val RELAY_URL = Regex("^https://([a-z0-9-]+\\.)*spotify\\.com/(connect-state|track-playback)/v1/[^#]*$")
+        private val RELAY_METHODS = setOf("GET", "POST", "PUT", "DELETE")
         private val SKIPPED_HEADERS = setOf("host", "content-length", "cookie", "user-agent", "x-requested-with")
         private const val CHROME_MAJOR = "141"
         private const val DESKTOP_UA =
