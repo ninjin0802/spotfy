@@ -148,6 +148,25 @@
     main [data-testid="home-page"] [data-testid="component-shelf"] [data-testid="card-image"] { border-radius: 4px !important; }
     main [data-testid="home-page"] [data-testid="component-shelf"] [data-testid="play-button"] { display: none !important; }
 
+    /* アーティストページ：大きな写真の上に名前、操作は「フォロー・…」左／シャッフル・再生 右 */
+    main [data-testid="artist-page"] [data-testid="entity-header"] { min-height: 340px !important; }
+    main [data-testid="artist-page"] [data-testid="entityTitle"] h1 { font-size: 44px !important; line-height: 1.05 !important; font-weight: 900 !important; }
+    main [data-testid="artist-page"] [data-testid="action-bar-row"] { display: flex !important; align-items: center !important; gap: 12px !important; }
+    main [data-testid="artist-page"] [data-testid="action-bar-row"] > :first-child { order: 10; margin-left: auto !important; }
+    main [data-testid="artist-page"] [data-testid="action-bar-row"] [data-testid="play-button"] { width: 56px !important; height: 56px !important; }
+    main [data-testid="artist-page"] [data-testid="action-bar-row"] [data-testid="play-button"] > span { background-color: var(--m-accent, #1ed760) !important; }
+    main [data-testid="artist-page"] [data-encore-id="buttonSecondary"] { height: 32px !important; padding: 0 14px !important; font-size: 13px !important; }
+    main [data-testid="artist-page"] h2 { font-size: 20px !important; font-weight: 800 !important; }
+    main [data-testid="artist-page"] [data-testid="tracklist-row"] { padding: 0 !important; }
+    /* 詳細ページ左上の戻るボタン */
+    #m-back {
+      position: fixed; top: 12px; left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
+      background: rgba(0,0,0,.55); color: #fff; display: none; align-items: center; justify-content: center;
+    }
+    #m-back svg { width: 22px; height: 22px; fill: currentColor; }
+    html.m-detail #m-back { display: flex; }
+    html.m-lib #m-back, html.m-search #m-back, html.m-player #m-back, html.m-settings #m-back { display: none !important; }
+
     /* コンテンツ */
     .contentSpacing { padding-left: 16px !important; padding-right: 16px !important; }
     h1 { word-break: break-word; }
@@ -544,6 +563,52 @@
     if (!st || !st._playerPromise) return Promise.resolve(0);
     return st._playerPromise.then(function (p) { return p && p._currentContent && p._currentContent._bitrate || 0; }, function () { return 0; });
   }
+  // ---- 音量の均一化 ----
+  // Web Player の設定画面のスイッチは保存されない（デスクトップアプリ専用の設定）ため、
+  // 再生中の音声にコンプレッサーを挟んで曲ごとの音量差を自前でならす。
+  var leveler = null;
+  function audioElement() {
+    var st = streamer();
+    if (!st || !st._playerPromise) return Promise.resolve(null);
+    return st._playerPromise.then(function (p) { return p && p._player instanceof HTMLMediaElement ? p : null; }, function () { return null; });
+  }
+  function applyLeveling(on) {
+    return audioElement().then(function (p) {
+      if (!p) return false;
+      var ap = p._audioProcessor || {};
+      if (!leveler || leveler.el !== p._player) {
+        var ctx = ap._audioContext, src = ap._mediaElementSource;
+        if (!ctx || !src) {
+          ctx = new (window.AudioContext || window.webkitAudioContext)();
+          src = ctx.createMediaElementSource(p._player);
+          // Spotify のイコライザーが後から同じ要素に接続しようとしても使えるよう、作ったものを渡しておく
+          if (!ap._audioContext) { ap._audioContext = ctx; ap._mediaElementSource = src; }
+        }
+        var comp = ctx.createDynamicsCompressor();
+        comp.threshold.value = -24; comp.knee.value = 24; comp.ratio.value = 4;
+        comp.attack.value = 0.01; comp.release.value = 0.3;
+        var makeup = ctx.createGain();
+        makeup.gain.value = 1.6;
+        comp.connect(makeup);
+        leveler = { el: p._player, ctx: ctx, src: src, comp: comp, makeup: makeup, on: null };
+      }
+      if (leveler.on === on) return true;
+      try { leveler.src.disconnect(); } catch (e) {}
+      try { leveler.makeup.disconnect(); } catch (e) {}
+      if (on) { leveler.src.connect(leveler.comp); leveler.makeup.connect(leveler.ctx.destination); }
+      else leveler.src.connect(leveler.ctx.destination);
+      if (leveler.ctx.state === 'suspended') leveler.ctx.resume();
+      leveler.on = on;
+      return true;
+    }).catch(function () { return false; });
+  }
+  var levelingApplied = false;
+  function applySavedLeveling() {
+    if (levelingApplied || pref('normalize', '0') !== '1' || !streamer()) return;
+    levelingApplied = true;
+    applyLeveling(true).then(function (ok) { if (!ok) levelingApplied = false; });
+  }
+
   var qualityApplied = false;
   function applySavedQuality() {
     if (qualityApplied) return;
@@ -662,13 +727,15 @@
       sec('言語', [spotifySelect('アプリの言語', '変更後はプレーヤーを再起動', /言語を選択|language/i)]);
     } else if (id === 'playback') {
       sec(null, [
-        spotifySwitch('音量の均一化', 'すべての曲を同じ音量で再生する', /音量の均一|Normalize volume/),
-        spotifySwitch('自動再生', '曲が終わったら似た曲を再生する', /自動再生|Autoplay/),
+        row('音量の均一化', '曲ごとの音量差をならして、同じくらいの音量で再生する', switchEl(pref('normalize', '0') === '1', function (v) {
+          try { localStorage.setItem('m.normalize', v ? '1' : '0'); } catch (e) {}
+          applyLeveling(v);
+        })),
         row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
       ]);
     } else if (id === 'privacy') {
       sec(null, [
-        spotifySwitch('再生状況を公開', 'フォロワーに聴いている曲を表示', /再生状況|listening activity/i),
+        row('再生状況を公開', 'Spotify の仕様で、この設定は公式アプリ（PC・スマホ）からしか変更できません。Web Player 版では保存されません', null),
         spotifySwitch('フォロワーとフォロー中を公開', null, /フォロワー＆フォロー中|followers/i),
         spotifySwitch('プロフィールにプレイリストを表示', null, /プロフィールに追加したプレイリスト|playlists on/i)
       ]);
@@ -1279,7 +1346,19 @@
     if (mdv) mdv.classList.toggle('on', !!activeDeviceName());
     updatePlayer();
     tintMiniPlayer();
+    // アーティスト・アルバム・プレイリストなどの詳細ページでは左上に戻るボタン
+    var detail = /\/(artist|album|playlist|show|episode|user|genre|section|collection|lyrics)\b/.test(location.pathname);
+    document.documentElement.classList.toggle('m-detail', detail);
+    if (!document.getElementById('m-back') && document.body) {
+      var bb = document.createElement('button');
+      bb.id = 'm-back';
+      bb.setAttribute('aria-label', '戻る');
+      bb.innerHTML = BACK;
+      bb.addEventListener('click', function () { history.back(); });
+      document.body.appendChild(bb);
+    }
     applySavedQuality();
+    applySavedLeveling();
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
     var h = document.documentElement.classList;
     h.toggle('m-home', /^\/(intl-[a-z-]+\/?)?$/i.test(location.pathname) && !h.contains('m-lib') && !h.contains('m-search'));
