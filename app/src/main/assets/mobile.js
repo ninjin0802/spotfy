@@ -576,7 +576,6 @@
       position: fixed; left: 0; right: 0; bottom: 0; height: calc(${NAV_H}px + var(--m-bottom, 0px)); padding-bottom: var(--m-bottom, 0px); box-sizing: border-box; z-index: 9999;
       display: flex; font-family: inherit;
       background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.9));
-      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     }
     #m-tabbar button {
       flex: 1; background: none; border: 0; color: #b3b3b3; font-size: 11px;
@@ -1906,7 +1905,7 @@
     tidyEditDialog();
     tidyBigCards();
     // main の中で position: sticky のもの（ホームのフィルター欄など）に目印を付ける
-    document.querySelectorAll('#main-view [data-encore-id="chip"]').forEach(function (ch) {
+    if (!document.querySelector('#main-view .m-sticky')) document.querySelectorAll('#main-view [data-encore-id="chip"]').forEach(function (ch) {
       for (var p = ch.parentElement; p && p.id !== 'main-view'; p = p.parentElement) {
         if (p.classList.contains('m-sticky')) break;
         if (getComputedStyle(p).position === 'sticky') { p.classList.add('m-sticky'); break; }
@@ -2010,11 +2009,20 @@
     return false;
   };
 
-  var pending = false;
-  new MutationObserver(function () {
+  // 画面の手直しはまとめて行う。スクロール中（カルーセルの横スクロールなど）は止めて、
+  // 指を離して落ち着いてから実行する（スクロール中に重い処理が走るとカクつくため）
+  var pending = null, scrolling = 0;
+  function schedule(delay) {
     if (pending) return;
-    pending = true;
-    requestAnimationFrame(function () { pending = false; tidy(); });
-  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label'] });
+    pending = setTimeout(function () {
+      pending = null;
+      if (Date.now() - scrolling < 250) return schedule(250);
+      tidy();
+    }, delay);
+  }
+  document.addEventListener('scroll', function () { scrolling = Date.now(); }, { capture: true, passive: true });
+  document.addEventListener('touchmove', function () { scrolling = Date.now(); }, { capture: true, passive: true });
+  new MutationObserver(function () { schedule(120); })
+    .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label'] });
   tidy();
 })();
