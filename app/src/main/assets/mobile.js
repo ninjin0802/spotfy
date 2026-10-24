@@ -478,6 +478,11 @@
       background: rgba(0,0,0,.55); color: #fff; display: none; align-items: center; justify-content: center;
     }
     #m-back svg { width: 22px; height: 22px; fill: currentColor; }
+    #m-more { position: fixed; top: calc(var(--m-top, 0px) + 12px); right: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
+      background: rgba(0,0,0,.55); color: #fff; display: none; align-items: center; justify-content: center; }
+    #m-more svg { width: 20px; height: 20px; fill: currentColor; }
+    html.m-coll #m-more { display: flex; }
+    html.m-lib #m-more, html.m-search #m-more, html.m-player #m-more, html.m-settings #m-more, html.m-sp #m-more { display: none !important; }
     html.m-detail #m-back { display: flex; }
     /* スクロールすると出る上部バーのタイトルが戻るボタンに重ならないように */
     html.m-detail [data-testid="topbar-content-wrapper"] { padding-left: 44px !important; }
@@ -2199,7 +2204,14 @@
       bb.innerHTML = BACK;
       bb.addEventListener('click', function () { history.back(); });
       document.body.appendChild(bb);
+      var mm = document.createElement('button');
+      mm.id = 'm-more';
+      mm.setAttribute('aria-label', 'その他');
+      mm.innerHTML = P.more;
+      mm.addEventListener('click', openCollectionMenu);
+      document.body.appendChild(mm);
     }
+    document.documentElement.classList.toggle('m-coll', /^\/(album|playlist)\//.test(location.pathname.replace(/^\/intl-[a-z-]+/i, '')));
     applySavedQuality();
     gaplessTick();
     gaplessWatch();
@@ -2741,7 +2753,7 @@
         b.querySelector('img').src = img; b.querySelector('.lbl').textContent = x.name;
         b.addEventListener('click', function () {
           closeTrackMenu();
-          Promise.resolve(pl.add(x.uri, [t.uri], { after: 'end' })).then(function () { toast('「' + x.name + '」に追加しました'); }, function () { toast('追加できませんでした'); });
+          Promise.resolve(pl.add(x.uri, t.uris || [t.uri], { after: 'end' })).then(function () { toast('「' + x.name + '」に追加しました'); }, function () { toast('追加できませんでした'); });
         });
         sheet.appendChild(b);
       });
@@ -2769,6 +2781,66 @@
     if (!t) return;
     e.preventDefault(); e.stopPropagation();
     openTrackMenu(t);
+  }, true);
+
+  // ==== アルバム・プレイリストの「⋮」メニュー（公式アプリと同じ項目） ====
+  TM_ICONS.radio = TI('<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/>');
+  TM_ICONS.addLib = TI('<circle cx="12" cy="12" r="9.5"/><path d="M12 7.5v9M7.5 12h9"/>');
+  function pageTracks() {
+    return [].map.call(document.querySelectorAll('main [data-testid="tracklist-row"] a[href*="/track/"]'), function (a) {
+      return 'spotify:track:' + a.getAttribute('href').split('/track/')[1].split(/[/?#]/)[0];
+    }).filter(function (u, i, arr) { return arr.indexOf(u) === i; });
+  }
+  function openCollectionMenu() {
+    var m = location.pathname.replace(/^\/intl-[a-z-]+/i, '').match(/^\/(album|playlist)\/([A-Za-z0-9]+)/);
+    if (!m) return false;
+    var uri = 'spotify:' + m[1] + ':' + m[2];
+    var head = document.querySelector('main [data-testid="entity-header"]');
+    var title = head && head.querySelector('h1') ? head.querySelector('h1').textContent : '';
+    var img = head && head.querySelector('img') ? bigArt(head.querySelector('img').src) : '';
+    var arA = head && head.querySelector('a[href*="/artist/"], a[href*="/user/"]');
+    var sheet = document.getElementById('m-tm');
+    if (!sheet) {
+      var bg = document.createElement('div'); bg.id = 'm-tm-bg'; bg.addEventListener('click', closeTrackMenu); document.body.appendChild(bg);
+      sheet = document.createElement('section'); sheet.id = 'm-tm'; document.body.appendChild(sheet);
+    }
+    var lib = service('LibraryAPI'), player = service('PlayerAPI');
+    sheet.innerHTML = '<div class="grip"></div><div class="hd"><img alt=""><div><b></b><small></small></div></div>';
+    sheet.querySelector('.hd img').src = img;
+    sheet.querySelector('.hd b').textContent = title;
+    sheet.querySelector('.hd small').textContent = arA ? arA.textContent : '';
+    function item(icon, label, fn) {
+      var b = document.createElement('button'); b.className = 'it';
+      b.innerHTML = icon + '<span class="lbl"></span>'; b.querySelector('.lbl').textContent = label;
+      b.addEventListener('click', fn); sheet.appendChild(b); return b;
+    }
+    item(TM_ICONS.share, 'シェア', function () { closeTrackMenu(); shareUrl('https://open.spotify.com/' + m[1] + '/' + m[2], title); });
+    var lb = item(TM_ICONS.addLib, 'マイライブラリに追加', function () {
+      var on = lb.dataset.on === '1'; closeTrackMenu();
+      if (lib) Promise.resolve(on ? lib.remove({ uris: [uri] }) : lib.add({ uris: [uri] })).then(function () { toast(on ? 'マイライブラリから削除しました' : 'マイライブラリに追加しました'); });
+    });
+    if (lib) Promise.resolve(lib.contains(uri)).then(function (x) {
+      if (x && x[0]) { lb.dataset.on = '1'; lb.querySelector('.lbl').textContent = 'マイライブラリから削除'; lb.querySelector('svg').outerHTML = P.saved; }
+    }, function () {});
+    if (arA && /\/artist\//.test(arA.getAttribute('href'))) item(TM_ICONS.artist, 'アーティストに移動', function () { closeTrackMenu(); spaGo(arA.getAttribute('href').replace(/^\/intl-[a-z-]+/i, '')); });
+    item(TM_ICONS.next, '[次に再生] に追加', function () {
+      closeTrackMenu();
+      var t = pageTracks();
+      if (player && t.length) Promise.resolve(player.addToQueue(t.map(function (u) { return { uri: u }; }))).then(function () { toast('[次に再生] に追加しました'); });
+    });
+    item(TM_ICONS.playlist, 'プレイリストに追加', function () {
+      var t = pageTracks();
+      openPlaylistPicker({ uri: t[0], uris: t });
+    });
+    sheet.scrollTop = 0;
+    document.documentElement.classList.add('m-tm');
+    return true;
+  }
+  // アクションバーの「…」と、右上の ⋮
+  document.addEventListener('click', function (e) {
+    var mb = e.target.closest && e.target.closest('main [data-testid="action-bar-row"] [data-testid="more-button"]');
+    if (!mb) return;
+    if (openCollectionMenu()) { e.preventDefault(); e.stopPropagation(); }
   }, true);
 
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
