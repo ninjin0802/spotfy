@@ -28,11 +28,32 @@
   }
 })();
 
+// アプリとの連絡口。AndroidBridge は open.spotify.com のメインフレームにだけ注入される
+(function () {
+  if (window.__native || !window.AndroidBridge) return;
+  var settings = {};
+  var send = function (msg) { AndroidBridge.postMessage(JSON.stringify(msg)); };
+  AndroidBridge.onmessage = function (e) {
+    var m = JSON.parse(e.data);
+    if (m.type === 'settings') settings = m.values || {};
+    if (m.type === 'relay' && window.__relayDone) window.__relayDone(m.id, m.status, m.contentType, m.body);
+  };
+  window.__native = {
+    relay: function (id, url, method, headers, body) {
+      send({ type: 'relay', id: id, url: url, method: method, headers: headers, body: body });
+    },
+    setPlaying: function (playing) { send({ type: 'playing', value: playing }); },
+    setSetting: function (name, value) { settings[name] = value; send({ type: 'setting', name: name, value: value }); },
+    getSetting: function (name, fallback) { return name in settings ? settings[name] : fallback; }
+  };
+  send({ type: 'hello' });
+})();
+
 // Connect の操作リクエストはアプリ（端末内）から送り直す。
 // WebView は全リクエストに X-Requested-With を付け、Spotify はそれが付いたコマンドを受理しても
 // プレーヤーへ配信しないため、ページから直接送ると再生が始まらない。外部サーバーは経由しない。
 (function () {
-  if (window.__relayInstalled || !window.AndroidBridge) return;
+  if (window.__relayInstalled || !window.__native) return;
   window.__relayInstalled = true;
   var RELAYED = /^https:\/\/([a-z0-9-]+\.)*spotify\.com\/(connect-state|track-playback)\/v1\//;
   var original = window.fetch;
@@ -64,7 +85,7 @@
         pending[id] = { resolve: resolve, reject: reject };
         var h = {};
         headers.forEach(function (v, k) { h[k] = v; });
-        AndroidBridge.relay(id, url, method, JSON.stringify(h), b == null ? null : b);
+        window.__native.relay(id, url, method, h, b == null ? null : b);
       });
     });
   };

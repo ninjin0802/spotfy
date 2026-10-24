@@ -227,10 +227,10 @@
   }
 
   function nativeSetting(name, value) {
-    try { if (window.AndroidBridge && AndroidBridge.setSetting) AndroidBridge.setSetting(name, String(value)); } catch (e) {}
+    try { if (window.__native) window.__native.setSetting(name, String(value)); } catch (e) {}
   }
   function nativeValue(name, fallback) {
-    try { return window.AndroidBridge && AndroidBridge.getSetting ? AndroidBridge.getSetting(name, fallback) : fallback; } catch (e) { return fallback; }
+    try { return window.__native ? window.__native.getSetting(name, fallback) : fallback; } catch (e) { return fallback; }
   }
 
   function spaGo(path) {
@@ -529,9 +529,9 @@
     // 再生状態をアプリ側へ通知（バックグラウンド再生用のサービス制御）
     var pp = document.querySelector('[data-testid="control-button-playpause"]');
     var playing = !!pp && /一時停止|Pause/.test(pp.getAttribute('aria-label') || '');
-    if (window.AndroidBridge && playing !== window.__mPlaying) {
+    if (window.__native && playing !== window.__mPlaying) {
       window.__mPlaying = playing;
-      AndroidBridge.setPlaying(playing);
+      window.__native.setPlaying(playing);
     }
   }
 
