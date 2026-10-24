@@ -67,6 +67,27 @@
     html.m-search #global-nav-bar input::placeholder { color: #535353 !important; }
     html.m-search #global-nav-bar form button, html.m-search #global-nav-bar form svg { color: #121212 !important; fill: #121212 !important; }
     html.m-search #m-avatar { display: block; top: calc(var(--m-top, 0px) + 16px); }
+    /* 検索ボックスの × は右端に（虫めがねと重ならないように） */
+    html.m-search #global-nav-bar form > div:has([data-testid="clear-button"]) {
+      left: auto !important; right: 4px !important; width: auto !important; justify-content: flex-end !important; top: 0 !important; bottom: 0 !important; height: auto !important; align-items: center !important;
+    }
+    html.m-search #global-nav-bar form > div:has([data-testid="clear-button"]) > div:not(:has([data-testid="clear-button"])) { display: none !important; }
+    html.m-search #global-nav-bar input { padding-right: 48px !important; }
+
+    /* 検索結果：公式アプリと同じく、見出しを出さず「← 検索ボックス」だけの細いヘッダー */
+    html.m-search.m-results .Root > div:first-child { grid-template-rows: 0 calc(64px + var(--m-top, 0px)) minmax(0, 1fr) 0 !important; }
+    html.m-search.m-results #global-nav-bar { height: calc(64px + var(--m-top, 0px)) !important; padding: calc(var(--m-top, 0px) + 8px) 12px 8px 56px !important; }
+    html.m-search.m-results #global-nav-bar::before, html.m-search.m-results #m-avatar { display: none !important; }
+    html.m-search.m-results #global-nav-bar input { background: #2a2a2a !important; color: #fff !important; padding-left: 16px !important; }
+    html.m-search.m-results #global-nav-bar form [data-testid="search-icon"] { display: none !important; }
+    html.m-search.m-results #global-nav-bar form [data-testid="clear-button"] svg { fill: #fff !important; color: #fff !important; }
+    #m-sback { position: fixed; left: 8px; top: calc(var(--m-top, 0px) + 12px); width: 40px; height: 40px; border: 0; background: none; color: #fff; z-index: 8200; display: none; align-items: center; justify-content: center; }
+    #m-sback svg { width: 24px; height: 24px; fill: currentColor; }
+    html.m-search.m-results #m-sback { display: flex; }
+    /* 一番上の結果も、公式アプリと同じく普通の行として表示（大きなカード・再生ボタンなし） */
+    html.m-results main [role="grid"] [role="row"]:first-child [role="group"] { background: none !important; padding: 8px 0 !important; height: auto !important; }
+    html.m-results main [role="grid"] [role="row"]:first-child [data-testid="trailing"] [data-testid="play-button"] { display: none !important; }
+    html.m-results main [role="grid"] [role="row"]:first-child [data-testid="entity-image"] { width: 56px !important; height: 56px !important; }
     /* ジャンルのカード：2 列、角丸、公式アプリと同じく画像は右下に傾けて置く */
     html.m-search main [data-testid="grid-container"] {
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important; margin: 0 !important; width: 100% !important;
@@ -84,7 +105,7 @@
     html.m-search #m-avatar { top: calc(var(--m-top, 0px) + 16px) !important; }
 
     /* 検索ボックスを触ったら、最近の検索を全画面で出す（公式アプリの検索画面と同じ） */
-    html.m-searching #floating-ui-popover-layer > *, html.m-searching [data-testid="search-dropdown"] {
+    html.m-searching .m-recent, html.m-searching [data-testid="search-dropdown"] {
       position: fixed !important; left: 0 !important; right: 0 !important; top: calc(120px + var(--m-top, 0px)) !important; bottom: calc(${NAV_H}px + var(--m-bottom, 0px)) !important;
       width: 100vw !important; max-width: none !important; max-height: none !important; transform: none !important;
       border-radius: 0 !important; background: #121212 !important; box-shadow: none !important; z-index: 9400 !important; overflow-y: auto !important;
@@ -1916,6 +1937,27 @@
       }
     });
     applySavedLeveling();
+    // 検索ボックスの「最近の検索」ドロップダウンに目印を付ける（全画面で表示するため）
+    if (document.documentElement.classList.contains('m-searching')) {
+      var hd = document.evaluate('//*[text()="最近の検索" or text()="Recent searches"]', document, null, 9, null).singleNodeValue;
+      for (var pp = hd; pp && pp !== document.body; pp = pp.parentElement) {
+        var pos = getComputedStyle(pp).position;
+        if (pos === 'absolute' || pos === 'fixed') { pp.classList.add('m-recent'); break; }
+      }
+    }
+    // 検索結果ページ（/search/〜）かどうか。タブバーも「検索」を選択状態にする
+    var h0 = document.documentElement.classList;
+    var inResults = /^\/search\/.+/.test(location.pathname);
+    h0.toggle('m-results', inResults);
+    if (/^\/search/.test(location.pathname) && !h0.contains('m-search') && !h0.contains('m-lib')) setTab('search');
+    if (!document.getElementById('m-sback') && document.body) {
+      var sb = document.createElement('button');
+      sb.id = 'm-sback';
+      sb.setAttribute('aria-label', '戻る');
+      sb.innerHTML = BACK;
+      sb.addEventListener('click', function () { spaGo('/search'); });
+      document.body.appendChild(sb);
+    }
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
     var h = document.documentElement.classList;
     h.toggle('m-home', /^\/(intl-[a-z-]+\/?)?(home\/?)?$/i.test(location.pathname) && !h.contains('m-lib') && !h.contains('m-search'));
