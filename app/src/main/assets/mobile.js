@@ -185,6 +185,13 @@
     /* 表示切り替え（リスト／コンパクト）ボタンは公式アプリにないので消す */
     main [data-testid="action-bar-row"] button[aria-haspopup="true"]:not([data-testid]) { display: none !important; }
 
+    /* プロフィール：大きな丸いアイコンを中央に、その下に名前 */
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) { height: auto !important; max-height: none !important; min-height: 0 !important; padding: 64px 16px 16px !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child { display: flex !important; flex-direction: column !important; align-items: center !important; text-align: center !important; height: auto !important; gap: 12px !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="user-image"], main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="edit-image-button"] { width: 140px !important; height: 140px !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="entityTitle"] h1 { font-size: 28px !important; font-weight: 800 !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child { align-items: center !important; width: 100% !important; }
+
     /* 詳細ページ左上の戻るボタン */
     #m-back {
       position: fixed; top: 12px; left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
@@ -444,6 +451,20 @@
     })();
   }
 
+  // 自分のプロフィールを開く（公式アプリの「プロフィールを表示」）
+  var myId = null;
+  function openProfile() {
+    if (myId) return spaGo('/user/' + myId);
+    var auth = window.__mConnect && __mConnect.auth();
+    var viaMenu = function () { userMenu(function (e) { return /^\/user\//.test((e.getAttribute('href') || '').replace(/^\/intl-[a-z-]+/i, '')); }); };
+    if (!auth) return viaMenu();
+    fetch('https://api.spotify.com/v1/me', { headers: { authorization: auth } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (me) {
+        if (me && me.id) { myId = me.id; spaGo('/user/' + myId); } else viaMenu();
+      }, viaMenu);
+  }
+
   function account() {
     var b = document.querySelector('[data-testid="user-widget-link"]');
     var img = b && b.querySelector('img');
@@ -699,7 +720,7 @@
     me.querySelector('b').textContent = a.name;
     me.addEventListener('click', function () {
       closeSettings();
-      setTimeout(function () { userMenu(function (e) { return /^\/user\//.test(e.getAttribute('href') || ''); }); }, 300);
+      setTimeout(openProfile, 300);
     });
     box.appendChild(me);
     SETTINGS_PAGES.forEach(function (pg) {
@@ -1268,7 +1289,7 @@
       closeDrawer();
       if (!account().name) { if (!click('[data-testid="login-button"]')) location.href = 'https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F'; return; }
       setTab('home');
-      userMenu(function (e) { return /^\/user\//.test(e.getAttribute('href') || ''); });
+      openProfile();
     });
     [
       ['news', '最新情報', function () { click('[data-testid="whats-new-feed-button"]'); }],
