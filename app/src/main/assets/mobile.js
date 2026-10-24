@@ -131,7 +131,10 @@
     html.m-searching:not(.m-typing) #m-recentpage { display: block; }
     html.m-searching.m-typing main { visibility: visible !important; }
     /* 入力中の候補：公式アプリと同じく、ヘッダーの下いっぱいに通常のリストとして出す */
-    html.m-typing .m-suggest {
+    html.m-typing .m-suggest { display: none !important; }
+    html.m-search form:has(input:placeholder-shown) [data-testid="clear-button"] { display: none !important; }
+    #m-recentpage { bottom: calc(${NAV_H}px + var(--m-bottom, 0px) + 64px) !important; }
+    html.m-typing-old .m-suggest {
       position: fixed !important; left: 0 !important; right: 0 !important; top: calc(56px + var(--m-top, 0px)) !important; bottom: 0 !important;
       width: 100vw !important; max-width: none !important; max-height: none !important; height: auto !important; transform: none !important;
       margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #121212 !important; z-index: 10062 !important;
@@ -147,7 +150,8 @@
     html.m-searching .os-scrollbar { display: none !important; }
     #m-recentpage h2 { font-size: 20px; font-weight: 700; margin: 12px 16px 8px; }
     #m-recentpage .r { display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 16px; }
-    #m-recentpage .r img { width: 56px; height: 56px; object-fit: cover; flex: none; border-radius: 2px; }
+    #m-recentpage .r { min-height: 64px; box-sizing: border-box; }
+    #m-recentpage .r img { width: 48px; height: 48px; object-fit: cover; flex: none; border-radius: 2px; }
     #m-recentpage .r img.round { border-radius: 50%; }
     #m-recentpage .r .t { flex: 1; min-width: 0; }
     #m-recentpage .r .t b { display: block; font-size: 16px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -219,7 +223,7 @@
     .m-recent [role="row"] button[aria-label$="を再生"] { display: none !important; }
     html.m-searching main { visibility: hidden !important; }
     
-    html.m-searching #m-tabbar, html.m-searching [data-testid="now-playing-bar"] { visibility: hidden !important; }
+
     #m-cancel { display: none; position: absolute; right: 16px; top: calc(var(--m-top, 0px) + 16px); background: none; border: 0; color: #fff; font-size: 15px; font-weight: 600; height: 32px; z-index: 2; }
     html.m-search.m-searching #m-cancel { display: none; }
     html.m-searching .m-recent { background: #121212 !important; }
@@ -739,6 +743,39 @@
     #m-invite .send { display: flex; align-items: center; gap: 16px; width: 100%; padding: 8px 16px; background: none; border: 0; color: #fff; font-size: 16px; font-family: inherit; }
     #m-invite .send .ic { width: 52px; height: 52px; border-radius: 50%; background: #3e3e3e; display: flex; align-items: center; justify-content: center; }
     #m-invite .send svg { width: 24px; height: 24px; color: #fff; }
+
+    /* 自前の検索ページ */
+    #m-sp { position: fixed; inset: 0; z-index: 9990; background: #121212; display: none; flex-direction: column; color: #fff; font-family: inherit; }
+    html.m-amoled #m-sp { background: #000; }
+    html.m-sp #m-sp { display: flex; }
+    #m-sp header { flex: none; display: flex; align-items: center; gap: 4px; padding: calc(var(--m-top, 0px) + 4px) 16px 6px 4px; background: #1f1f1f; }
+    #m-sp header .back { width: 44px; height: 44px; background: none; border: 0; color: #fff; display: flex; align-items: center; justify-content: center; flex: none; }
+    #m-sp header .back svg { width: 24px; height: 24px; fill: currentColor; }
+    #m-sp .box { flex: 1; position: relative; height: 38px; }
+    #m-sp .box input { width: 100%; height: 38px; border: 0; outline: none; border-radius: 19px; background: #333; color: #fff; font-size: 15px; padding: 0 40px 0 16px; box-sizing: border-box; font-family: inherit; -webkit-appearance: none; caret-color: var(--m-accent, #1ed760); }
+    #m-sp .box input::placeholder { color: #a7a7a7; }
+    #m-sp .box input::-webkit-search-cancel-button { display: none; }
+    #m-sp .clr { position: absolute; right: 8px; top: 9px; width: 20px; height: 20px; border: 0; border-radius: 50%; display: none;
+      background: #b3b3b3 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7 7l6 6M13 7l-6 6' stroke='%23333' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E") center/20px no-repeat; }
+    #m-sp.has-q .clr { display: block; }
+    #m-sp .list { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0 calc(${NAV_H}px + var(--m-bottom, 0px) + 80px); }
+    #m-sp .list::-webkit-scrollbar { display: none; }
+    #m-sp h2 { font-size: 20px; font-weight: 700; margin: 14px 16px 8px; }
+    #m-sp .r { display: flex; align-items: center; gap: 12px; padding: 0 4px 0 16px; min-height: 64px; }
+    #m-sp .r img { width: 48px; height: 48px; object-fit: cover; flex: none; border-radius: 2px; background: #282828; }
+    #m-sp .r img.round { border-radius: 50%; }
+    #m-sp .r .t { flex: 1; min-width: 0; }
+    #m-sp .r .t b { display: flex; align-items: center; gap: 4px; font-size: 16px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-sp .r .t b .vf { width: 16px; height: 16px; flex: none; }
+    #m-sp .r .t small { display: block; font-size: 13px; color: #a7a7a7; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-sp .r .tr { display: flex; align-items: center; flex: none; }
+    #m-sp .r .tr button { width: 44px; height: 44px; background: none; border: 0; color: #a7a7a7; display: flex; align-items: center; justify-content: center; }
+    #m-sp .r .tr svg { width: 22px; height: 22px; fill: currentColor; }
+    #m-sp .r .tr .dots svg { width: 20px; height: 20px; }
+    #m-sp .r .tr .add.on { color: var(--m-accent, #1ed760); }
+    #m-sp .empty { color: #a7a7a7; padding: 32px 16px; text-align: center; font-size: 14px; }
+    html.m-sp #m-player { z-index: 10010; }
+    html.m-sp #main { z-index: auto !important; isolation: auto !important; }
 
     /* 下部タブバー（固定） */
     #m-tabbar {
@@ -2042,6 +2079,7 @@
     // ライブラリが折りたたみ表示（アイコンだけ）なら展開する
     if (name === 'lib') click('#Desktop_LeftSidebar_Id button[aria-label="マイライブラリを開く"], #Desktop_LeftSidebar_Id button[aria-label="Open Your Library"]');
     h.remove('m-np', 'm-player');
+    if (h.contains('m-sp')) closeSearchPage();
     if (h.contains('m-settings')) closeSettings();
     document.querySelectorAll('#m-tabbar button').forEach(function (b) {
       b.classList.toggle('on', b.dataset.tab === name);
@@ -2245,22 +2283,11 @@
   }, true);
 
   // 検索ボックスにフォーカスがある間は「検索中」表示にする
+  // Spotify の検索ボックスを触ったら、自前の検索ページ（Myspoti と同じく API から直接描く）を開く
   document.addEventListener('focusin', function (e) {
     if (e.target.matches && e.target.matches('#global-nav-bar input')) {
-      document.documentElement.classList.add('m-searching');
-      var bar = document.getElementById('global-nav-bar');
-      if (bar && !document.getElementById('m-cancel')) {
-        var c = document.createElement('button');
-        c.id = 'm-cancel';
-        c.textContent = 'キャンセル';
-        c.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
-        c.addEventListener('click', function () {
-          var i = document.querySelector('#global-nav-bar input');
-          if (i) i.blur();
-          document.documentElement.classList.remove('m-searching');
-        });
-        bar.appendChild(c);
-      }
+      e.target.blur();
+      openSearchPage(e.target.value || '');
     }
   });
   // ---- 検索中の「最近」画面 ----
@@ -2307,7 +2334,7 @@
       r.querySelector('img').src = d.img;
       if (m && (m[1] === 'artist' || m[1] === 'user')) r.querySelector('img').className = 'round';
       r.querySelector('b').textContent = d.title;
-      r.querySelector('small').textContent = d.sub;
+      r.querySelector('small').textContent = /^プレイリスト/.test(d.sub) ? 'プレイリスト' : d.sub;
       var add = r.querySelector('.add');
       var uri = m ? 'spotify:' + m[1] + ':' + m[2] : '';
       var paint = function (on) { add.classList.toggle('on', !!on); add.innerHTML = on ? P.saved : P.add; };
@@ -2335,13 +2362,30 @@
   }
 
   // 文字を入力している間は「最近」ではなく検索結果を出す（公式アプリと同じ）
+  // 公式アプリと同じく、入力に合わせて結果をその場で出す（候補のドロップダウンは使わない）
+  var liveTimer = null;
+  function liveSearch(v) {
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(function () {
+      var q = v.trim();
+      if (!q) return;
+      var path = '/search/' + encodeURIComponent(q);
+      if (location.pathname === path) return;
+      if (/^\/search\/.+/.test(location.pathname)) history.replaceState({}, '', path); else history.pushState({}, '', path);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }));
+    }, 350);
+  }
+  var composing = false;
+  document.addEventListener('compositionstart', function () { composing = true; }, true);
+  document.addEventListener('compositionend', function (e) {
+    composing = false;
+    if (false) liveSearch(e.target.value);
+  }, true);
   document.addEventListener('input', function (e) {
-    if (e.target.matches && e.target.matches('#global-nav-bar input')) {
-      document.documentElement.classList.toggle('m-typing', !!e.target.value);
-    }
+    if (false) liveSearch(e.target.value);
   }, true);
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && e.target.matches && e.target.matches('#global-nav-bar input') && e.target.value) {
+    if (false) {
       var q = e.target.value;
       document.documentElement.classList.add('m-typing');
       if (location.pathname !== '/search/' + encodeURIComponent(q)) spaGo('/search/' + encodeURIComponent(q));
@@ -2387,10 +2431,200 @@
     document.documentElement.style.setProperty('--m-bottom', (bottom || 0) + 'px');
   };
 
+
+  // ==== 自前の検索ページ ====
+  // Web Player の GraphQL（ページ自身のローダー）で検索・履歴を取り、公式アプリと同じリストを描く
+  var GQL = {
+    recentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    saveRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    removeRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    searchTopResultsList: 'dd78eaff943eba629ed70ee25517b9cea0dcaa41193e2592ae2727660b21892c'
+  };
+  var platformCache = null;
+  function gql(name, vars, op) {
+    if (!platformCache) {
+      var host = document.getElementById('main');
+      var els = host ? [host].concat([].slice.call(host.querySelectorAll('*'))) : [];
+      for (var i = 0; i < els.length && !platformCache; i++) {
+        var k = Object.keys(els[i]).find(function (x) { return x.indexOf('__reactContainer$') === 0; });
+        if (!k) continue;
+        var stack = [els[i][k]];
+        while (stack.length) {
+          var f = stack.pop(), v = f.memoizedProps && f.memoizedProps.value;
+          if (v && typeof v === 'object' && typeof v.getGraphQLLoader === 'function') { platformCache = v; break; }
+          if (f.sibling) stack.push(f.sibling);
+          if (f.child) stack.push(f.child);
+        }
+      }
+    }
+    if (!platformCache) return Promise.reject(new Error('no platform'));
+    return platformCache.getGraphQLLoader()({ name: name, operation: op || 'query', sha256Hash: GQL[name], value: null }, vars);
+  }
+  function pickImg(o) {
+    var best = '', seen = 0;
+    (function walk(x, d) {
+      if (!x || typeof x !== 'object' || d > 6 || best) return;
+      if (Array.isArray(x.sources) && x.sources.length) {
+        var srcs = x.sources.slice().sort(function (a, b) { return (a.width || 300) - (b.width || 300); });
+        var s = srcs.find(function (z) { return (z.width || 300) >= 100; }) || srcs[srcs.length - 1];
+        best = s && s.url || '';
+        return;
+      }
+      for (var k in x) if (k !== 'extractedColors') walk(x[k], d + 1);
+    })(o, 0);
+    return best;
+  }
+  function names(list) { return (list && list.items || []).map(function (a) { return a.profile && a.profile.name || a.name; }).filter(Boolean).join(', '); }
+  // GraphQL の各種ラッパーを {uri, kind, title, sub, img, round, verified} に
+  function entity(w) {
+    var d = w && (w.data || w);
+    if (!d || !d.uri && !d._uri) return null;
+    switch (w.__typename) {
+      case 'ArtistResponseWrapper': return { uri: d.uri, kind: 'artist', title: d.profile && d.profile.name, sub: 'アーティスト', img: pickImg(d.visuals || d.visualIdentity || d), round: true, verified: !!(d.profile && d.profile.verified || d.onPlatformReputationTrait && d.onPlatformReputationTrait.verification && d.onPlatformReputationTrait.verification.isVerified) };
+      case 'TrackResponseWrapper': return { uri: d.uri, kind: 'track', title: d.name, sub: '曲 • ' + names(d.artists), img: pickImg(d.albumOfTrack), album: d.albumOfTrack && d.albumOfTrack.uri };
+      case 'AlbumResponseWrapper': return { uri: d.uri, kind: 'album', title: d.name, sub: (d.type === 'SINGLE' ? 'シングル' : d.type === 'EP' ? 'EP' : 'アルバム') + ' • ' + names(d.artists), img: pickImg(d.coverArt) };
+      case 'PlaylistResponseWrapper': return { uri: d.uri, kind: 'playlist', title: d.name, sub: 'プレイリスト', img: pickImg(d.images) };
+      case 'PodcastOrAudiobookResponseWrapper': return { uri: d.uri, kind: 'show', title: d.name, sub: 'ポッドキャスト', img: pickImg(d.coverArt) };
+      case 'EpisodeResponseWrapper': return { uri: d.uri, kind: 'episode', title: d.name, sub: 'エピソード', img: pickImg(d.coverArt) };
+      case 'UserResponseWrapper': return { uri: d.uri, kind: 'user', title: d.displayName || d.name, sub: 'プロフィール', img: pickImg(d.avatar), round: true };
+      case 'GenreResponseWrapper': return { uri: d.uri, kind: 'genre', title: d.name, sub: 'ジャンル', img: pickImg(d.image || d.images) };
+      default: return null;
+    }
+  }
+  function uriPath(uri) {
+    var p = (uri || '').split(':');
+    if (p[1] === 'user' && p[3] === 'playlist') return '/playlist/' + p[4];
+    if (p[1] === 'genre' || p[1] === 'page') return '/genre/' + p[2];
+    return '/' + p[1] + '/' + p[2];
+  }
+  var DOTS = '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>';
+  var VERIFIED = '<svg class="vf" viewBox="0 0 24 24"><path d="M12 1.5l2.6 1.9 3.2-.1 1 3.1 2.6 1.9-1 3.1 1 3.1-2.6 1.9-1 3.1-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3.1-2.6-1.9 1-3.1-1-3.1 2.6-1.9 1-3.1 3.2.1z" fill="#9be0b0"/><path d="M10.5 15.6 7 12.1l1.4-1.4 2.1 2.1 5.1-5.1 1.4 1.4z" fill="#121212"/></svg>';
+
+  var sp = { el: null, input: null, list: null, q: '', seq: 0, timer: null };
+  function buildSearchPage() {
+    var el = document.createElement('section');
+    el.id = 'm-sp';
+    el.innerHTML = '<header><button class="back" aria-label="戻る">' + BACK + '</button>' +
+      '<div class="box"><input type="search" enterkeyhint="search" autocomplete="off" placeholder="何を聴きたいですか？"><button class="clr" aria-label="クリア"></button></div></header>' +
+      '<div class="list"></div>';
+    document.body.appendChild(el);
+    sp.el = el; sp.input = el.querySelector('input'); sp.list = el.querySelector('.list');
+    el.querySelector('.back').addEventListener('click', closeSearchPage);
+    el.querySelector('.clr').addEventListener('mousedown', function (e) { e.preventDefault(); });
+    el.querySelector('.clr').addEventListener('click', function () { sp.input.value = ''; onQuery(); sp.input.focus(); });
+    sp.input.addEventListener('input', onQuery);
+    sp.input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(sp.timer); runSearch(sp.input.value.trim()); hideKb(); }
+    });
+    // 一覧をスクロールしたらキーボードを閉じる（公式アプリと同じ）
+    var kbAt = 0;
+    sp.list.addEventListener('scroll', function () {
+      if (document.activeElement !== sp.input || Date.now() - kbAt < 600) return;
+      kbAt = Date.now();
+      hideKb();
+    }, { passive: true });
+  }
+  function hideKb() { if (window.__native && __native.send) __native.send({ type: 'hideKeyboard' }); }
+  function openSearchPage(q) {
+    if (!sp.el) buildSearchPage();
+    document.documentElement.classList.add('m-sp');
+    sp.input.value = q || '';
+    onQuery(true);
+    setTimeout(function () { sp.input.focus(); }, 50);
+  }
+  function closeSearchPage() {
+    document.documentElement.classList.remove('m-sp');
+    if (sp.input) sp.input.blur();
+  }
+  window.__mSearchOpen = function () { return !!sp.el && document.documentElement.classList.contains('m-sp'); };
+  function onQuery(now) {
+    var q = sp.input.value.trim();
+    sp.el.classList.toggle('has-q', !!q);
+    clearTimeout(sp.timer);
+    if (!q) return showRecents();
+    sp.timer = setTimeout(function () { runSearch(q); }, now === true ? 0 : 250);
+  }
+  function rowEl(e, opts) {
+    var r = document.createElement('div');
+    r.className = 'r';
+    r.innerHTML = '<img alt=""' + (e.round ? ' class="round"' : '') + '><div class="t"><b></b><small></small></div><div class="tr"></div>';
+    r.querySelector('img').src = e.img || '';
+    r.querySelector('b').textContent = e.title || '';
+    if (e.verified) r.querySelector('b').insertAdjacentHTML('beforeend', VERIFIED);
+    r.querySelector('small').textContent = e.sub || '';
+    var tr = r.querySelector('.tr');
+    var lib = service('LibraryAPI');
+    if (opts.dots && e.kind === 'track') {
+      var dt = document.createElement('button');
+      dt.className = 'dots'; dt.innerHTML = DOTS; dt.setAttribute('aria-label', 'その他');
+      dt.addEventListener('click', function (ev) { ev.stopPropagation(); closeSearchPage(); if (e.album) spaGo(uriPath(e.album)); });
+      tr.appendChild(dt);
+    }
+    if (lib && (e.kind === 'track' || e.kind === 'album' || e.kind === 'playlist' || e.kind === 'show' || (e.kind === 'artist' && opts.recent))) {
+      var add = document.createElement('button');
+      add.className = 'add'; add.setAttribute('aria-label', 'ライブラリに追加');
+      var paint = function (on) { add.classList.toggle('on', !!on); add.innerHTML = on ? P.saved : P.add; };
+      paint(false);
+      Promise.resolve(lib.contains(e.uri)).then(function (x) { paint(x && x[0]); }, function () {});
+      add.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var on = add.classList.contains('on');
+        Promise.resolve(on ? lib.remove({ uris: [e.uri] }) : lib.add({ uris: [e.uri] })).then(function () { paint(!on); });
+      });
+      if (!(opts.recent && e.kind === 'artist')) tr.appendChild(add);
+    }
+    if (opts.recent) {
+      var del = document.createElement('button');
+      del.className = 'del'; del.innerHTML = X_ICON; del.setAttribute('aria-label', '削除');
+      del.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        gql('removeRecentSearches', { uris: [e.uri] }, 'mutation').catch(function () {});
+        r.remove();
+      });
+      tr.appendChild(del);
+    }
+    r.addEventListener('mousedown', function (ev) { if (!ev.target.closest('input')) ev.preventDefault(); });
+    r.addEventListener('click', function () {
+      gql('saveRecentSearches', { uris: [e.uri] }, 'mutation').catch(function () {});
+      if (e.kind === 'track') {
+        var api = service('PlayerAPI');
+        if (api && api.play) api.play({ uri: e.uri }, {}, {});
+        hideKb();
+        return;
+      }
+      closeSearchPage();
+      spaGo(uriPath(e.uri));
+    });
+    return r;
+  }
+  function showRecents() {
+    var my = ++sp.seq;
+    gql('recentSearches', { limit: 50, includeAuthors: true, includeEpisodeContentRatingsV2: true }).then(function (res) {
+      if (my !== sp.seq) return;
+      var items = (((res.data || {}).recentSearches || {}).recentSearchesItems || {}).items || [];
+      sp.list.innerHTML = '<h2>最近</h2>';
+      items.map(entity).filter(Boolean).forEach(function (e) { sp.list.appendChild(rowEl(e, { recent: true })); });
+      sp.list.scrollTop = 0;
+    }, function () {});
+  }
+  function runSearch(q) {
+    if (!q) return;
+    var my = ++sp.seq;
+    gql('searchTopResultsList', { query: q, limit: 30, offset: 0, numberOfTopResults: 30, includeArtistHasConcertsField: false, includeAudiobooks: true, includeAuthors: true, includePreReleases: true, includeAlbumPreReleases: false, includeEpisodeContentRatingsV2: true, sectionFilters: ['GENERIC'] }).then(function (res) {
+      if (my !== sp.seq) return;
+      var items = (((res.data || {}).searchV2 || {}).topResultsV2 || {}).itemsV2 || [];
+      sp.list.innerHTML = '';
+      items.map(function (x) { return entity(x.item); }).filter(Boolean).forEach(function (e) { sp.list.appendChild(rowEl(e, { dots: true })); });
+      if (!sp.list.childElementCount) sp.list.innerHTML = '<p class="empty">「' + q.replace(/[<&>]/g, '') + '」に一致するものは見つかりませんでした</p>';
+      sp.list.scrollTop = 0;
+    }, function () {});
+  }
+
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
   window.__mobileBack = function () {
     var h = document.documentElement.classList;
     if (h.contains('m-devices')) { closeDevices(); return true; }
+    if (h.contains('m-sp')) { closeSearchPage(); return true; }
     if (h.contains('m-vis')) { closeVisibility(); return true; }
     if (h.contains('m-invite')) { closeInvite(); return true; }
     if (h.contains('m-searching')) { var si = document.querySelector('#global-nav-bar input'); if (si) si.blur(); h.remove('m-searching'); return true; }
