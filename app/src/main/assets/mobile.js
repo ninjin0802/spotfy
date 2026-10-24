@@ -758,6 +758,23 @@
       padding: 12px 16px; font-size: 14px; font-weight: 600; display: none; font-family: inherit; }
     html.m-toast #m-toast { display: block; }
 
+    /* 再生リストのボトムシート */
+    #m-q-bg { position: fixed; inset: 0; z-index: 10070; background: rgba(0,0,0,.6); display: none; }
+    #m-q { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10071; background: #242424; color: #fff; border-radius: 12px 12px 0 0; height: 85vh;
+      transform: translateY(100%); transition: transform .22s ease; display: flex; flex-direction: column; font-family: inherit; padding-bottom: var(--m-bottom, 0px); box-sizing: border-box; }
+    html.m-q #m-q-bg { display: block; }
+    html.m-q #m-q { transform: none; }
+    #m-q .grip { width: 36px; height: 4px; border-radius: 2px; background: #6a6a6a; margin: 8px auto 10px; flex: none; }
+    #m-q h3 { margin: 0 16px 6px; font-size: 18px; font-weight: 700; text-align: center; flex: none; }
+    #m-q .ql { flex: 1; overflow-y: auto; padding: 0 0 20px; }
+    #m-q h4 { margin: 18px 16px 6px; font-size: 16px; font-weight: 700; }
+    #m-q .qr { display: flex; align-items: center; gap: 12px; padding: 6px 16px; }
+    #m-q .qr img { width: 48px; height: 48px; object-fit: cover; border-radius: 2px; flex: none; background: #333; }
+    #m-q .qr .t { flex: 1; min-width: 0; }
+    #m-q .qr b { display: block; font-size: 16px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-q .qr.cur b { color: var(--m-accent, #1ed760); }
+    #m-q .qr small { display: block; font-size: 13px; color: #a7a7a7; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
     /* 下部タブバー（固定） */
     #m-tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; height: calc(${NAV_H}px + var(--m-bottom, 0px)); padding-bottom: var(--m-bottom, 0px); box-sizing: border-box; z-index: 9999;
@@ -1743,7 +1760,7 @@
     on('.shuffle', function () { var b = q('[data-testid="general-controls"] button[aria-label*="シャッフル"], [data-testid="general-controls"] button[aria-label*="shuffle" i]'); if (b) b.click(); });
     on('.like', function () { var b = q('[data-testid="now-playing-widget-v2"] button[aria-checked]'); if (b) b.click(); });
     on('.dev', openDevices);
-    on('.queue', function () { openPanel(q('[data-testid="control-button-queue"]')); });
+    on('.queue', openQueue);
     on('.lyrics-card', function () { closePlayer(); var b = q('[data-testid="lyrics-button"]'); if (b) b.click(); });
     on('.more', function () {
       var w = q('[data-testid="now-playing-widget-v2"]');
@@ -2698,7 +2715,7 @@
       closeTrackMenu();
       if (player && player.addToQueue) Promise.resolve(player.addToQueue([{ uri: t.uri }])).then(function () { toast('[次に再生] に追加しました'); });
     });
-    item(TM_ICONS.queue, '再生リストに移動', function () { closeTrackMenu(); openPlayer(); openPanel(q('[data-testid="control-button-queue"]')); });
+    item(TM_ICONS.queue, '再生リストに移動', function () { closeTrackMenu(); openQueue(); });
     var albumBtn = item(TM_ICONS.album, 'アルバムに移動', function () { closeTrackMenu(); closePlayer(); if (window.__mSearchOpen && __mSearchOpen()) closeSearchPage(); if (t.album) spaGo(uriPath(t.album)); });
     // アルバムが分からない行（アーティストの人気曲など）は曲の情報から取る
     if (!t.album) gql('getTrack', { uri: t.uri }).then(function (r) {
@@ -2863,10 +2880,54 @@
     if (b && b.closest('a, [role="button"], [data-encore-id="card"], .m-bigcard')) e.preventDefault();
   }, true);
 
+  // ==== 再生リスト（キュー）：公式アプリと同じボトムシート ====
+  function closeQueue() { document.documentElement.classList.remove('m-q'); }
+  function openQueue() {
+    var sh = document.getElementById('m-q');
+    if (!sh) {
+      var bg = document.createElement('div'); bg.id = 'm-q-bg'; bg.addEventListener('click', closeQueue); document.body.appendChild(bg);
+      sh = document.createElement('section'); sh.id = 'm-q'; document.body.appendChild(sh);
+    }
+    var player = service('PlayerAPI');
+    sh.innerHTML = '<div class="grip"></div><h3>再生リスト</h3><div class="ql"></div>';
+    document.documentElement.classList.add('m-q');
+    if (!player) return;
+    Promise.resolve(player.getQueue()).then(function (qq) {
+      var list = sh.querySelector('.ql');
+      var st = window.__mConnect && __mConnect.get(), ps = st && st.cluster && st.cluster.player_state;
+      var ctxName = ps && ps.context_metadata && (ps.context_metadata.context_description || ps.context_metadata.title) || '';
+      function img(t) { var im = t.images || (t.album && t.album.images) || []; return (im.find ? (im.find(function (x) { return (x.width || x.label) && (x.width <= 300 || x.label === 'small'); }) || im[0]) : null) || {}; }
+      function row(t, playable) {
+        var r = document.createElement('div'); r.className = 'qr';
+        r.innerHTML = '<img alt=""><div class="t"><b></b><small></small></div>';
+        r.querySelector('img').src = img(t).url || '';
+        r.querySelector('b').textContent = t.name || '';
+        r.querySelector('small').textContent = (t.artists || []).map(function (a) { return a.name; }).join(', ');
+        if (playable) r.addEventListener('click', function () {
+          if (player.skipTo) Promise.resolve(player.skipTo({ uri: t.uri, uid: t.uid })).catch(function () {});
+          closeQueue();
+        });
+        return r;
+      }
+      function head(txt) { var h = document.createElement('h4'); h.textContent = txt; list.appendChild(h); }
+      if (qq.current) { head('再生中'); var cr = row(qq.current, false); cr.classList.add('cur'); list.appendChild(cr); }
+      if (qq.queued && qq.queued.length) {
+        head('次に再生');
+        qq.queued.slice(0, 50).forEach(function (t) { list.appendChild(row(t, true)); });
+      }
+      var nx = (qq.nextUp || []).slice(0, 50);
+      if (nx.length) {
+        head(nx[0].provider === 'autoplay' ? '自動再生でこのあと流れる曲' : (ctxName ? '次の曲: ' + ctxName : '次の曲'));
+        nx.forEach(function (t) { list.appendChild(row(t, true)); });
+      }
+    }, function () {});
+  }
+
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
   window.__mobileBack = function () {
     var h = document.documentElement.classList;
     if (h.contains('m-tm')) { closeTrackMenu(); return true; }
+    if (h.contains('m-q')) { closeQueue(); return true; }
     if (h.contains('m-devices')) { closeDevices(); return true; }
     if (h.contains('m-sp')) { closeSearchPage(); return true; }
     if (h.contains('m-vis')) { closeVisibility(); return true; }
