@@ -472,6 +472,8 @@
     main [data-testid="tracklist-row"] [aria-colindex="1"] button { display: none !important; }
     main [data-testid="tracklist-row"] [aria-colindex="1"] span[data-encore-id="text"] { display: inline !important; visibility: visible !important; }
 
+    /* ダウンロードは Premium 専用で、Web 版ではデスクトップアプリの案内が出るだけなので消す */
+    main [data-testid="action-bar-row"] button[aria-label="ダウンロード"], main [data-testid="action-bar-row"] button[aria-label="Download"] { display: none !important; }
     /* 曲一覧の見出し行（# タイトル ⏱）は公式アプリにないので消す */
     main div:has(> [role="presentation"] > [role="row"] > [role="columnheader"]) { display: none !important; }
     main [data-testid="playlist-page"] [data-testid="entity-header"] p:not(:has(a)), main [data-testid="playlist-page"] [data-testid="entity-header"] [data-encore-id="text"]:not(h1) { font-size: 13px !important; }
