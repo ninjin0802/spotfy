@@ -467,6 +467,11 @@
     main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] button { display: none !important; }
     main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] span[data-encore-id="text"] { display: inline !important; font-size: 15px !important; }
 
+    /* 曲の行：公式アプリと同じく選択時の灰色の背景は出さない（再生中は曲名が緑になるだけ） */
+    main [data-testid="tracklist-row"], main [data-testid="tracklist-row"]:hover, main [role="row"][aria-selected="true"] [data-testid="tracklist-row"] { background: none !important; }
+    main [data-testid="tracklist-row"] [aria-colindex="1"] button { display: none !important; }
+    main [data-testid="tracklist-row"] [aria-colindex="1"] span[data-encore-id="text"] { display: inline !important; visibility: visible !important; }
+
     /* 詳細ページ左上の戻るボタン */
     #m-back {
       position: fixed; top: calc(var(--m-top, 0px) + 12px); left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
@@ -2621,6 +2626,13 @@
       sp.list.scrollTop = 0;
     }, function () {});
   }
+
+  // 曲の行は公式アプリと同じく 1 回のタップで再生（Web 版はタップで選択、ダブルクリックで再生）
+  document.addEventListener('click', function (e) {
+    var row = e.target.closest && e.target.closest('main [data-testid="tracklist-row"]');
+    if (!row || e.target.closest('button, a, input')) return;
+    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+  }, true);
 
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
   window.__mobileBack = function () {
