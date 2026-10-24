@@ -47,7 +47,7 @@ class MainActivity : Activity() {
             setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         }
         val root = FrameLayout(this).apply {
-            setBackgroundColor(0xFF000000.toInt())
+            setBackgroundColor(0xFF121212.toInt())
             addView(webView)
         }
         setContentView(root)
@@ -57,8 +57,9 @@ class MainActivity : Activity() {
         // 上はステータスバーの裏までページを描き（公式アプリと同じ）、その高さをページに伝える
         root.setOnApplyWindowInsetsListener { v, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
-            v.setPadding(bars.left, 0, bars.right, bars.bottom)
+            v.setPadding(bars.left, 0, bars.right, 0)
             statusBarCss = bars.top / resources.displayMetrics.density
+            navBarCss = bars.bottom / resources.displayMetrics.density
             pushStatusBar()
             insets
         }
@@ -228,8 +229,11 @@ class MainActivity : Activity() {
     private val mobileUiJs by lazy { assets.open("mobile.js").bufferedReader().use { it.readText() } }
 
     private var statusBarCss = 0f
+    private var navBarCss = 0f
 
-    private fun pushStatusBar() = webView.evaluateJavascript("window.__mSetTop && __mSetTop($statusBarCss)", null)
+    private fun pushStatusBar() = webView.evaluateJavascript(
+        "window.__mSetTop && __mSetTop($statusBarCss, $navBarCss)", null,
+    )
 
     private fun injectMobileUi(view: WebView) {
         view.evaluateJavascript(mobileUiJs, null)

@@ -13,9 +13,13 @@
     html, body { overscroll-behavior: none !important; }
     /* 公式アプリと同じく、画面の一番上（ステータスバーの裏）まで描く。--m-top はステータスバーの高さ */
     main { padding-top: var(--m-top, 0px) !important; }
+    html, body, .Root, #main-view, .main-view-container { background-color: #121212 !important; }
+    html.m-amoled, html.m-amoled body, html.m-amoled .Root, html.m-amoled #main-view, html.m-amoled .main-view-container { background-color: #000 !important; }
     #main-view > header { padding-top: var(--m-top, 0px) !important; height: calc(64px + var(--m-top, 0px)) !important; box-sizing: border-box !important; }
     #m-settings header, #m-player .page, :is(.m-editbox) > div:first-child { padding-top: var(--m-top, 0px) !important; }
-    #m-player .page { padding-top: calc(var(--m-top, 0px) + 4px) !important; }
+    #m-player .page { padding-top: calc(var(--m-top, 0px) + 4px) !important; padding-bottom: calc(var(--m-bottom, 0px) + 20px) !important; }
+    #m-devices, #m-vis, #m-invite { padding-bottom: calc(var(--m-bottom, 0px) + 24px) !important; }
+    #m-drawer { padding-bottom: var(--m-bottom, 0px); }
     :is(.m-editbox) > div:first-child { height: calc(56px + var(--m-top, 0px)) !important; }
     .m-editbox > div:first-child button[aria-label] { top: calc(var(--m-top, 0px) + 8px) !important; }
     .m-editbox .m-save-wrap { top: calc(var(--m-top, 0px) + 8px) !important; }
@@ -78,7 +82,7 @@
 
     /* 検索ボックスを触ったら、最近の検索を全画面で出す（公式アプリの検索画面と同じ） */
     html.m-searching #floating-ui-popover-layer > *, html.m-searching [data-testid="search-dropdown"] {
-      position: fixed !important; left: 0 !important; right: 0 !important; top: calc(120px + var(--m-top, 0px)) !important; bottom: ${NAV_H}px !important;
+      position: fixed !important; left: 0 !important; right: 0 !important; top: calc(120px + var(--m-top, 0px)) !important; bottom: calc(${NAV_H}px + var(--m-bottom, 0px)) !important;
       width: 100vw !important; max-width: none !important; max-height: none !important; transform: none !important;
       border-radius: 0 !important; background: #121212 !important; box-shadow: none !important; z-index: 9400 !important; overflow-y: auto !important;
     }
@@ -90,7 +94,7 @@
     #Desktop_LeftSidebar_Id, .m-right { display: none !important; }
     html.m-lib #Desktop_LeftSidebar_Id, html.m-np .m-right {
       display: flex !important; position: fixed !important; top: 0 !important; left: 0 !important;
-      width: 100vw !important; max-width: none !important; height: calc(100vh - ${NAV_H}px) !important;
+      width: 100vw !important; max-width: none !important; height: calc(100vh - ${NAV_H}px - var(--m-bottom, 0px)) !important;
       box-sizing: border-box !important;
       z-index: 9000 !important; background: #121212 !important; margin: 0 !important;
     }
@@ -122,16 +126,16 @@
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowSubtitle"] { font-size: 13px !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] [data-testid="play-button"] { display: none !important; }
     /* ライブラリ表示中もミニプレーヤーは見せる */
-    html.m-lib #Desktop_LeftSidebar_Id { height: calc(100vh - ${NAV_H}px - 64px) !important; }
+    html.m-lib #Desktop_LeftSidebar_Id { height: calc(100vh - ${NAV_H}px - 64px - var(--m-bottom, 0px)) !important; }
     html.m-lib #Desktop_LeftSidebar_Id *, html.m-np .m-right > * { max-width: none !important; }
     html.m-lib #Desktop_LeftSidebar_Id > *, html.m-np .m-right * { width: 100% !important; }
 
     /* ミニプレーヤー */
     /* ミニプレーヤーはタブバーのすぐ上に浮かせ、コンテンツはその下までスクロールさせる */
     .Root > div:first-child > div:has(> [data-testid="now-playing-bar"]) {
-      padding: 0 !important; position: fixed !important; left: 0; right: 0; bottom: ${NAV_H}px; z-index: 10000;
+      padding: 0 !important; position: fixed !important; left: 0; right: 0; bottom: calc(${NAV_H}px + var(--m-bottom, 0px)); z-index: 10000;
     }
-    .main-view-container__scroll-node-child { padding-bottom: calc(${NAV_H}px + 80px) !important; }
+    .main-view-container__scroll-node-child { padding-bottom: calc(${NAV_H}px + 80px + var(--m-bottom, 0px)) !important; }
     [data-testid="now-playing-bar"] {
       margin: 0 8px 4px !important; padding: 0 !important; height: 56px !important; width: calc(100vw - 16px) !important; box-sizing: border-box !important;
       background: #2a2a2a !important; border-radius: 6px !important; overflow: hidden !important; position: relative !important; left: 8px !important;
@@ -281,6 +285,23 @@
     #m-vis .sw input:checked + span { background: var(--m-accent, #1ed760); border-color: var(--m-accent, #1ed760); }
     #m-vis .sw input:checked + span::after { transform: translateX(20px); background: #000; }
 
+    /* 「フォロー中」の最新リリース：公式アプリと同じコンパクトなカード（動画を出さず、ジャケット・情報・ボタン） */
+    .m-bigcard { height: auto !important; min-height: 0 !important; max-height: none !important; position: relative !important; border-radius: 8px !important;
+      overflow: hidden !important; display: flex !important; flex-direction: column !important; padding: 20px !important; gap: 16px !important; box-sizing: border-box !important; }
+    .m-bigcard > :first-child:not(header):not(footer) { display: none !important; }
+    .m-bigcard > div:not(:first-child) { position: absolute !important; inset: 0 !important; height: auto !important; z-index: 0 !important; }
+    .m-bigcard > header, .m-bigcard > footer { position: relative !important; inset: auto !important; z-index: 1 !important; width: auto !important; padding: 0 !important; margin: 0 !important; height: auto !important; }
+    .m-bigcard > header { display: flex !important; gap: 16px !important; align-items: flex-start !important; padding-right: 32px !important; }
+    .m-bigcard > header > div:first-child, .m-bigcard > header > div:first-child * { width: 116px !important; height: 116px !important; min-width: 116px !important; }
+    .m-bigcard > header h2 { font-size: 15px !important; font-weight: 700 !important; }
+    .m-bigcard > footer > div:first-child { height: auto !important; min-height: 0 !important; margin-bottom: 12px !important; }
+    .m-bigcard > footer > div:last-child { display: flex !important; align-items: center !important; gap: 12px !important; }
+    .m-bigcard > footer > div:last-child > div:last-child { margin-left: auto !important; display: flex !important; align-items: center !important; gap: 12px !important; }
+    .m-bigcard [data-testid="more-button"] { position: absolute !important; top: -150px; right: -4px; transform: rotate(90deg); }
+    .m-bigcard [data-testid="add-button"] svg { width: 30px !important; height: 30px !important; }
+    .m-bigcard .m-card-play { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 0; color: #000; display: flex; align-items: center; justify-content: center; }
+    .m-bigcard .m-card-play svg { width: 20px; height: 20px; fill: #000; }
+
     /* 詳細ページ左上の戻るボタン */
     #m-back {
       position: fixed; top: calc(var(--m-top, 0px) + 12px); left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
@@ -363,7 +384,7 @@
 
     /* アプリの設定画面 */
     #m-settings {
-      position: fixed; inset: 0 0 ${NAV_H}px 0; z-index: 9500; background: #121212; color: #fff;
+      position: fixed; inset: 0 0 calc(${NAV_H}px + var(--m-bottom, 0px)) 0; z-index: 9500; background: #121212; color: #fff;
       overflow-y: auto; display: none; font-family: inherit; padding-bottom: 72px; box-sizing: border-box;
     }
     html.m-settings #m-settings { display: block; }
@@ -525,19 +546,8 @@
 
     /* ページ下部の「会社情報」などのフッターは公式アプリにないので消す */
     .main-view-container__mh-footer-container, main [data-testid="footer-div"], main nav[aria-label*="フッター"] { display: none !important; }
-    /* フィルターは公式アプリと同じく、1 つずつ独立した丸いボタン（Web 版のように「音楽」と「フォロー中」をくっつけない） */
-    main [data-testid="carousel-scroller"] [data-carousel-item] { margin: 0 8px 0 0 !important; padding: 0 !important; }
-    main [data-encore-id="chip"] { border-radius: 32px !important; margin: 0 !important; padding: 0 14px !important; height: 32px !important; background-color: #2a2a2a; color: #fff; }
-    main [data-encore-id="chip"] > span { border-radius: 32px !important; padding: 0 !important; background: none !important; }
-    /* 何か絞り込んでいるときは「すべて」の代わりに × を出す（押すと解除） */
-    main [data-testid="carousel-scroller"]:has([data-encore-id="chip"][aria-checked="true"]:not([aria-label="すべて"])) [data-encore-id="chip"][aria-label="すべて"] {
-      width: 32px !important; padding: 0 !important; justify-content: center !important; font-size: 0 !important;
-    }
-    main [data-testid="carousel-scroller"]:has([data-encore-id="chip"][aria-checked="true"]:not([aria-label="すべて"])) [data-encore-id="chip"][aria-label="すべて"]::before {
-      content: "✕"; font-size: 14px; color: #fff;
-    }
     /* 選択中のフィルター（すべて／音楽…）は公式アプリと同じ緑 */
-    main button[role="checkbox"][aria-checked="true"] {
+    main [role="checkbox"][aria-checked="true"] > *, main button[role="checkbox"][aria-checked="true"] {
       background-color: var(--m-accent, #1ed760) !important; color: #000 !important;
     }
     /* ミニプレーヤーの追加ボタン */
@@ -560,7 +570,7 @@
 
     /* 下部タブバー（固定） */
     #m-tabbar {
-      position: fixed; left: 0; right: 0; bottom: 0; height: ${NAV_H}px; z-index: 9999;
+      position: fixed; left: 0; right: 0; bottom: 0; height: calc(${NAV_H}px + var(--m-bottom, 0px)); padding-bottom: var(--m-bottom, 0px); box-sizing: border-box; z-index: 9999;
       display: flex; font-family: inherit;
       background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.9));
       -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
@@ -774,6 +784,31 @@
     }, function () {});
   }
   function closeVisibility() { document.documentElement.classList.remove('m-vis'); }
+
+  // 最新リリースのカードを公式アプリ風に（再生ボタンを足す）
+  function tidyBigCards() {
+    document.querySelectorAll('main [data-testid="big-card-toggle-preview-button"]').forEach(function (pv) {
+      var card = pv.closest('footer');
+      card = card && card.parentElement;
+      if (!card || card.classList.contains('m-bigcard')) return;
+      card.classList.add('m-bigcard');
+      var link = card.querySelector('header a[href]');
+      var add = card.querySelector('[data-testid="add-button"]');
+      if (link && add && !card.querySelector('.m-card-play')) {
+        var pb = document.createElement('button');
+        pb.className = 'm-card-play';
+        pb.setAttribute('aria-label', '再生');
+        pb.innerHTML = P.play;
+        pb.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          var m = (link.getAttribute('href') || '').match(/\/(album|playlist|track|artist|show|episode)\/([A-Za-z0-9]+)/);
+          var api = service('PlayerAPI');
+          if (m && api && api.play) api.play({ uri: 'spotify:' + m[1] + ':' + m[2] }, {});
+        });
+        add.after(pb);
+      }
+    });
+  }
 
   // 自分のプロフィールを開く（公式アプリの「プロフィールを表示」）
   var myId = null;
@@ -1866,6 +1901,7 @@
     gaplessWatch();
     tidyProfile();
     tidyEditDialog();
+    tidyBigCards();
     applySavedLeveling();
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
     var h = document.documentElement.classList;
@@ -1944,7 +1980,10 @@
   }, 2500);
 
   // アプリからステータスバーの高さを受け取る
-  window.__mSetTop = function (px) { document.documentElement.style.setProperty('--m-top', px + 'px'); };
+  window.__mSetTop = function (px, bottom) {
+    document.documentElement.style.setProperty('--m-top', px + 'px');
+    document.documentElement.style.setProperty('--m-bottom', (bottom || 0) + 'px');
+  };
 
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
   window.__mobileBack = function () {
