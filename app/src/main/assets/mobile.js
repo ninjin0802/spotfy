@@ -579,7 +579,7 @@
     #m-tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; height: calc(${NAV_H}px + var(--m-bottom, 0px)); padding-bottom: var(--m-bottom, 0px); box-sizing: border-box; z-index: 9999;
       display: flex; font-family: inherit;
-      background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.9));
+      background: linear-gradient(to bottom, rgba(10,10,10,.9), rgba(10,10,10,.98));
     }
     #m-tabbar button {
       flex: 1; background: none; border: 0; color: #b3b3b3; font-size: 11px;
