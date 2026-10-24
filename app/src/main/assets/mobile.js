@@ -758,22 +758,44 @@
       padding: 12px 16px; font-size: 14px; font-weight: 600; display: none; font-family: inherit; }
     html.m-toast #m-toast { display: block; }
 
-    /* 再生リストのボトムシート */
+    /* 再生リストのボトムシート（最初は半分、引っぱると全画面） */
     #m-q-bg { position: fixed; inset: 0; z-index: 10070; background: rgba(0,0,0,.6); display: none; }
-    #m-q { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10071; background: #242424; color: #fff; border-radius: 12px 12px 0 0; height: 85vh;
-      transform: translateY(100%); transition: transform .22s ease; display: flex; flex-direction: column; font-family: inherit; padding-bottom: var(--m-bottom, 0px); box-sizing: border-box; }
+    #m-q { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10071; background: #1f1f1f; color: #fff; border-radius: 12px 12px 0 0; height: 66vh;
+      transform: translateY(100%); transition: transform .25s ease, height .25s ease; display: flex; flex-direction: column; font-family: inherit; box-sizing: border-box; }
+    #m-q.drag { transition: none; }
     html.m-q #m-q-bg { display: block; }
     html.m-q #m-q { transform: none; }
-    #m-q .grip { width: 36px; height: 4px; border-radius: 2px; background: #6a6a6a; margin: 8px auto 10px; flex: none; }
-    #m-q h3 { margin: 0 16px 6px; font-size: 18px; font-weight: 700; text-align: center; flex: none; }
-    #m-q .ql { flex: 1; overflow-y: auto; padding: 0 0 20px; }
-    #m-q h4 { margin: 18px 16px 6px; font-size: 16px; font-weight: 700; }
-    #m-q .qr { display: flex; align-items: center; gap: 12px; padding: 6px 16px; }
-    #m-q .qr img { width: 48px; height: 48px; object-fit: cover; border-radius: 2px; flex: none; background: #333; }
+    html.m-q-full #m-q { height: calc(100vh - var(--m-top, 0px) - 8px); }
+    #m-q .grip { width: 36px; height: 4px; border-radius: 2px; background: #6a6a6a; margin: 8px auto 12px; flex: none; }
+    #m-q .qh { display: flex; align-items: flex-start; padding: 0 16px 8px; flex: none; }
+    #m-q .qh > div { flex: 1; min-width: 0; }
+    #m-q .qh h3 { margin: 0; font-size: 22px; font-weight: 700; }
+    #m-q .qh small { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #b3b3b3; margin-top: 4px; }
+    #m-q .qh .dv { color: var(--m-accent, #1ed760); }
+    #m-q .qh .dv svg { width: 18px; height: 18px; fill: none; }
+    #m-q .edit { height: 36px; padding: 0 16px; border-radius: 18px; border: 0; background: #333; color: #fff; font-weight: 700; font-size: 14px; flex: none; }
+    #m-q .ql { flex: 1; overflow-y: auto; padding: 4px 0 8px; overscroll-behavior: contain; }
+    #m-q .qr { display: flex; align-items: center; gap: 14px; padding: 6px 12px 6px 16px; min-height: 64px; box-sizing: border-box; }
+    #m-q .qr img { width: 56px; height: 56px; object-fit: cover; border-radius: 2px; flex: none; background: #333; }
     #m-q .qr .t { flex: 1; min-width: 0; }
-    #m-q .qr b { display: block; font-size: 16px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-q .qr b { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #m-q .qr.cur b { color: var(--m-accent, #1ed760); }
-    #m-q .qr small { display: block; font-size: 13px; color: #a7a7a7; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-q .qr small { display: block; font-size: 14px; color: #a7a7a7; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-q .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex: none; }
+    #m-q .eq i { width: 3px; background: currentColor; animation: m-eq .9s ease-in-out infinite alternate; }
+    #m-q .eq i:nth-child(2) { animation-delay: .3s; } #m-q .eq i:nth-child(3) { animation-delay: .6s; }
+    @keyframes m-eq { from { height: 3px; } to { height: 12px; } }
+    #m-q .hd2 { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #b3b3b3; flex: none; }
+    #m-q .hd2 svg { width: 24px; height: 24px; fill: currentColor; }
+    #m-q .cpp { width: 40px; height: 40px; border-radius: 50%; border: 0; background: #fff; color: #000; display: flex; align-items: center; justify-content: center; flex: none; }
+    #m-q .cpp svg { width: 18px; height: 18px; fill: #000; }
+    #m-q .rm { display: none; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #e22134; color: #fff; font-size: 20px; line-height: 1; flex: none; order: -1; }
+    #m-q.editing .rm { display: block; }
+    #m-q .qbar { flex: none; display: flex; gap: 10px; padding: 10px 16px calc(var(--m-bottom, 0px) + 12px); background: #1f1f1f; }
+    #m-q .qbar button { flex: 1; height: 68px; border-radius: 8px; border: 0; background: #2a2a2a; color: #b3b3b3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; }
+    #m-q .qbar button.on { color: var(--m-accent, #1ed760); }
+    #m-q .qbar svg { width: 26px; height: 26px; }
+    #m-tm button.it:not(:has(svg)) { padding-left: 22px; }
 
     /* 下部タブバー（固定） */
     #m-tabbar {
@@ -2881,46 +2903,129 @@
   }, true);
 
   // ==== 再生リスト（キュー）：公式アプリと同じボトムシート ====
-  function closeQueue() { document.documentElement.classList.remove('m-q'); }
+  // 最初は画面の半分ほど。上に引っぱる（または一覧をスクロールする）と全画面に広がる
+  var HANDLE = '<svg viewBox="0 0 24 24"><path d="M4 7h16v1.6H4zm0 4.2h16v1.6H4zm0 4.2h16V17H4z"/></svg>';
+  var TIMER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M18.5 6.5l1.5-1.5"/></svg>';
+  var sleepTimer = null;
+  function closeQueue() { document.documentElement.classList.remove('m-q', 'm-q-full'); }
   function openQueue() {
     var sh = document.getElementById('m-q');
     if (!sh) {
       var bg = document.createElement('div'); bg.id = 'm-q-bg'; bg.addEventListener('click', closeQueue); document.body.appendChild(bg);
       sh = document.createElement('section'); sh.id = 'm-q'; document.body.appendChild(sh);
+      // つまみや見出しを上下にドラッグして広げる／閉じる
+      var y0 = null, dy = 0;
+      sh.addEventListener('touchstart', function (e) {
+        if (e.target.closest('.ql') && sh.querySelector('.ql').scrollTop > 0) return;
+        if (e.target.closest('button, .qbar')) return;
+        y0 = e.touches[0].clientY; dy = 0; sh.classList.add('drag');
+      }, { passive: true });
+      sh.addEventListener('touchmove', function (e) {
+        if (y0 == null) return;
+        dy = e.touches[0].clientY - y0;
+        var full = document.documentElement.classList.contains('m-q-full');
+        if (!full && dy < -40) { document.documentElement.classList.add('m-q-full'); y0 = null; sh.classList.remove('drag'); sh.style.transform = ''; return; }
+        if (dy > 0) sh.style.transform = 'translateY(' + dy + 'px)';
+      }, { passive: true });
+      sh.addEventListener('touchend', function () {
+        if (y0 == null) return;
+        y0 = null; sh.classList.remove('drag'); sh.style.transform = '';
+        if (dy > 100) {
+          if (document.documentElement.classList.contains('m-q-full')) document.documentElement.classList.remove('m-q-full');
+          else closeQueue();
+        }
+      });
     }
     var player = service('PlayerAPI');
-    sh.innerHTML = '<div class="grip"></div><h3>再生リスト</h3><div class="ql"></div>';
+    sh.innerHTML = '<div class="grip"></div><div class="qh"><div><h3>次に再生</h3><small class="ctx"></small><small class="dv"></small></div><button class="edit">編集</button></div>' +
+      '<div class="ql"></div>' +
+      '<div class="qbar"><button class="sh">' + P.shuffle + '<span>シャッフル</span></button><button class="rp">' + P.repeat + '<span>リピート</span></button><button class="tm">' + TIMER + '<span>タイマー</span></button></div>';
     document.documentElement.classList.add('m-q');
-    if (!player) return;
-    Promise.resolve(player.getQueue()).then(function (qq) {
-      var list = sh.querySelector('.ql');
-      var st = window.__mConnect && __mConnect.get(), ps = st && st.cluster && st.cluster.player_state;
-      var ctxName = ps && ps.context_metadata && (ps.context_metadata.context_description || ps.context_metadata.title) || '';
-      function img(t) { var im = t.images || (t.album && t.album.images) || []; return (im.find ? (im.find(function (x) { return (x.width || x.label) && (x.width <= 300 || x.label === 'small'); }) || im[0]) : null) || {}; }
-      function row(t, playable) {
-        var r = document.createElement('div'); r.className = 'qr';
-        r.innerHTML = '<img alt=""><div class="t"><b></b><small></small></div>';
-        r.querySelector('img').src = img(t).url || '';
-        r.querySelector('b').textContent = t.name || '';
-        r.querySelector('small').textContent = (t.artists || []).map(function (a) { return a.name; }).join(', ');
-        if (playable) r.addEventListener('click', function () {
-          if (player.skipTo) Promise.resolve(player.skipTo({ uri: t.uri, uid: t.uid })).catch(function () {});
-          closeQueue();
-        });
-        return r;
-      }
-      function head(txt) { var h = document.createElement('h4'); h.textContent = txt; list.appendChild(h); }
-      if (qq.current) { head('再生中'); var cr = row(qq.current, false); cr.classList.add('cur'); list.appendChild(cr); }
-      if (qq.queued && qq.queued.length) {
-        head('次に再生');
-        qq.queued.slice(0, 50).forEach(function (t) { list.appendChild(row(t, true)); });
-      }
-      var nx = (qq.nextUp || []).slice(0, 50);
-      if (nx.length) {
-        head(nx[0].provider === 'autoplay' ? '自動再生でこのあと流れる曲' : (ctxName ? '次の曲: ' + ctxName : '次の曲'));
-        nx.forEach(function (t) { list.appendChild(row(t, true)); });
-      }
-    }, function () {});
+    document.documentElement.classList.remove('m-q-full');
+    var list = sh.querySelector('.ql');
+    list.addEventListener('scroll', function () { if (list.scrollTop > 10) document.documentElement.classList.add('m-q-full'); }, { passive: true });
+    var st = window.__mConnect && __mConnect.get(), ps = st && st.cluster && st.cluster.player_state;
+    var ctxName = ps && ps.context_metadata && (ps.context_metadata.context_description || ps.context_metadata.title) || '';
+    sh.querySelector('.ctx').textContent = ctxName ? ctxName + 'を再生中' : '';
+    var rd = activeDeviceName();
+    sh.querySelector('.dv').innerHTML = DEV_ICONS.computer + '<span></span>';
+    sh.querySelector('.dv span').textContent = rd || 'このスマホ';
+    // 下のボタン（シャッフル・リピート・タイマー）
+    function paintBar() {
+      var sb = q('[data-testid="general-controls"] button[aria-label*="シャッフル"], [data-testid="general-controls"] button[aria-label*="huffle"]');
+      var rb = q('[data-testid="control-button-repeat"]');
+      sh.querySelector('.sh').classList.toggle('on', !!sb && (sb.getAttribute('aria-checked') === 'true' || /無効|disable/i.test(sb.getAttribute('aria-label') || '')));
+      var rs = rb ? rb.getAttribute('aria-checked') : 'false';
+      sh.querySelector('.rp').classList.toggle('on', rs === 'true' || rs === 'mixed');
+      sh.querySelector('.tm').classList.toggle('on', !!sleepTimer);
+    }
+    paintBar();
+    sh.querySelector('.sh').onclick = function () { var b = q('[data-testid="general-controls"] button[aria-label*="シャッフル"], [data-testid="general-controls"] button[aria-label*="huffle"]'); if (b) b.click(); setTimeout(function () { paintBar(); render(); }, 700); };
+    sh.querySelector('.rp').onclick = function () { var b = q('[data-testid="control-button-repeat"]'); if (b) b.click(); setTimeout(paintBar, 500); };
+    sh.querySelector('.tm').onclick = function () { openSleepTimer(paintBar); };
+    var editing = false;
+    sh.querySelector('.edit').onclick = function () { editing = !editing; this.textContent = editing ? '完了' : '編集'; sh.classList.toggle('editing', editing); };
+    function render() {
+      if (!player) return;
+      Promise.resolve(player.getQueue()).then(function (qq) {
+        list.innerHTML = '';
+        function img(t) { var im = t.images || (t.album && t.album.images) || []; return (im.find && (im.find(function (x) { return x.label === 'small'; }) || im[0])) || {}; }
+        function row(t, kind) {
+          var r = document.createElement('div'); r.className = 'qr' + (kind === 'cur' ? ' cur' : '');
+          r.innerHTML = '<img alt=""><div class="t"><b></b><small></small></div><button class="rm" aria-label="削除">−</button><span class="hd2">' + HANDLE + '</span>';
+          r.querySelector('img').src = img(t).url || '';
+          var b = r.querySelector('b');
+          if (kind === 'cur') b.innerHTML = '<span class="eq"><i></i><i></i><i></i></span>';
+          b.appendChild(document.createTextNode(t.name || ''));
+          r.querySelector('small').textContent = (t.artists || []).map(function (a) { return a.name; }).join(', ');
+          if (kind === 'cur') {
+            var pp = q('[data-testid="control-button-playpause"]'), pl = pp && /一時停止|Pause/.test(pp.getAttribute('aria-label') || '');
+            r.querySelector('.hd2').outerHTML = '<button class="cpp">' + (pl ? P.pause : P.play) + '</button>';
+            r.querySelector('.cpp').onclick = function (e) { e.stopPropagation(); if (pp) pp.click(); var me = this; setTimeout(function () { var pl2 = pp && /一時停止|Pause/.test(pp.getAttribute('aria-label') || ''); me.innerHTML = pl2 ? P.pause : P.play; }, 600); };
+            r.querySelector('.rm').remove();
+          } else {
+            r.addEventListener('click', function () { if (player.skipTo) Promise.resolve(player.skipTo({ uri: t.uri, uid: t.uid })).then(function () { setTimeout(render, 800); }); });
+            r.querySelector('.rm').onclick = function (e) {
+              e.stopPropagation();
+              Promise.resolve(player.removeFromQueue([{ uri: t.uri, uid: t.uid }])).then(function () { r.remove(); }, function () {});
+            };
+          }
+          return r;
+        }
+        if (qq.current) list.appendChild(row(qq.current, 'cur'));
+        (qq.queued || []).slice(0, 80).forEach(function (t) { list.appendChild(row(t, 'queued')); });
+        (qq.nextUp || []).slice(0, 80).forEach(function (t) { list.appendChild(row(t, 'next')); });
+      }, function () {});
+    }
+    render();
+  }
+  // おやすみタイマー
+  function openSleepTimer(done) {
+    var sheet = document.getElementById('m-tm');
+    if (!sheet) {
+      var bg = document.createElement('div'); bg.id = 'm-tm-bg'; bg.addEventListener('click', closeTrackMenu); document.body.appendChild(bg);
+      sheet = document.createElement('section'); sheet.id = 'm-tm'; document.body.appendChild(sheet);
+    }
+    sheet.innerHTML = '<div class="grip"></div><div class="hd"><div><b>おやすみタイマー</b><small>' + (sleepTimer ? 'あと ' + Math.max(1, Math.round((sleepTimer.at - Date.now()) / 60000)) + ' 分で停止' : '') + '</small></div></div>';
+    [[5, '5分'], [10, '10分'], [15, '15分'], [30, '30分'], [45, '45分'], [60, '1時間']].forEach(function (o) {
+      var b = document.createElement('button'); b.className = 'it'; b.textContent = o[1];
+      b.onclick = function () {
+        if (sleepTimer) clearTimeout(sleepTimer.h);
+        sleepTimer = { at: Date.now() + o[0] * 60000, h: setTimeout(function () {
+          var pp = q('[data-testid="control-button-playpause"]');
+          if (pp && /一時停止|Pause/.test(pp.getAttribute('aria-label') || '')) pp.click();
+          sleepTimer = null;
+        }, o[0] * 60000) };
+        closeTrackMenu(); toast(o[1] + '後に停止します'); if (done) done();
+      };
+      sheet.appendChild(b);
+    });
+    if (sleepTimer) {
+      var off = document.createElement('button'); off.className = 'it'; off.textContent = 'タイマーをオフにする';
+      off.onclick = function () { clearTimeout(sleepTimer.h); sleepTimer = null; closeTrackMenu(); toast('タイマーをオフにしました'); if (done) done(); };
+      sheet.appendChild(off);
+    }
+    document.documentElement.classList.add('m-tm');
   }
 
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
