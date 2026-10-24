@@ -110,6 +110,12 @@
     html.m-results main [role="grid"] [data-testid="more-button"] { opacity: 1 !important; visibility: visible !important; transform: rotate(90deg); }
     html.m-results main [data-testid="component-shelf"] [data-encore-id="cardTitle"] { font-weight: 700 !important; font-size: 14px !important; }
     html.m-results main [data-testid="component-shelf"] [data-encore-id="cardSubtitle"] { display: none !important; }
+    .m-follow { margin-left: auto; height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid #878787; background: none; color: #fff; font-weight: 700; font-size: 13px; flex: none; position: relative; z-index: 2; white-space: nowrap; }
+    html.m-results main [role="grid"] [role="group"]:has(.m-follow) [data-testid="trailing"] { margin-left: auto !important; display: flex !important; align-items: center !important; }
+    /* ライブラリの並べ替え行：公式アプリと同じ「⇅ 再生履歴」表記 */
+    html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] { flex-direction: row-reverse !important; gap: 6px !important; color: #fff !important; font-weight: 700 !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] > span:last-child svg { display: none !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] > span:last-child::before { content: "⇅"; font-size: 16px; }
     #m-sback { position: fixed; left: 8px; top: calc(var(--m-top, 0px) + 12px); width: 40px; height: 40px; border: 0; background: none; color: #fff; z-index: 8200; display: none; align-items: center; justify-content: center; }
     #m-sback svg { width: 24px; height: 24px; fill: currentColor; }
     html.m-search:is(.m-results, .m-searching) #m-sback { display: flex; }
@@ -393,6 +399,7 @@
     main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] { display: flex !important; align-items: center !important; justify-content: center !important; color: #b3b3b3 !important; }
     main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] * { visibility: visible !important; opacity: 1 !important; }
     main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] button { display: none !important; }
+    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] span[data-encore-id="text"] { display: inline !important; font-size: 15px !important; }
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
@@ -2108,6 +2115,30 @@
         if (getComputedStyle(cp).position === 'sticky') { cp.classList.add('m-schips'); break; }
       }
     }
+    // 検索のトップ結果がアーティストなら「フォローする／フォロー中」ボタンを付ける
+    if (/^\/search\/.+/.test(location.pathname)) {
+      var top = document.querySelector('main [role="grid"] [role="row"]:first-child [role="group"]');
+      var al = top && top.querySelector('a[href*="/artist/"]');
+      if (al && !top.querySelector('.m-follow')) {
+        var uri = 'spotify:artist:' + al.getAttribute('href').split('/artist/')[1].split(/[/?#]/)[0];
+        var fb = document.createElement('button');
+        fb.className = 'm-follow';
+        var lib = service('LibraryAPI');
+        var paint = function (on) { fb.dataset.on = on ? '1' : ''; fb.textContent = on ? 'フォロー中' : 'フォローする'; };
+        if (lib) Promise.resolve(lib.contains(uri)).then(function (r) { paint(r && r[0]); });
+        fb.addEventListener('click', function (ev) {
+          ev.stopPropagation(); ev.preventDefault();
+          if (!lib) return;
+          var on = fb.dataset.on === '1';
+          Promise.resolve(on ? lib.remove({ uris: [uri] }) : lib.add({ uris: [uri] })).then(function () { paint(!on); });
+        });
+        var tr = top.querySelector('[data-testid="trailing"]');
+        (tr || top).appendChild(fb);
+      }
+    }
+    // 並べ替えボタンの「最近」を公式アプリと同じ「再生履歴」に
+    var sortb = document.querySelector('#Desktop_LeftSidebar_Id [role="combobox"] > span:first-child');
+    if (sortb && sortb.textContent === '最近') sortb.textContent = '再生履歴';
     // 検索結果ページ（/search/〜）かどうか。タブバーも「検索」を選択状態にする
     var h0 = document.documentElement.classList;
     var inResults = /^\/search\/.+/.test(location.pathname);
