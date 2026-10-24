@@ -89,6 +89,25 @@
     html.m-search:is(.m-results, .m-searching) #global-nav-bar input { background: #2a2a2a !important; color: #fff !important; padding-left: 16px !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="search-icon"] { display: none !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] svg { fill: #fff !important; color: #fff !important; }
+    /* 公式アプリと同じ、丸い灰色の検索ボックスと小さな ⓧ */
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar > :has(form), html.m-search:is(.m-results, .m-searching) #global-nav-bar form { height: 40px !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar input { height: 40px !important; border-radius: 20px !important; font-size: 15px !important; font-weight: 400 !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar { padding-top: calc(var(--m-top, 0px) + 12px) !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] { width: 32px !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] span { width: 20px !important; height: 20px !important; border-radius: 50%; background: #b3b3b3; display: flex !important; align-items: center; justify-content: center; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] svg { width: 12px !important; height: 12px !important; fill: #2a2a2a !important; color: #2a2a2a !important; }
+    /* 結果の絞り込み（曲・アーティスト…）は上に貼りつけず普通に並べ、「すべて」は出さない */
+    .m-schips { position: relative !important; top: auto !important; background: none !important; box-shadow: none !important; margin: 4px 0 8px !important; padding: 0 !important; height: auto !important; }
+    .m-schips [role="presentation"] > [role="presentation"]:first-child { display: none !important; }
+    .m-schips a { color: #fff !important; }
+    .m-schips [role="presentation"] > [role="presentation"] { margin-right: 8px !important; }
+    html.m-results main [role="grid"] [role="row"]:first-child [data-testid="entity-image"],
+    html.m-results main [role="grid"] [role="row"]:first-child [role="group"] > [role="presentation"]:has(img),
+    html.m-results main [role="grid"] [role="row"]:first-child [role="group"] > [role="presentation"]:has(img) * { width: 56px !important; height: 56px !important; min-width: 56px !important; }
+    html.m-results main [role="grid"] [role="group"] { padding-left: 0 !important; padding-right: 0 !important; }
+    html.m-results main [role="grid"] [data-testid="more-button"] { opacity: 1 !important; visibility: visible !important; transform: rotate(90deg); }
+    html.m-results main [data-testid="component-shelf"] [data-encore-id="cardTitle"] { font-weight: 700 !important; font-size: 14px !important; }
+    html.m-results main [data-testid="component-shelf"] [data-encore-id="cardSubtitle"] { display: none !important; }
     #m-sback { position: fixed; left: 8px; top: calc(var(--m-top, 0px) + 12px); width: 40px; height: 40px; border: 0; background: none; color: #fff; z-index: 8200; display: none; align-items: center; justify-content: center; }
     #m-sback svg { width: 24px; height: 24px; fill: currentColor; }
     html.m-search:is(.m-results, .m-searching) #m-sback { display: flex; }
@@ -1147,6 +1166,30 @@
     }, 50);
   }
 
+  // ---- クロスフェード ----
+  // Web Player は 1 つの再生要素しか持たないため 2 曲を重ねて鳴らすことはできない。
+  // 代わりに、曲の終わりを指定秒数かけて小さくし、次の曲の始まりを同じ秒数かけて大きくする。
+  var xf = { timer: null, base: null };
+  function crossfadeSec() { return parseInt(pref('crossfade', '0'), 10) || 0; }
+  function crossfadeWatch() {
+    if (xf.timer) return;
+    xf.timer = setInterval(function () {
+      var sec = crossfadeSec();
+      audioElement().then(function (p) {
+        var el = p && p._player;
+        if (!el) return;
+        if (!sec || el.paused || !isFinite(el.duration) || el.duration < sec * 3) {
+          if (xf.base != null) { el.volume = xf.base; xf.base = null; }
+          return;
+        }
+        if (xf.base == null) xf.base = el.volume || 1;
+        var t = el.currentTime, rest = el.duration - t;
+        var k = Math.min(1, t / sec, rest / sec);
+        el.volume = Math.max(0, Math.min(1, xf.base * k));
+      });
+    }, 100);
+  }
+
   var qualityApplied = false;
   function applySavedQuality() {
     if (qualityApplied) return;
@@ -1193,7 +1236,7 @@
     ['account', 'アカウント', 'ユーザー名 • ログアウト', SI('<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="10" r="3.2"/><path d="M6.2 18.5c1.3-2.3 3.4-3.5 5.8-3.5s4.5 1.2 5.8 3.5"/>')],
     ['display', 'コンテンツと表示', 'テーマ • Canvas • 言語', SI('<path d="M9 18V5l10-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>')],
     ['privacy', 'プライバシーとソーシャル', 'フォロワー • 公開プレイリスト', SI('<rect x="5" y="10.5" width="14" height="10" rx="1.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>')],
-    ['playback', '再生', 'ギャップレス再生 • 音量の均一化', SI('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>')],
+    ['playback', '再生', 'ギャップレス再生 • クロスフェード • 音量の均一化', SI('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>')],
     ['app', 'アプリとデバイス', 'イコライザー • プレーヤーの再起動', SI('<rect x="3" y="4" width="11" height="13" rx="1.5"/><rect x="15" y="7" width="6" height="13" rx="1.5"/><circle cx="18" cy="15.5" r="1.6"/><path d="M6 20h5"/>')],
     ['quality', 'メディアの音質と画質', 'ストリーミングの音質', SI('<path d="M4 20V14M9 20V9M14 20V4M19 20v-8"/>')],
     ['about', 'このアプリについて', 'バージョン情報', SI('<circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.5v.1"/>')]
@@ -1270,6 +1313,9 @@
         row('ギャップレス再生', '曲と曲のあいだの無音をなくして、続けて再生する', switchEl(pref('gapless', '0') === '1', function (v) {
           try { localStorage.setItem('m.gapless', v ? '1' : '0'); } catch (e) {}
           gap.key = '';
+        })),
+                row('クロスフェード', '曲の終わりと次の曲の始まりをなめらかにフェードさせる', selectEl([['0', 'オフ'], ['2', '2 秒'], ['4', '4 秒'], ['6', '6 秒'], ['8', '8 秒'], ['12', '12 秒']], pref('crossfade', '0'), function (v) {
+          try { localStorage.setItem('m.crossfade', v); } catch (e) {}
         })),
                 row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
       ]);
@@ -1989,6 +2035,7 @@
     applySavedQuality();
     gaplessTick();
     gaplessWatch();
+    crossfadeWatch();
     tidyProfile();
     tidyEditDialog();
     tidyBigCards();
@@ -2023,6 +2070,12 @@
         if (pp.id && pp.id.indexOf('m-') === 0) break;
         var pos = getComputedStyle(pp).position;
         if (pos === 'absolute' || pos === 'fixed') { pp.classList.add('m-recent'); break; }
+      }
+    }
+    if (/^\/search\/.+/.test(location.pathname)) {
+      var cs0 = document.querySelector('main [data-testid="carousel-scroller"]');
+      for (var cp = cs0 && cs0.parentElement; cp && cp.tagName !== 'MAIN'; cp = cp.parentElement) {
+        if (getComputedStyle(cp).position === 'sticky') { cp.classList.add('m-schips'); break; }
       }
     }
     // 検索結果ページ（/search/〜）かどうか。タブバーも「検索」を選択状態にする
