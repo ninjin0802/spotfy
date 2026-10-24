@@ -250,9 +250,16 @@
     html.m-home main [data-testid="component-shelf"] [data-testid="carousel-scroller"] { padding: 0 !important; margin-left: -28px !important; width: calc(100% + 44px) !important; }
     main [data-testid="component-shelf"] [data-testid="see-all-link"]:not(h2 *), main [data-testid="rich-title-row-shelf-header"] a[href]:not(h2 a) { display: none !important; }
     main [data-testid="carousel-previous-button"], main [data-testid="carousel-next-button"] { display: none !important; }
-    main div:has(> [data-testid="shortcut-background"]), main div:has(> div > [data-testid="shortcut-background"]) { height: 42px !important; min-height: 0 !important; }
-    main [data-testid="shortcut-background"] { height: 42px !important; border-radius: 4px !important; background: rgba(255,255,255,.1) !important; }
-    main [data-testid="shortcut-image"] { width: 42px !important; height: 42px !important; }
+    main div:has(> [data-testid="shortcut-background"]), main div:has(> div > [data-testid="shortcut-background"]) { height: 40px !important; min-height: 0 !important; }
+    main [data-testid="shortcut-background"] { height: 40px !important; border-radius: 4px !important; background: rgba(255,255,255,.1) !important; }
+    main [data-testid="shortcut-image"] { width: 40px !important; height: 40px !important; object-fit: cover !important; }
+    main a:has(> div > div > [data-testid="shortcut-image"]), main a:has(> div > div > [data-testid="shortcut-image"]) > div, main div:has(> [data-testid="shortcut-image"]) { width: 40px !important; min-width: 40px !important; height: 40px !important; background: none !important; }
+    /* ショートカットは公式アプリと同じく 40px の行を 8px 間隔で並べる */
+    main section [data-testid="shortcut-background"], html.m-home main section div:has(> div > [data-testid="shortcut-background"]) { height: 40px !important; }
+    html.m-home main [data-testid="home-page"] section:first-child > div { grid-template-rows: none !important; grid-auto-rows: 40px !important; row-gap: 8px !important; }
+    html.m-home main [data-testid="home-page"] section:first-child p { font-size: 13px !important; line-height: 16px !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; white-space: normal !important; }
+    /* ホーム上部の灰色のグラデーションは公式アプリにはないので消す */
+    html.m-home main > div > div[style^="background-color"] { display: none !important; }
     main [data-testid="home-page"] [data-testid="component-shelf"] h2 { font-size: 22px !important; font-weight: 800 !important; letter-spacing: -.01em; }
     main [data-testid="home-page"] [data-testid="component-shelf"] [role="listitem"] { padding: 0 12px 0 0 !important; background: none !important; }
     main [data-testid="home-page"] [data-testid="component-shelf"] [data-testid="card-image"] { border-radius: 4px !important; }
@@ -429,6 +436,11 @@
 
     /* コンテンツ */
     .contentSpacing { padding-left: 16px !important; padding-right: 16px !important; }
+    /* 棚の見出しは公式アプリと同じく詰める（Web 版は上に小見出し用の空きがある） */
+    main [data-testid="rich-title-row-shelf-header"], main [data-testid="rich-title-row-shelf-header"] > div { height: auto !important; min-height: 0 !important; }
+    main [data-testid="rich-title-row-shelf-header"] { margin-bottom: 12px !important; }
+    html.m-home main .contentSpacing > section + section { margin-top: 8px !important; }
+    html.m-home main .contentSpacing > section:first-child { margin-bottom: 0 !important; }
     h1 { word-break: break-word; }
     [role="presentation"] > [role="row"], [data-testid="tracklist-row"] {
       grid-template-columns: [index] 24px [first] minmax(0,1fr) [last] 72px !important;
