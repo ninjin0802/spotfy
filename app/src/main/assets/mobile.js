@@ -788,6 +788,9 @@
     @keyframes m-eq { from { height: 3px; } to { height: 12px; } }
     #m-q .hd2 { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #b3b3b3; flex: none; }
     #m-q .hd2 svg { width: 24px; height: 24px; fill: currentColor; }
+    #m-q .hd2 { touch-action: none; }
+    #m-q .qr { transition: transform .15s ease; background: #1f1f1f; position: relative; }
+    #m-q .qr.lift { transition: none; z-index: 2; background: #333; box-shadow: 0 6px 18px rgba(0,0,0,.5); }
     #m-q .cpp { width: 40px; height: 40px; border-radius: 50%; border: 0; background: #fff; color: #000; display: flex; align-items: center; justify-content: center; flex: none; }
     #m-q .cpp svg { width: 18px; height: 18px; fill: #000; }
     #m-q .rm { display: none; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #e22134; color: #fff; font-size: 20px; line-height: 1; flex: none; order: -1; }
@@ -2989,6 +2992,45 @@
     sh.querySelector('.tm').onclick = function () { openSleepTimer(paintBar); };
     var editing = false;
     sh.querySelector('.edit').onclick = function () { editing = !editing; this.textContent = editing ? '完了' : '編集'; sh.classList.toggle('editing', editing); };
+    // 三本線を押したまま上下にドラッグして並べ替え（公式アプリと同じ）
+    function enableDrag(r) {
+      var h = r.querySelector('.hd2');
+      if (!h) return;
+      h.addEventListener('touchstart', function (e) {
+        e.stopPropagation();
+        var y0 = e.touches[0].clientY, rh = r.getBoundingClientRect().height, from = Array.prototype.indexOf.call(list.children, r), to = from;
+        r.classList.add('lift');
+        function move(ev) {
+          ev.preventDefault();
+          var dy = ev.touches[0].clientY - y0;
+          r.style.transform = 'translateY(' + dy + 'px)';
+          to = Math.max(1, Math.min(list.children.length - 1, from + Math.round(dy / rh)));
+          Array.prototype.forEach.call(list.children, function (c, i) {
+            if (c === r) return;
+            var sh = 0;
+            if (from < to && i > from && i <= to) sh = -rh;
+            if (from > to && i >= to && i < from) sh = rh;
+            c.style.transform = sh ? 'translateY(' + sh + 'px)' : '';
+          });
+          // 端に近づいたら一覧をスクロール
+          var lr = list.getBoundingClientRect(), yy = ev.touches[0].clientY;
+          if (yy < lr.top + 40) list.scrollTop -= 8; else if (yy > lr.bottom - 40) list.scrollTop += 8;
+        }
+        function end() {
+          document.removeEventListener('touchmove', move, { capture: true });
+          document.removeEventListener('touchend', end, true);
+          r.classList.remove('lift');
+          Array.prototype.forEach.call(list.children, function (c) { c.style.transform = ''; });
+          if (to === from) return;
+          var target = list.children[to];
+          if (from < to) target.after(r); else target.before(r);
+          var opt = from < to ? { after: { uri: target._t.uri, uid: target._t.uid } } : { before: { uri: target._t.uri, uid: target._t.uid } };
+          Promise.resolve(player.reorderQueue([{ uri: r._t.uri, uid: r._t.uid }], opt)).catch(function () { toast('並べ替えできませんでした'); render(); });
+        }
+        document.addEventListener('touchmove', move, { capture: true, passive: false });
+        document.addEventListener('touchend', end, true);
+      }, { passive: true });
+    }
     function render() {
       if (!player) return;
       Promise.resolve(player.getQueue()).then(function (qq) {
@@ -3016,9 +3058,11 @@
           }
           return r;
         }
+        list._items = [];
+        var mk = function (t, kind) { var r = row(t, kind); r._t = t; if (kind !== 'cur') { list._items.push(r); enableDrag(r); } return r; };
         if (qq.current) list.appendChild(row(qq.current, 'cur'));
-        (qq.queued || []).slice(0, 80).forEach(function (t) { list.appendChild(row(t, 'queued')); });
-        (qq.nextUp || []).slice(0, 80).forEach(function (t) { list.appendChild(row(t, 'next')); });
+        (qq.queued || []).slice(0, 80).forEach(function (t) { list.appendChild(mk(t, 'queued')); });
+        (qq.nextUp || []).slice(0, 80).forEach(function (t) { list.appendChild(mk(t, 'next')); });
       }, function () {});
     }
     render();
