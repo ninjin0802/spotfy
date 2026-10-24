@@ -42,6 +42,7 @@
     relay: function (id, url, method, headers, body) {
       send({ type: 'relay', id: id, url: url, method: method, headers: headers, body: body });
     },
+    send: function (msg) { send(msg); },
     setPlaying: function (playing) { send({ type: 'playing', value: playing }); },
     setSetting: function (name, value) { settings[name] = value; send({ type: 'setting', name: name, value: value }); },
     getSetting: function (name, fallback) { return name in settings ? settings[name] : fallback; }

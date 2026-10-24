@@ -18,20 +18,20 @@ class PlaybackService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "再生", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(MediaControls.CHANNEL_ID, "再生", NotificationManager.IMPORTANCE_LOW)
         )
-        val open = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        val notification = Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play)
+        // 曲情報つきのメディア通知を、そのままフォアグラウンド通知として使う
+        val notification = MediaControls.instance?.buildNotification() ?: Notification.Builder(this, MediaControls.CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText("バックグラウンドで再生中")
-            .setContentIntent(open)
-            .setOngoing(true)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this, 0, Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+            )
             .build()
-        startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        startForeground(MediaControls.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         foregrounded = true
         // startForeground() より前に停止が要求されていたら、ここで止める
         if (stopRequested) stopSelf()
@@ -39,6 +39,9 @@ class PlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        // 一時停止中も通知（メディアコントロール）は残す
+        stopForeground(STOP_FOREGROUND_DETACH)
+        MediaControls.instance?.post()
         foregrounded = false
         stopRequested = false
         super.onDestroy()
@@ -59,6 +62,5 @@ class PlaybackService : Service() {
             else stopRequested = true
         }
 
-        private const val CHANNEL_ID = "playback"
     }
 }

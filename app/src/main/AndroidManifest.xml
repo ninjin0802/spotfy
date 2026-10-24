@@ -30,6 +30,10 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name=".MediaControls$Receiver"
+            android:exported="false" />
+
         <service
             android:name=".PlaybackService"
             android:exported="false"

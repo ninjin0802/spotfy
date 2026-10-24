@@ -9,6 +9,10 @@
     html, body { width: 100vw !important; overflow: hidden !important; }
     .Root { height: 100vh !important; width: 100vw !important; overflow: hidden !important; }
     #onetrust-consent-sdk { display: none !important; }
+    /* 画面全体が横にずれないようにする（棚のカルーセルは従来どおり横スクロール可） */
+    html, body { overscroll-behavior: none !important; }
+    [data-overlayscrollbars-viewport] { overflow-x: hidden !important; overscroll-behavior-x: none !important; }
+    .os-scrollbar-horizontal { display: none !important; }
 
     /* 3 カラムのグリッドを、メインビューだけの 1 カラムに */
     .Root > div:first-child {
@@ -56,6 +60,7 @@
       box-sizing: border-box !important;
       z-index: 9000 !important; background: #121212 !important; margin: 0 !important;
     }
+    html.m-lib #Desktop_LeftSidebar_Id button[aria-label*="全画面"], html.m-lib #Desktop_LeftSidebar_Id button[aria-label*="拡大"] { display: none !important; }
     /* ライブラリ表示中もミニプレーヤーは見せる */
     html.m-lib #Desktop_LeftSidebar_Id { height: calc(100vh - ${NAV_H}px - 64px) !important; }
     html.m-lib #Desktop_LeftSidebar_Id *, html.m-np .m-right > * { max-width: none !important; }
@@ -125,7 +130,11 @@
     }
     [data-testid="playback-progressbar"] [data-testid="progress-bar"] { --fg-color: var(--m-accent, #1ed760) !important; }
     html.m-amoled body, html.m-amoled #main-view, html.m-amoled .Root, html.m-amoled #Desktop_LeftSidebar_Id,
-    html.m-amoled #Desktop_LeftSidebar_Id *, html.m-amoled #m-settings, html.m-amoled #m-tabbar { background-color: #000 !important; }
+    html.m-amoled #Desktop_LeftSidebar_Id > *, html.m-amoled #m-settings { background-color: #000 !important; }
+    /* 子要素すべてを塗るとホバー用の重ね要素まで不透明になり文字が隠れるので、色トークンだけ差し替える */
+    html.m-amoled #Desktop_LeftSidebar_Id, html.m-amoled #main-view {
+      --background-base: #000 !important; --background-elevated-base: #000 !important;
+    }
     html.m-amoled.m-search #global-nav-bar { background-color: #000 !important; }
     html.m-amoled .main-view-container, html.m-amoled #global-nav-bar { background: #000 !important; }
     [data-testid="now-playing-bar"] { transition: background-color .4s ease; }
@@ -162,41 +171,58 @@
     /* 全画面プレーヤー */
     #m-player {
       position: fixed; inset: 0; z-index: 10010; color: #fff; font-family: inherit; display: flex; flex-direction: column;
-      padding: 8px 24px 24px; box-sizing: border-box; transform: translateY(100%); transition: transform .25s ease;
-      background: linear-gradient(to bottom, var(--m-tint, #404040), #121212 85%);
+      padding: 4px 24px 20px; box-sizing: border-box; transform: translateY(100%); overflow: hidden;
+      transition: transform .32s cubic-bezier(.2,.8,.2,1); background: #121212; touch-action: none;
     }
+    #m-player.dragging { transition: none; }
     html.m-player #m-player { transform: none; }
-    #m-player .top { display: flex; align-items: center; height: 56px; margin: 0 -12px; }
-    #m-player .top .ctx { flex: 1; text-align: center; font-size: 12px; line-height: 1.3; min-width: 0; }
-    #m-player .top .ctx b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #m-player button { background: none; border: 0; color: inherit; padding: 0; display: flex; align-items: center; justify-content: center; }
+    /* ジャケットをぼかした背景＋色のグラデーション */
+    #m-player .bg { position: absolute; inset: -40px; z-index: -2; background: center/cover no-repeat; filter: blur(60px) saturate(1.4); opacity: .45; }
+    #m-player .shade { position: absolute; inset: 0; z-index: -1;
+      background: linear-gradient(to bottom, var(--m-tint, #404040) 0%, rgba(18,18,18,.55) 55%, #121212 100%); opacity: .92; }
+    #m-player .grab { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.35); margin: 6px auto 0; flex: none; }
+    #m-player .top { display: flex; align-items: center; height: 52px; margin: 0 -12px; flex: none; }
+    #m-player .top .ctx { flex: 1; text-align: center; min-width: 0; }
+    #m-player .top .ctx small { display: block; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.75); }
+    #m-player .top .ctx b { display: block; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-player button { background: none; border: 0; color: inherit; padding: 0; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+    #m-player button:active { transform: scale(.92); }
     #m-player svg { fill: currentColor; }
     #m-player .ib { width: 48px; height: 48px; }
     #m-player .ib svg { width: 24px; height: 24px; }
-    #m-player .art { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 16px 0; }
-    #m-player .art img { width: 100%; max-height: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
-    #m-player .meta { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+    #m-player .art { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 20px 0 28px; }
+    #m-player .art img {
+      width: 100%; max-height: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.35);
+      transition: transform .45s cubic-bezier(.2,.8,.2,1);
+    }
+    #m-player.paused .art img { transform: scale(.88); }
+    #m-player .meta { display: flex; align-items: center; gap: 12px; flex: none; }
     #m-player .meta .t { flex: 1; min-width: 0; }
-    #m-player .meta b { display: block; font-size: 22px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #m-player .meta span { display: block; color: #b3b3b3; font-size: 16px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-player .meta b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-player .meta span { display: block; color: rgba(255,255,255,.7); font-size: 16px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #m-player .like svg { width: 28px; height: 28px; }
     #m-player .like.on { color: var(--m-accent, #1ed760); }
-    #m-player .seek { margin-top: 16px; }
+    #m-player .seek { margin-top: 18px; flex: none; }
     #m-player input[type=range] {
-      width: 100%; height: 4px; -webkit-appearance: none; appearance: none; border-radius: 2px; margin: 8px 0; outline: none;
-      background: linear-gradient(to right, #fff var(--p, 0%), rgba(255,255,255,.3) var(--p, 0%));
+      width: 100%; height: 4px; -webkit-appearance: none; appearance: none; border-radius: 2px; margin: 10px 0 6px; outline: none;
+      background: linear-gradient(to right, #fff var(--p, 0%), rgba(255,255,255,.25) var(--p, 0%)); transition: height .15s;
     }
-    #m-player input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; }
-    #m-player .times { display: flex; justify-content: space-between; font-size: 12px; color: #b3b3b3; }
-    #m-player .ctrls { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 16px; }
+    #m-player input[type=range]:active { height: 6px; }
+    #m-player input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+    #m-player .times { display: flex; justify-content: space-between; font-size: 11px; color: rgba(255,255,255,.65); font-variant-numeric: tabular-nums; }
+    #m-player .ctrls { display: flex; align-items: center; justify-content: space-between; margin: 10px -8px 18px; flex: none; }
+    #m-player .ctrls .s { position: relative; }
     #m-player .ctrls .s svg { width: 24px; height: 24px; }
-    #m-player .ctrls .m svg { width: 36px; height: 36px; }
+    #m-player .ctrls .m svg { width: 34px; height: 34px; }
     #m-player .ctrls .on { color: var(--m-accent, #1ed760); }
-    #m-player .ctrls .pp { width: 64px; height: 64px; border-radius: 50%; background: #fff; color: #000; }
-    #m-player .ctrls .pp svg { width: 28px; height: 28px; }
-    #m-player .bottom { display: flex; align-items: center; gap: 8px; }
-    #m-player .bottom .dev { flex: 1; justify-content: flex-start; gap: 8px; font-size: 13px; color: var(--m-accent, #1ed760); }
-    #m-player .bottom svg { width: 20px; height: 20px; }
+    #m-player .ctrls .s.on::after { content: ""; position: absolute; bottom: 6px; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+    #m-player .ctrls .pp { width: 72px; height: 72px; border-radius: 50%; background: #fff; color: #000; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    #m-player .ctrls .pp svg { width: 30px; height: 30px; }
+    #m-player .bottom { display: flex; align-items: center; gap: 4px; flex: none; }
+    #m-player .bottom .dev { flex: 1; justify-content: flex-start; gap: 8px; font-size: 13px; font-weight: 600; color: var(--m-accent, #1ed760); min-width: 0; }
+    #m-player .bottom .dev span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-player .bottom svg { width: 22px; height: 22px; }
     /* プレーヤーから開くキュー・デバイス一覧はプレーヤーより手前に出す */
     html.m-player.m-np .m-right { z-index: 10020 !important; height: 100vh !important; }
     #m-panel-close {
@@ -234,6 +260,12 @@
     #m-mini-pp svg { width: 26px; height: 26px; fill: currentColor; }
     #m-mini-prog { position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px !important; padding: 0 !important; width: auto !important; background: rgba(255,255,255,.25); border-radius: 1px; overflow: hidden; z-index: 2; }
     #m-mini-prog i { display: block; height: 100%; width: 0; background: #fff; }
+    /* 「〜で再生中」の緑のバーは、ミニプレーヤーのデバイスボタンの色で示す */
+    [data-testid="now-playing-bar"] > div:not(:first-child):not([id^="m-mini"]) { display: none !important; }
+    /* ミニプレーヤーの曲名が長いときは横に流す */
+    @keyframes m-marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--m-dist)); } }
+    [data-testid="now-playing-bar"] a { text-decoration: none !important; }
+    .m-marquee { animation: m-marquee var(--m-dur, 8s) linear infinite alternate; will-change: transform; }
     #m-mini-dev { width: 40px; height: 40px; background: none; border: 0; color: #fff; flex: none; display: flex; align-items: center; justify-content: center; }
     #m-mini-dev svg { width: 22px; height: 22px; fill: currentColor; }
     #m-mini-dev.on { color: var(--m-accent, #1ed760); }
@@ -498,7 +530,7 @@
     pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>',
     repeat: '<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg>',
     repeatOne: '<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2zm-4-2V9h-1l-2 1v1h1.5v4z"/></svg>',
-    device: '<svg viewBox="0 0 24 24"><path d="M3 5h12v2H5v10h4v2H3zm14 0h4v14h-4zm2 11.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM19 7a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg>',
+    device: '<svg viewBox="0 0 24 24"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h11A1.5 1.5 0 0 1 16 4.5V6h-1.5V4.5h-11v10H11V16H3.5A1.5 1.5 0 0 1 2 14.5zM6 18.5h5V20H6z"/><path d="M13 9.5A1.5 1.5 0 0 1 14.5 8h6A1.5 1.5 0 0 1 22 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5zm1.5 0v10h6v-10zM17.5 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 3.5a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5zm0 1.3a.95.95 0 1 0 0 1.9.95.95 0 0 0 0-1.9z"/></svg>',
     share: '<svg viewBox="0 0 24 24"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.7-3.4a3 3 0 0 0 0-1.6l6.7-3.4A3 3 0 1 0 15 7l-6.7 3.4a3 3 0 1 0 0 3.2L15 17a3 3 0 1 0 3-1z"/></svg>',
     queue: '<svg viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h12v2H3zm0 6h12v2H3zm14-3 5 3-5 3z"/></svg>',
     lyrics: '<svg viewBox="0 0 24 24"><path d="M4 4h16v12H7l-3 3zm3 4v2h10V8zm0 4v2h7v-2z"/></svg>'
@@ -609,8 +641,9 @@
     var el = document.createElement('section');
     el.id = 'm-player';
     el.innerHTML =
+      '<div class="bg"></div><div class="shade"></div><div class="grab"></div>' +
       '<div class="top"><button class="ib down" aria-label="閉じる">' + P.down + '</button>' +
-      '<div class="ctx">再生中<b></b></div><button class="ib more" aria-label="その他">' + P.more + '</button></div>' +
+      '<div class="ctx"><small>再生中</small><b></b></div><button class="ib more" aria-label="その他">' + P.more + '</button></div>' +
       '<div class="art"><img alt=""></div>' +
       '<div class="meta"><div class="t"><b></b><span></span></div><button class="ib like" aria-label="お気に入り">' + P.heartOff + '</button></div>' +
       '<div class="seek"><input type="range" min="0" max="1000" value="0"><div class="times"><span class="pos">0:00</span><span class="dur">0:00</span></div></div>' +
@@ -650,6 +683,25 @@
       if (navigator.share) navigator.share({ url: url }).catch(function () {});
       else if (navigator.clipboard) navigator.clipboard.writeText(url);
     });
+    // 下にスワイプして閉じる
+    var startY = null, dy = 0;
+    el.addEventListener('touchstart', function (e) {
+      if (e.target.closest('input, .ctrls, .bottom')) return;
+      startY = e.touches[0].clientY; dy = 0;
+      el.classList.add('dragging');
+    }, { passive: true });
+    el.addEventListener('touchmove', function (e) {
+      if (startY == null) return;
+      dy = Math.max(0, e.touches[0].clientY - startY);
+      el.style.transform = 'translateY(' + dy + 'px)';
+    }, { passive: true });
+    el.addEventListener('touchend', function () {
+      if (startY == null) return;
+      startY = null;
+      el.classList.remove('dragging');
+      el.style.transform = '';
+      if (dy > 120) closePlayer();
+    });
     var range = el.querySelector('input[type=range]');
     range.addEventListener('input', function () { range.dataset.drag = '1'; range.style.setProperty('--p', range.value / 10 + '%'); });
     range.addEventListener('change', function () {
@@ -673,13 +725,17 @@
     var img = w.querySelector('[data-testid="cover-art-image"]');
     var src = bigArt(img && img.src);
     var pic = el.querySelector('.art img');
-    if (src && pic.getAttribute('src') !== src) pic.src = src;
+    if (src && pic.getAttribute('src') !== src) {
+      pic.src = src;
+      el.querySelector('.bg').style.backgroundImage = 'url("' + src + '")';
+    }
     el.querySelector('.meta b').textContent = title ? title.textContent : '';
     el.querySelector('.meta span').textContent = by ? by.textContent : '';
     el.querySelector('.ctx b').textContent = by ? by.textContent : '';
     var pp = q('[data-testid="control-button-playpause"]');
     var playing = pp && /一時停止|Pause/.test(pp.getAttribute('aria-label') || '');
     el.querySelector('.pp').innerHTML = playing ? P.pause : P.play;
+    el.classList.toggle('paused', !playing);
     var like = q('[data-testid="now-playing-widget-v2"] button[aria-checked]');
     var liked = like && like.getAttribute('aria-checked') === 'true';
     el.querySelector('.like').classList.toggle('on', !!liked);
@@ -704,7 +760,81 @@
     el.querySelector('.dev span').textContent = remote || 'このスマホ';
   }
 
+  // Android のメディアコントロールからの操作
+  window.__mMedia = function (action, pos) {
+    var pp = q('[data-testid="control-button-playpause"]');
+    var playing = pp && /一時停止|Pause/.test(pp.getAttribute('aria-label') || '');
+    if ((action === 'play' && !playing) || (action === 'pause' && playing)) pp.click();
+    if (action === 'next') { var n = q('[data-testid="control-button-skip-forward"]'); if (n) n.click(); }
+    if (action === 'prev') { var b = q('[data-testid="control-button-skip-back"]'); if (b) b.click(); }
+    if (action === 'seek') {
+      var src = q('[data-testid="playback-progressbar"] input[type=range]');
+      if (src) {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(src, pos);
+        src.dispatchEvent(new Event('input', { bubbles: true }));
+        src.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+  };
+
+  // 曲情報をアプリへ送る（通知・ロック画面のメディアコントロール用）
+  var lastMeta = '', lastMetaAt = 0;
+  function sendMeta() {
+    if (!window.__native || !window.__native.send) return;
+    var w = q('[data-testid="now-playing-widget-v2"]');
+    if (!w) return;
+    var title = w.querySelector('a[href*="/album/"], a[href*="/track/"], a[href*="/episode/"]');
+    var by = w.querySelector('[data-testid="now-playing-widget-v2-byline"]');
+    var img = w.querySelector('[data-testid="cover-art-image"]');
+    var pp = q('[data-testid="control-button-playpause"]');
+    var pos = q('[data-testid="playback-position"]'), dur = q('[data-testid="playback-duration"]');
+    var m = {
+      type: 'meta',
+      title: title ? title.textContent : '',
+      artist: by ? by.textContent : '',
+      album: '',
+      art: bigArt(img && img.src),
+      playing: !!pp && /一時停止|Pause/.test(pp.getAttribute('aria-label') || ''),
+      dur: dur ? toSec(dur.textContent) * 1000 : 0
+    };
+    var key = JSON.stringify(m);
+    var now = Date.now();
+    if (key === lastMeta && now - lastMetaAt < 10000) return;
+    lastMeta = key;
+    lastMetaAt = now;
+    m.pos = pos ? toSec(pos.textContent) * 1000 : 0;
+    window.__native.send(m);
+  }
+
+  // 曲名・アーティスト名がはみ出すときだけ流す
+  function marquee() {
+    var w = q('[data-testid="now-playing-widget-v2"]');
+    if (!w) return;
+    [w.querySelector('a[href*="/album/"], a[href*="/track/"], a[href*="/episode/"]'),
+     w.querySelector('[data-testid="now-playing-widget-v2-byline"]')].forEach(function (el) {
+      if (!el) return;
+      var box = el.parentElement;
+      while (box && box !== w && getComputedStyle(box).overflow !== 'hidden') box = box.parentElement;
+      if (!box || box === w) return;
+      var inner = box.firstElementChild;
+      if (!inner) return;
+      inner.classList.remove('m-marquee');
+      var dist = inner.scrollWidth - box.clientWidth;
+      if (dist > 4) {
+        inner.style.setProperty('--m-dist', -dist + 'px');
+        inner.style.setProperty('--m-dur', Math.max(4, dist / 25) + 's');
+        inner.style.display = 'inline-block';
+        inner.classList.add('m-marquee');
+      }
+    });
+  }
+
+  var marqueeKey = '';
   function updateMini() {
+    sendMeta();
+    var nw = q('[data-testid="now-playing-widget-v2"]');
+    var key = nw ? nw.getAttribute('aria-label') : '';
+    if (key !== marqueeKey) { marqueeKey = key; setTimeout(marquee, 300); }
     var pp = q('[data-testid="control-button-playpause"]');
     var btn = document.getElementById('m-mini-pp');
     if (btn && pp) {
@@ -789,12 +919,10 @@
     var h = document.documentElement.classList;
     h.toggle('m-lib', name === 'lib');
     h.toggle('m-search', name === 'search');
+    // ライブラリが折りたたみ表示（アイコンだけ）なら展開する
+    if (name === 'lib') click('#Desktop_LeftSidebar_Id button[aria-label="マイライブラリを開く"], #Desktop_LeftSidebar_Id button[aria-label="Open Your Library"]');
     h.remove('m-np', 'm-player');
     if (h.contains('m-settings')) closeSettings();
-    if (name === 'lib') {
-      var expand = document.querySelector('#Desktop_LeftSidebar_Id button[aria-label*="開く"], #Desktop_LeftSidebar_Id button[aria-label*="Open"]');
-      if (expand) expand.click();
-    }
     document.querySelectorAll('#m-tabbar button').forEach(function (b) {
       b.classList.toggle('on', b.dataset.tab === name);
     });

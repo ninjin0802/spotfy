@@ -249,6 +249,10 @@ class MainActivity : Activity() {
                 if (name == "orientation") applyOrientation()
             }
             "playing" -> setPlaying(m.optBoolean("value"))
+            "meta" -> media.update(
+                m.optString("title"), m.optString("artist"), m.optString("album"), m.optString("art"),
+                m.optBoolean("playing"), m.optLong("pos"), m.optLong("dur"),
+            )
             "relay" -> {
                 val id = m.optInt("id")
                 val url = m.optString("url")
@@ -265,6 +269,15 @@ class MainActivity : Activity() {
                     }
                     finishRelay(reply, id, status, type, text)
                 }
+            }
+        }
+    }
+
+    /** 通知・ロック画面のメディアコントロールからの操作を Web Player に伝える */
+    private val media by lazy {
+        MediaControls(applicationContext) { action, pos ->
+            runOnUiThread {
+                webView.evaluateJavascript("window.__mMedia && __mMedia(${JSONObject.quote(action)}, $pos)", null)
             }
         }
     }
@@ -299,6 +312,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         PlaybackService.stop(this)
+        media.release()
         CookieManager.getInstance().flush()
         webView.destroy()
         super.onDestroy()
