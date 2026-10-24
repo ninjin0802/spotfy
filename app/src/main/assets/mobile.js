@@ -14,6 +14,9 @@
     /* 公式アプリと同じく、画面の一番上（ステータスバーの裏）まで描く。--m-top はステータスバーの高さ */
     main { padding-top: var(--m-top, 0px) !important; }
     html, body, .Root, #main-view, .main-view-container { background-color: #121212 !important; }
+    /* スクロールで上に貼りつくフィルター欄などは、ステータスバーの下で止め、その上も背景色で覆う */
+    .m-sticky { top: var(--m-top, 0px) !important; background-color: var(--m-bg, #121212) !important; box-shadow: 0 calc(-1 * var(--m-top, 0px)) 0 0 var(--m-bg, #121212) !important; z-index: 5 !important; }
+    html.m-amoled { --m-bg: #000; }
     html.m-amoled, html.m-amoled body, html.m-amoled .Root, html.m-amoled #main-view, html.m-amoled .main-view-container { background-color: #000 !important; }
     #main-view > header { padding-top: var(--m-top, 0px) !important; height: calc(64px + var(--m-top, 0px)) !important; box-sizing: border-box !important; }
     #m-settings header, #m-player .page, :is(.m-editbox) > div:first-child { padding-top: var(--m-top, 0px) !important; }
@@ -1902,6 +1905,13 @@
     tidyProfile();
     tidyEditDialog();
     tidyBigCards();
+    // main の中で position: sticky のもの（ホームのフィルター欄など）に目印を付ける
+    document.querySelectorAll('#main-view [data-encore-id="chip"]').forEach(function (ch) {
+      for (var p = ch.parentElement; p && p.id !== 'main-view'; p = p.parentElement) {
+        if (p.classList.contains('m-sticky')) break;
+        if (getComputedStyle(p).position === 'sticky') { p.classList.add('m-sticky'); break; }
+      }
+    });
     applySavedLeveling();
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
     var h = document.documentElement.classList;
