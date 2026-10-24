@@ -547,6 +547,17 @@
     #m-player .card h3 { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
     #m-player .card p { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; color: rgba(255,255,255,.85); }
     #m-player .card.artist p { font-size: 22px; }
+    /* 歌詞カード：公式アプリと同じく、曲の色の背景に同期した歌詞を数行 */
+    #m-player .lyrics-card { position: relative; height: 330px; overflow: hidden; background: var(--m-lyr, rgba(0,0,0,.28)); }
+    #m-player .lyrics-card .lyw { position: absolute; left: 16px; right: 16px; top: 52px; bottom: 12px; overflow: hidden; }
+    #m-player .lyrics-card .ly { transition: transform .4s ease; }
+    #m-player .lyrics-card .ly p { font-size: 20px !important; font-weight: 700 !important; line-height: 1.45 !important; margin: 0 0 12px !important; color: rgba(0,0,0,.6) !important; }
+    #m-player .lyrics-card .ly p.on { color: #fff !important; }
+    #m-player .lyrics-card .ly p.past { color: rgba(255,255,255,.7) !important; }
+    #m-player .lyrics-card .exp { position: absolute; right: 12px; top: 10px; width: 32px; height: 32px; border-radius: 50%; background: rgba(0,0,0,.3); display: flex; align-items: center; justify-content: center; z-index: 1; }
+    #m-player .lyrics-card .exp svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
+    #m-player .lyrics-card h3 { position: absolute; left: 16px; top: 16px; margin: 0; z-index: 1; }
+
     #m-player .card small { display: block; margin-top: 10px; font-size: 13px; color: rgba(255,255,255,.7); }
     #m-player.dragging { transition: none; }
     #m-player::-webkit-scrollbar { display: none; }
@@ -573,9 +584,10 @@
     #m-player.paused .art img { transform: scale(.88); }
     #m-player .meta { display: flex; align-items: center; gap: 12px; flex: none; }
     #m-player .meta .t { flex: 1; min-width: 0; }
-    #m-player .meta b { display: block; font-size: 22px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+    #m-player .meta b { display: block; font-size: 24px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; }
     #m-player .meta b span { display: inline-block; }
-    #m-player .meta span { display: block; color: rgba(255,255,255,.7); font-size: 16px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-player .meta b span { color: #fff; font-size: inherit; margin: 0; }
+    #m-player .meta .t > span { display: block; color: rgba(255,255,255,.7); font-size: 16px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #m-player .like svg { width: 28px; height: 28px; }
     #m-player .like.on { color: var(--m-accent, #1ed760); }
     #m-player .like.on svg { color: var(--m-accent, #1ed760); }
@@ -1700,7 +1712,7 @@
       '<div class="bottom"><button class="dev">' + P.device + '<span>このデバイス</span></button>' +
       '<button class="ib share" aria-label="共有">' + P.share + '</button>' +
       '<button class="ib queue" aria-label="キュー">' + P.queue + '</button></div></div>' +
-      '<div class="extras"><button class="card lyrics-card"><h3>歌詞</h3><p>タップして歌詞を表示</p></button>' +
+      '<div class="extras"><button class="card lyrics-card"><h3>歌詞</h3><span class="exp"><svg viewBox="0 0 16 16"><path d="M9.5 2.5H13.5V6.5M6.5 13.5H2.5V9.5M13.5 2.5 9 7M2.5 13.5 7 9"/></svg></span><div class="lyw"><div class="ly"><p>タップして歌詞を表示</p></div></div></button>' +
       '<button class="card artist"><h3>アーティストについて</h3><p></p><small>アーティストのページを開く</small></button></div>';
     document.body.appendChild(el);
 
@@ -1766,6 +1778,49 @@
       src.dispatchEvent(new Event('input', { bubbles: true }));
       src.dispatchEvent(new Event('change', { bubbles: true }));
     });
+  }
+
+  // ---- 歌詞（Web Player と同じ color-lyrics API）----
+  var lyr = { uri: '', lines: [], idx: -1 };
+  function loadLyrics(tr) {
+    var el = document.getElementById('m-player');
+    var box = el && el.querySelector('.lyrics-card .ly');
+    if (!box || !tr || tr.uri === lyr.uri) return;
+    lyr = { uri: tr.uri, lines: [], idx: -1 };
+    box.innerHTML = '<p>歌詞を読み込み中…</p>';
+    box.style.transform = '';
+    var id = tr.uri.split(':')[2];
+    var img = encodeURIComponent(bigArt((tr.metadata && tr.metadata.image_url) || '').replace('spotify:image:', 'https://i.scdn.co/image/'));
+    var h = { accept: 'application/json', 'app-platform': 'WebPlayer' };
+    if (window.__mConnect) { h.authorization = __mConnect.auth(); var ct = __mConnect.clientToken(); if (ct) h['client-token'] = ct; }
+    fetch('https://spclient.wg.spotify.com/color-lyrics/v2/track/' + id + '/image/' + img + '?format=json&vocalRemoval=false&market=from_token', { headers: h })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (lyr.uri !== tr.uri) return;
+        var lines = j && j.lyrics && j.lyrics.lines || [];
+        lyr.lines = lines.filter(function (l) { return l.words; }).map(function (l) { return { t: +l.startTimeMs, w: l.words }; });
+        lyr.synced = j && j.lyrics && j.lyrics.syncType === 'LINE_SYNCED';
+        if (j && j.colors && j.colors.background) {
+          var c = j.colors.background >>> 0;
+          el.style.setProperty('--m-lyr', 'rgb(' + ((c >> 16) & 255) + ',' + ((c >> 8) & 255) + ',' + (c & 255) + ')');
+        } else el.style.removeProperty('--m-lyr');
+        if (!lyr.lines.length) { box.innerHTML = '<p>この曲の歌詞はありません</p>'; return; }
+        box.innerHTML = '';
+        lyr.lines.forEach(function (l) { var p = document.createElement('p'); p.textContent = l.w; box.appendChild(p); });
+      }, function () { box.innerHTML = '<p>歌詞を読み込めませんでした</p>'; });
+  }
+  function syncLyrics(posMs) {
+    var el = document.getElementById('m-player');
+    var box = el && el.querySelector('.lyrics-card .ly');
+    if (!box || !lyr.lines.length || !lyr.synced) return;
+    var i = -1;
+    for (var k = 0; k < lyr.lines.length; k++) { if (lyr.lines[k].t <= posMs) i = k; else break; }
+    if (i === lyr.idx) return;
+    lyr.idx = i;
+    var ps = box.children;
+    for (var n = 0; n < ps.length; n++) { ps[n].className = n === i ? 'on' : n < i ? 'past' : ''; }
+    var target = ps[Math.max(0, i - 1)];
+    box.style.transform = 'translateY(' + (-(target ? target.offsetTop : 0)) + 'px)';
   }
 
   function updatePlayer() {
@@ -1834,6 +1889,11 @@
     }
     var remote = activeDeviceName();
     el.querySelector('.dev span').textContent = remote || 'このスマホ';
+    var cst2 = window.__mConnect && __mConnect.get(), ps2 = cst2 && cst2.cluster && cst2.cluster.player_state;
+    if (ps2 && ps2.track) {
+      loadLyrics(ps2.track);
+      syncLyrics(pos ? toSec(pos.textContent) * 1000 + 500 : 0);
+    }
     var dt = remoteDeviceType();
     if (el.querySelector('.dev').dataset.t !== dt) { el.querySelector('.dev').dataset.t = dt; el.querySelector('.dev svg').outerHTML = dt ? devIcon(dt) : P.device; }
   }
@@ -1977,6 +2037,8 @@
   var playerTimer = null;
   function openPlayer() {
     document.documentElement.classList.remove('m-np');
+    var mp = document.getElementById('m-player');
+    if (mp) mp.scrollTop = 0;
     document.documentElement.classList.add('m-player');
     updatePlayer();
     clearInterval(playerTimer);
