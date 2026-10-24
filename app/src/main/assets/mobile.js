@@ -256,7 +256,7 @@
     main a:has(> div > div > [data-testid="shortcut-image"]), main a:has(> div > div > [data-testid="shortcut-image"]) > div, main div:has(> [data-testid="shortcut-image"]) { width: 40px !important; min-width: 40px !important; height: 40px !important; background: none !important; }
     /* ショートカットは公式アプリと同じく 40px の行を 8px 間隔で並べる */
     main section [data-testid="shortcut-background"], html.m-home main section div:has(> div > [data-testid="shortcut-background"]) { height: 40px !important; }
-    html.m-home main [data-testid="home-page"] section:first-child > div { grid-template-rows: none !important; grid-auto-rows: 40px !important; row-gap: 8px !important; }
+    html.m-home main [data-testid="home-page"] section:first-child > div:not([data-testid="grid-container"]) { grid-template-rows: none !important; grid-auto-rows: 40px !important; row-gap: 8px !important; }
     html.m-home main [data-testid="home-page"] section:first-child p { font-size: 13px !important; line-height: 16px !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; white-space: normal !important; }
     /* スクロールしたとき、フィルター欄の裏に Spotify がジャケットの色を敷くが、公式アプリは背景色のまま */
     .m-sticky > div[style*="--background-base"] { display: none !important; }
@@ -265,6 +265,13 @@
     html.m-home main section[aria-label="最近"] [data-encore-id="card"] { width: 112px !important; min-width: 112px !important; max-width: 112px !important; flex: none !important; }
     html.m-home main section[aria-label="最近"] [data-encore-id="card"] { padding: 0 6px !important; }
     /* 大きなおすすめカードの棚は、PC 版の行の高さ（動画用）を使わず中身の高さで詰めて並べる */
+    /* PC 版はおすすめの棚を重ねて表示（行の高さ 40px）するので、スマホでは1枚ずつ縦に並べる */
+    html.m-home main [data-testid="grid-container"][style*="--row-count"] { grid-template-rows: none !important; grid-auto-rows: auto !important; row-gap: 12px !important; margin-inline: 0 !important; }
+    main div > .m-bigcard.m-bigcard.m-bigcard { margin-left: 0 !important; margin-right: 0 !important; }
+    main div:has(> .m-bigcard) { padding-left: 0 !important; padding-right: 0 !important; }
+    main div > .m-bigcard.m-bigcard.m-bigcard > a + footer { margin-top: 20px !important; }
+    .m-bigcard > a:not(:has(img, video)) { display: none !important; }
+    html.m-home main [data-testid="grid-container"][style*="--row-count"] > * { height: auto !important; }
     main [data-testid="grid-container"]:has(.m-bigcard) { grid-template-rows: none !important; grid-auto-rows: auto !important; row-gap: 12px !important; }
     main [data-testid="grid-container"]:has(.m-bigcard) > * { height: auto !important; }
     /* ホーム上部の灰色のグラデーションは公式アプリにはないので消す */
@@ -1070,7 +1077,8 @@
       var card = ft.parentElement;
       if (!card || card.classList.contains('m-bigcard')) return;
       var hdr = card.querySelector(':scope > header');
-      if (!hdr || !card.querySelector('[data-testid="carousel-scroller"], video')) return;
+      // ポッドキャストのおすすめは動画のサムネイル（:scope > a）だけのこともある
+      if (!hdr || !card.querySelector('[data-testid="carousel-scroller"], video, :scope > a img')) return;
       // ジャケット画像の読み込みが済んでから処理する（色を取るため）。見た目は CSS が先に当たる
       var hlink = hdr.querySelector('a[href]');
       var tkey = hlink ? hlink.getAttribute('href').replace(/^\/intl-[a-z-]+/i, '') : '';
