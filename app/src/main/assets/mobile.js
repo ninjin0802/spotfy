@@ -369,62 +369,32 @@
     #m-vis .sw input:checked + span { background: var(--m-accent, #1ed760); border-color: var(--m-accent, #1ed760); }
     #m-vis .sw input:checked + span::after { transform: translateX(20px); background: #000; }
 
-    /* 「フォロー中」の最新リリース：公式アプリと同じコンパクトなカード（動画を出さず、ジャケット・情報・ボタン） */
-    .m-bigcard { height: auto !important; min-height: 0 !important; max-height: none !important; position: relative !important; border-radius: 8px !important;
-      overflow: hidden !important; display: flex !important; flex-direction: column !important; padding: 20px !important; gap: 16px !important; box-sizing: border-box !important; }
-    .m-bigcard > :first-child:not(header):not(footer) { display: none !important; }
-    .m-bigcard > div:not(:first-child) { position: absolute !important; inset: 0 !important; height: auto !important; z-index: 0 !important; }
+    /* 「フォロー中」の最新リリース：公式アプリと同じ、ジャケット色のカード（動画なし） */
+    .m-bigcard { height: auto !important; min-height: 0 !important; max-height: none !important; aspect-ratio: auto !important; position: relative !important; border-radius: 8px !important;
+      overflow: hidden !important; display: flex !important; flex-direction: column !important; padding: 20px !important; gap: 14px !important; box-sizing: border-box !important;
+      background: var(--m-card, #2a2a2a) !important; margin-bottom: 16px !important; }
+    .m-bigcard > div:not(:has(header)):not(:has(footer)) { display: none !important; }
+    div:has(> .m-bigcard), div:has(> div > .m-bigcard) { height: auto !important; aspect-ratio: auto !important; }
+    .m-bigcard { --background-color: var(--m-card) !important; }
     .m-bigcard > header, .m-bigcard > footer { position: relative !important; inset: auto !important; z-index: 1 !important; width: auto !important; padding: 0 !important; margin: 0 !important; height: auto !important; }
     .m-bigcard > header { display: flex !important; gap: 16px !important; align-items: flex-start !important; padding-right: 32px !important; }
-    .m-bigcard > header > div:first-child, .m-bigcard > header > div:first-child * { width: 116px !important; height: 116px !important; min-width: 116px !important; }
-    .m-bigcard > header h2 { font-size: 15px !important; font-weight: 700 !important; }
-    .m-bigcard > footer > div:first-child { height: auto !important; min-height: 0 !important; margin-bottom: 12px !important; }
-    .m-bigcard > footer > div:last-child { display: flex !important; align-items: center !important; gap: 12px !important; }
-    .m-bigcard > footer > div:last-child > div:last-child { margin-left: auto !important; display: flex !important; align-items: center !important; gap: 12px !important; }
-    .m-bigcard [data-testid="more-button"] { position: absolute !important; top: -150px; right: -4px; transform: rotate(90deg); }
+    .m-bigcard > header > div:first-child, .m-bigcard > header > div:first-child * { width: 116px !important; height: 116px !important; min-width: 116px !important; border-radius: 2px; }
+    .m-bigcard > header > div:not(:first-child):not(.m-bc-t) { display: none !important; }
+    .m-bigcard .m-bc-t b { display: block; font-size: 15px; font-weight: 700; color: #fff; }
+    .m-bigcard .m-bc-t span { display: block; font-size: 14px; color: rgba(255,255,255,.75); margin-top: 3px; }
+    .m-bigcard > footer > div:first-child { display: none !important; }
+    .m-bigcard .m-bc-sub { font-size: 14px; color: rgba(255,255,255,.85); }
+    .m-bigcard > footer { position: static !important; transform: none !important; width: 100% !important; left: auto !important; display: block !important; }
+    .m-bigcard > footer > div:last-child > div:first-child { flex: none !important; }
+    .m-bigcard [data-testid="big-card-toggle-preview-button"] { width: auto !important; gap: 8px !important; white-space: nowrap !important; }
+    .m-bigcard [data-testid="big-card-toggle-preview-button"] > span { position: static !important; margin: 0 !important; }
+    .m-bigcard > footer > div:last-child { opacity: 1 !important; display: flex !important; align-items: center !important; gap: 12px !important; }
+    .m-bigcard > footer > div:last-child > div:last-child { margin-left: auto !important; display: flex !important; align-items: center !important; gap: 14px !important; }
+    .m-bigcard [data-testid="big-card-toggle-preview-button"] { background: rgba(0,0,0,.25) !important; border-radius: 20px !important; height: 40px !important; padding: 0 16px !important; color: rgba(255,255,255,.75) !important; }
+    .m-bigcard [data-testid="more-button"] { position: absolute !important; top: 16px !important; right: 12px !important; transform: rotate(90deg); }
     .m-bigcard [data-testid="add-button"] svg { width: 30px !important; height: 30px !important; }
     .m-bigcard .m-card-play { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 0; color: #000; display: flex; align-items: center; justify-content: center; }
     .m-bigcard .m-card-play svg { width: 20px; height: 20px; fill: #000; }
-
-    /* 操作の並びは公式アプリと同じく、右端に「シャッフル・再生」 */
-    main [data-testid="action-bar-row"] button[aria-label*="シャッフル"], main [data-testid="action-bar-row"] button[aria-label*="huffle"] { order: 9 !important; margin-left: auto !important; }
-    main [data-testid="action-bar-row"]:has(button[aria-label*="シャッフル"]) > :first-child { margin-left: 12px !important; }
-    /* 曲の行は ⊕ と再生時間を出さず、縦の「⋮」だけ（公式アプリと同じ） */
-    main [data-testid="tracklist-row"] button[aria-checked]:not([data-testid]), main [data-testid="tracklist-row"] [aria-colindex]:last-child > div[data-encore-id="text"],
-    main [data-testid="tracklist-row"] [data-testid="tracklist-duration"] { display: none !important; }
-    main [data-testid="tracklist-row"] [data-testid="more-button"] { opacity: 1 !important; visibility: visible !important; transform: rotate(90deg); }
-    main [data-testid="artist-page"] [data-testid="tracklist-row"] { grid-template-columns: [index] 24px [first] minmax(0,1fr) [last] 40px !important; }
-    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] { display: flex !important; align-items: center !important; justify-content: center !important; color: #b3b3b3 !important; }
-    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] * { visibility: visible !important; opacity: 1 !important; }
-    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] button { display: none !important; }
-    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] span[data-encore-id="text"] { display: inline !important; font-size: 15px !important; }
-
-    /* 曲の行：公式アプリと同じく選択時の灰色の背景は出さない（再生中は曲名が緑になるだけ） */
-    main [data-testid="tracklist-row"], main [data-testid="tracklist-row"]:hover, main [role="row"][aria-selected="true"] [data-testid="tracklist-row"] { background: none !important; }
-    main [data-testid="tracklist-row"] [aria-colindex="1"] button { display: none !important; }
-    main [data-testid="tracklist-row"] [aria-colindex="1"] span[data-encore-id="text"] { display: inline !important; visibility: visible !important; }
-
-    /* ダウンロードは Premium 専用で、Web 版ではデスクトップアプリの案内が出るだけなので消す */
-    main [data-testid="action-bar-row"] button[aria-label="ダウンロード"], main [data-testid="action-bar-row"] button[aria-label="Download"] { display: none !important; }
-    /* 曲一覧の見出し行（# タイトル ⏱）は公式アプリにないので消す */
-    main div:has(> [role="presentation"] > [role="row"] > [role="columnheader"]) { display: none !important; }
-    main [data-testid="playlist-page"] [data-testid="entity-header"] p:not(:has(a)), main [data-testid="playlist-page"] [data-testid="entity-header"] [data-encore-id="text"]:not(h1) { font-size: 13px !important; }
-
-    /* プレイリスト：公式アプリと同じく「説明 / 作成者 / 保存数 • 時間」の 3 行。ジャケットに名前が入る Spotify 製はタイトルを出さない */
-    main [data-testid="playlist-page"] [data-testid="entity-header"] > div:last-child > div:last-child > div:last-child { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 0 4px !important; }
-    main [data-testid="playlist-page"] [data-testid="entity-header"] > div:last-child > div:last-child > div:last-child > div:first-child { flex: 0 0 100% !important; display: flex !important; align-items: center !important; gap: 6px !important; margin: 6px 0 4px !important; font-weight: 700 !important; color: #fff !important; }
-    main [data-testid="playlist-page"] [data-testid="entity-header"] > div:last-child > div:last-child > div:last-child > div:first-child + [data-separator],
-    main [data-testid="playlist-page"] [data-testid="entity-header"] > div:last-child > div:last-child > div:last-child > [data-separator]:last-child,
-    main [data-testid="playlist-page"] [data-testid="entity-header"] > div:last-child > div:last-child > div:last-child > div:not(:first-child) > span:first-child,
-    main [data-testid="playlist-page"] [data-testid="entity-header"] > div:last-child > div:last-child > div:last-child > div:not(:first-child) > [data-separator] { display: none !important; }
-    main [data-testid="playlist-page"] [data-testid="entity-header"] > div:last-child > div:last-child > div:last-child * { color: #b3b3b3; font-size: 13px !important; }
-    main [data-testid="playlist-page"] [data-testid="entity-header"] > div:last-child > div:last-child > div:last-child > div:first-child * { color: #fff !important; font-size: 14px !important; font-weight: 700 !important; }
-    html.m-spotify-made main [data-testid="playlist-page"] [data-testid="entityTitle"] { display: none !important; }
-
-    /* アルバム・プレイリストの操作列：公式アプリと同じく「…」の代わりに共有ボタン（メニューは右上の ⋮） */
-    html.m-coll main [data-testid="action-bar-row"] [data-testid="more-button"] { display: none !important; }
-    .m-ab-share { width: 40px; height: 40px; background: none; border: 0; color: #b3b3b3; display: flex; align-items: center; justify-content: center; }
-    .m-ab-share svg { width: 26px; height: 26px; }
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
@@ -985,6 +955,34 @@
       card = card && card.parentElement;
       if (!card || card.classList.contains('m-bigcard')) return;
       card.classList.add('m-bigcard');
+      // 見出し：公式アプリと同じく「アーティスト（太字） / 種類 • タイトル」
+      var hd = card.querySelector(':scope > header');
+      var h2 = hd && hd.querySelector('h2'), kind = hd && hd.querySelector('span span');
+      var artists = hd ? [].map.call(hd.querySelectorAll('a[href*="/artist/"]'), function (x) { return x.textContent; }).join(', ') : '';
+      if (hd && h2 && !hd.querySelector('.m-bc-t')) {
+        var tb = document.createElement('div');
+        tb.className = 'm-bc-t';
+        tb.innerHTML = '<b></b><span></span>';
+        tb.querySelector('b').textContent = artists || h2.textContent;
+        tb.querySelector('span').textContent = h2.textContent + (kind ? ' • ' + kind.textContent : '');
+        hd.appendChild(tb);
+      }
+      // カードの色はジャケットから
+      var cimg = hd && hd.querySelector('img');
+      if (cimg) {
+        var pr = new Image(); pr.crossOrigin = 'anonymous';
+        pr.onload = function () {
+          try {
+            var cv = document.createElement('canvas'); cv.width = cv.height = 8;
+            var g = cv.getContext('2d'); g.drawImage(pr, 0, 0, 8, 8);
+            var d = g.getImageData(0, 0, 8, 8).data, r = 0, gg = 0, bb = 0;
+            for (var i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; bb += d[i + 2]; }
+            var n = d.length / 4, k = 0.42;
+            card.style.setProperty('--m-card', 'rgb(' + Math.round(r / n * k) + ',' + Math.round(gg / n * k) + ',' + Math.round(bb / n * k) + ')');
+          } catch (e) {}
+        };
+        pr.src = cimg.src;
+      }
       var link = card.querySelector('header a[href]');
       var add = card.querySelector('[data-testid="add-button"]');
       if (link && add && !card.querySelector('.m-card-play')) {
