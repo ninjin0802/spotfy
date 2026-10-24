@@ -129,14 +129,29 @@
       gap: 12px !important; column-gap: 12px !important; row-gap: 12px !important;
     }
     html.m-search main [data-testid="grid-container"] > [role="listitem"] { padding: 0 !important; width: auto !important; }
-    html.m-search main [data-testid="grid-container"] a { display: block !important; width: 100% !important; height: 100px !important; border-radius: 6px !important; overflow: hidden !important; }
+    html.m-search main [data-testid="grid-container"] a { display: block !important; width: 100% !important; height: 70px !important; border-radius: 6px !important; overflow: hidden !important; }
     html.m-search main [data-testid="grid-container"] a > div { width: 100% !important; height: 100% !important; }
     html.m-search main [data-testid="grid-container"] img {
       width: 64px !important; height: 64px !important; right: -12px !important; bottom: -4px !important; left: auto !important; top: auto !important;
       transform: rotate(25deg) !important; position: absolute !important; box-shadow: 0 2px 8px rgba(0,0,0,.4);
     }
     html.m-search main [data-testid="grid-container"] a span { font-size: 16px !important; font-weight: 700 !important; }
-    html.m-search main section h2 { font-size: 16px !important; font-weight: 700 !important; }
+    html.m-search:not(.m-results) main section:has([data-testid="grid-container"]) [data-testid="rich-title-row-shelf-header"],
+    html.m-search:not(.m-results) main section:has([data-testid="grid-container"]) > div:first-child:has(h2) { display: none !important; }
+    html.m-search:not(.m-results) main .contentSpacing { padding-top: 8px !important; }
+    html.m-search:not(.m-results) main .contentSpacing > div, html.m-search:not(.m-results) main .contentSpacing > div > div { padding-top: 0 !important; margin-top: 0 !important; }
+    html.m-search main section h2 { font-size: 20px !important; font-weight: 700 !important; }
+    html.m-search:not(.m-results):not(.m-searching) #global-nav-bar::before { font-size: 24px !important; line-height: 40px !important; padding-left: 52px !important; }
+    html.m-search:not(.m-results):not(.m-searching) #m-avatar { top: calc(var(--m-top, 0px) + 16px) !important; width: 40px !important; height: 40px !important; }
+    html.m-search:not(.m-results):not(.m-searching) .Root > div:first-child { grid-template-rows: 0 calc(132px + var(--m-top, 0px)) minmax(0, 1fr) 0 !important; }
+    html.m-search:not(.m-results):not(.m-searching) #global-nav-bar { height: calc(132px + var(--m-top, 0px)) !important; gap: 16px !important; }
+    html.m-search #global-nav-bar > :has(form), html.m-search #global-nav-bar > :has(form) * :has(> form) { width: 100% !important; max-width: none !important; }
+    html.m-search #global-nav-bar form { width: 100% !important; }
+    html.m-search #global-nav-bar div:has(> form) { padding: 0 !important; }
+    html.m-search #global-nav-bar > :has(form) { width: calc(100vw - 32px) !important; margin-left: 8px !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar > :has(form) { width: calc(100vw - 72px) !important; margin-left: 0 !important; }
+    html.m-search main [data-testid="grid-container"] a span { font-size: 15px !important; }
+    .m-recent .os-scrollbar, .m-recent ::-webkit-scrollbar { display: none !important; }
     html.m-search #m-avatar { top: calc(var(--m-top, 0px) + 16px) !important; }
 
     /* 検索ボックスを触ったら、最近の検索を全画面で出す（公式アプリの検索画面と同じ） */
