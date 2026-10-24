@@ -124,6 +124,27 @@
     html.m-results main [role="grid"] [role="group"]:has(.m-follow) [data-testid="trailing"] { margin-left: auto !important; display: flex !important; align-items: center !important; }
     /* ライブラリの並べ替え行：公式アプリと同じ「⇅ 再生履歴」表記 */
     html.m-lib #Desktop_LeftSidebar_Id .m-libsorthide { position: absolute !important; opacity: 0 !important; height: 0 !important; overflow: hidden !important; pointer-events: none !important; }
+    /* マウス用のツールチップ（「…のその他のオプション」など）はタッチでは邪魔なので出さない */
+    [data-tippy-root]:not(:has([role="menu"], [role="dialog"] button)), [data-tippy-root]:has([role="tooltip"]) { display: none !important; }
+    /* Spotify Web 独自のメニュー（右クリックメニュー・保存先の選択など）は、公式アプリと同じく下からのボトムシートで出す */
+    [data-tippy-root]:has([role="menu"], [role="dialog"] button) {
+      position: fixed !important; inset: auto 0 0 0 !important; transform: none !important; width: 100vw !important; max-width: none !important; z-index: 10080 !important;
+      box-shadow: 0 0 0 100vmax rgba(0,0,0,.6) !important;
+    }
+    [data-tippy-root]:has([role="menu"], [role="dialog"] button) > *, [data-tippy-root]:has([role="menu"], [role="dialog"] button) .tippy-box {
+      max-width: none !important; width: 100% !important; transform: none !important;
+    }
+    [data-tippy-root] #context-menu:has([role="menu"]), [data-tippy-root] [role="menu"], [data-tippy-root] [role="dialog"]:has(button) {
+      width: 100% !important; max-width: none !important; max-height: 70vh !important; overflow-y: auto !important; box-sizing: border-box !important;
+      background: #242424 !important; border-radius: 12px 12px 0 0 !important; padding: 20px 0 calc(12px + var(--m-bottom, 0px)) !important; box-shadow: none !important; position: relative !important;
+    }
+    [data-tippy-root] [role="dialog"]:has(button) div { max-width: none !important; }
+    [data-tippy-root] [role="dialog"]:has(button) > div, [data-tippy-root] [role="dialog"]:has(button) > div > div { width: 100% !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; box-sizing: border-box !important; }
+    [data-tippy-root] #context-menu:has([role="menu"])::before { content: ""; position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: #6a6a6a; }
+    [data-tippy-root] [role="menu"] [role="menuitem"], [data-tippy-root] [role="menu"] [role="menuitemradio"], [data-tippy-root] [role="menu"] [role="menuitemcheckbox"] {
+      min-height: 52px !important; padding: 0 20px !important; font-size: 16px !important; gap: 16px !important;
+    }
+    [data-tippy-root] [role="menu"] [role="menuitem"] svg { width: 22px !important; height: 22px !important; }
     [data-tippy-root]:has(#sort-and-view-picker), html.m-libop [data-tippy-root] { opacity: 0 !important; pointer-events: none !important; }
     #m-libbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px 12px; width: 100%; box-sizing: border-box; border-top: 1px solid #2a2a2a; }
     #m-libbar button { background: none; border: 0; color: #fff; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; font-family: inherit; padding: 4px; }
@@ -791,6 +812,19 @@
     #m-tm .hd small { display: block; font-size: 14px; color: #a7a7a7; margin-top: 3px; }
     #m-tm button.it { display: flex; align-items: center; gap: 18px; width: 100%; padding: 15px 18px; background: none; border: 0; color: #fff; font-size: 16px; text-align: left; font-family: inherit; }
     #m-tm button.it svg { width: 26px; height: 26px; flex: none; }
+    #m-tm .sv-hd { display: flex; align-items: center; justify-content: space-between; padding: 4px 20px 12px; }
+    #m-tm .sv-hd b { font-size: 20px; font-weight: 700; }
+    #m-tm .sv-new { background: #fff; color: #000; border: 0; border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 700; font-family: inherit; }
+    #m-tm .sv-list { max-height: 55vh; overflow-y: auto; }
+    #m-tm .sv-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 8px 20px; background: none; border: 0; color: #fff; text-align: left; font-family: inherit; }
+    #m-tm .sv-row img, #m-tm .sv-row .liked-cv { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; flex: none; background: #333; }
+    #m-tm .sv-row .liked-cv { background: linear-gradient(135deg, #450af5, #c4efd9); display: flex; align-items: center; justify-content: center; }
+    #m-tm .sv-row .liked-cv svg { width: 20px; height: 20px; fill: #fff; }
+    #m-tm .sv-row .nm { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #m-tm .sv-row .ck { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid #b3b3b3; box-sizing: border-box; flex: none; display: flex; align-items: center; justify-content: center; }
+    #m-tm .sv-row .ck.on { background: var(--m-accent, #1ed760); border-color: var(--m-accent, #1ed760); }
+    #m-tm .sv-row .ck.on::after { content: ""; width: 10px; height: 5px; border: solid #000; border-width: 0 0 2px 2px; transform: translateY(-1px) rotate(-45deg); }
+    #m-tm .sv-done { display: block; margin: 16px auto 8px; background: #fff; color: #000; border: 0; border-radius: 999px; padding: 12px 36px; font-size: 15px; font-weight: 700; font-family: inherit; }
     #m-tm button.cr { padding: 10px 18px; }
     #m-tm .cr .ic { width: 56px; height: 56px; border-radius: 50%; background: #2a2a2a; display: flex; align-items: center; justify-content: center; flex: none; color: #b3b3b3; }
     #m-tm .cr .ic svg { width: 26px; height: 26px; }
@@ -1842,7 +1876,10 @@
     on('.next', function () { var b = q('[data-testid="control-button-skip-forward"]'); if (b) b.click(); });
     on('.repeat', toggleRepeat);
     on('.shuffle', toggleShuffle);
-    on('.like', function () { var b = q('[data-testid="now-playing-widget-v2"] button[aria-checked]'); if (b) b.click(); });
+    on('.like', function () {
+      var b = q('[data-testid="now-playing-widget-v2"] button[aria-checked]');
+      if (b && b.getAttribute('aria-checked') === 'true') openSavedIn(nowTrack()); else if (b) b.click();
+    });
     on('.dev', openDevices);
     on('.queue', openQueue);
     on('.lyrics-card', function () { closePlayer(); var b = q('[data-testid="lyrics-button"]'); if (b) b.click(); });
@@ -2369,7 +2406,8 @@
       box.querySelector('#m-mini-add').addEventListener('click', function (ev) {
         ev.stopPropagation();
         var lb = q('[data-testid="now-playing-widget-v2"] button[aria-checked]');
-        if (lb) lb.click();
+        if (lb && lb.getAttribute('aria-checked') === 'true') openSavedIn(nowTrack());
+        else if (lb) lb.click();
       });
       box.querySelector('#m-mini-dev').addEventListener('click', function (ev) { ev.stopPropagation(); openDevices(); });
       box.querySelector('#m-mini-pp').addEventListener('click', function (ev) {
@@ -2805,7 +2843,11 @@
     t._h = setTimeout(function () { document.documentElement.classList.remove('m-toast'); }, 2200);
   }
   function closeTrackMenu() { document.documentElement.classList.remove('m-tm'); }
+  var lastTrackMenu = { uri: '', at: 0 };
   function openTrackMenu(t) {
+    // 1回のタップで2回呼ばれても、開き直さない
+    if (t.uri === lastTrackMenu.uri && Date.now() - lastTrackMenu.at < 600 && document.documentElement.classList.contains('m-tm')) return;
+    lastTrackMenu = { uri: t.uri, at: Date.now() };
     var sheet = document.getElementById('m-tm');
     if (!sheet) {
       var bg = document.createElement('div'); bg.id = 'm-tm-bg'; bg.addEventListener('click', closeTrackMenu); document.body.appendChild(bg);
@@ -2892,6 +2934,83 @@
     if (!t) return;
     e.preventDefault(); e.stopPropagation();
     openTrackMenu(t);
+  }, true);
+
+  // ==== 「保存先」シート（公式アプリと同じ：お気に入りの曲＋自分のプレイリストにチェック、完了で反映） ====
+  function nowTrack() {
+    var st = playState(), it = st && st.item;
+    if (!it || !/^spotify:track:/.test(it.uri || '')) return null;
+    var md = it.metadata || {};
+    return { uri: it.uri, title: it.name || md.title, img: bigArt(md.image_url || ''), artist: md.artist_name };
+  }
+  function openSavedIn(t) {
+    if (!t || !t.uri) return;
+    var sheet = document.getElementById('m-tm');
+    if (!sheet) {
+      var bg = document.createElement('div'); bg.id = 'm-tm-bg'; bg.addEventListener('click', closeTrackMenu); document.body.appendChild(bg);
+      sheet = document.createElement('section'); sheet.id = 'm-tm'; document.body.appendChild(sheet);
+    }
+    var lib = service('LibraryAPI'), root = service('RootlistAPI'), pl = service('PlaylistAPI');
+    sheet.innerHTML = '<div class="grip"></div><div class="sv-hd"><b>保存先</b><button class="sv-new">新しいプレイリスト</button></div><div class="sv-list"></div><button class="sv-done">完了</button>';
+    var list = sheet.querySelector('.sv-list');
+    var rows = [];   // { uri, was, now, uid, el }
+    function addRow(cover, name, uri) {
+      var b = document.createElement('button'); b.className = 'sv-row';
+      b.innerHTML = cover + '<span class="nm"></span><span class="ck"></span>';
+      b.querySelector('.nm').textContent = name;
+      var r = { uri: uri, was: false, now: false, el: b };
+      b.addEventListener('click', function () { r.now = !r.now; b.querySelector('.ck').classList.toggle('on', r.now); });
+      r.set = function (on) { r.was = r.now = on; b.querySelector('.ck').classList.toggle('on', on); };
+      rows.push(r); list.appendChild(b); return r;
+    }
+    var liked = addRow('<span class="liked-cv">' + P.heart + '</span>', 'お気に入りの曲', 'liked');
+    if (lib) Promise.resolve(lib.contains(t.uri)).then(function (x) { liked.set(!!(x && x[0])); }, function () {});
+    if (root && pl) Promise.resolve(root.getContents({})).then(function (c) {
+      var out = [];
+      (function walk(items) { (items || []).forEach(function (x) { if (x.type === 'folder') walk(x.items); else if (x.type === 'playlist' && (x.isOwnedBySelf || x.canAdd)) out.push(x); }); })(c.items);
+      out.forEach(function (x) {
+        var img = x.images && x.images[0] && x.images[0].url || '';
+        var r = addRow('<img alt="">', x.name, x.uri);
+        r.el.querySelector('img').src = img;
+        Promise.resolve(pl.getContents(x.uri)).then(function (cc) {
+          var hit = (cc.items || []).find(function (i) { return i.uri === t.uri; });
+          if (hit) { r.uid = hit.uid; r.set(true); }
+        }, function () {});
+      });
+    }, function () {});
+    sheet.querySelector('.sv-new').onclick = function () {
+      if (!root) return;
+      var n = 1 + rows.length;
+      Promise.resolve(root.createPlaylist('マイプレイリスト #' + n, { before: 'start' })).then(function (uri) {
+        if (!uri) throw 0;
+        return Promise.resolve(pl.add(uri, [t.uri], { after: 'end' })).then(function () { closeTrackMenu(); toast('「マイプレイリスト #' + n + '」に追加しました'); });
+      }).catch(function () { toast('プレイリストを作れませんでした'); });
+    };
+    sheet.querySelector('.sv-done').onclick = function () {
+      closeTrackMenu();
+      var jobs = [];
+      rows.forEach(function (r) {
+        if (r.now === r.was) return;
+        if (r.uri === 'liked') jobs.push(Promise.resolve(r.now ? lib.add({ uris: [t.uri] }) : lib.remove({ uris: [t.uri] })));
+        else if (r.now) jobs.push(Promise.resolve(pl.add(r.uri, [t.uri], { after: 'end' })));
+        else if (r.uid) jobs.push(Promise.resolve(pl.remove(r.uri, [{ uid: r.uid }])));
+      });
+      if (!jobs.length) return;
+      Promise.all(jobs).then(function () {
+        var anyOn = rows.some(function (r) { return r.now; });
+        toast(anyOn ? '保存先を変更しました' : (liked.was && !liked.now && rows.length === 1 ? 'お気に入りの曲から削除しました' : '削除しました'));
+      }, function () { toast('変更できませんでした'); });
+    };
+    document.documentElement.classList.add('m-tm');
+  }
+  // 保存済み（緑のチェック）の曲の「✓」を押したら、Spotify の小さなメニューではなく「保存先」シート
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('main [data-testid="tracklist-row"] button[aria-checked="true"]');
+    if (!b) return;
+    var t = trackFromRow(b.closest('[data-testid="tracklist-row"]'));
+    if (!t) return;
+    e.preventDefault(); e.stopPropagation();
+    openSavedIn(t);
   }, true);
 
   // ==== アルバム・プレイリストの「⋮」メニュー（公式アプリと同じ項目） ====
@@ -2990,7 +3109,8 @@
 
   // ページの中に差し込んだ自前のボタンを押しても、下にある Spotify のカードや行が反応しないようにする
   // （カードは pointerdown / mousedown の段階で画面遷移の準備を始めるため、click だけ止めても一瞬開こうとする）
-  var OWN_BTN = '.m-card-play, .m-ab-share, .m-follow, .m-row-more, #m-mini-ctl button, #m-edit, #m-gear';
+  // 曲の「⋮」も含める（Spotify が押した瞬間に自分のメニューを開き、ボトムシートが一度閉じて開き直して見えるため）
+  var OWN_BTN = '.m-card-play, .m-ab-share, .m-follow, .m-row-more, #m-mini-ctl button, #m-edit, #m-gear, main [data-testid="tracklist-row"] [data-testid="more-button"], main [data-testid="tracklist-row"] button[aria-checked="true"]';
   ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup'].forEach(function (type) {
     document.addEventListener(type, function (e) {
       if (e.target.closest && e.target.closest(OWN_BTN)) e.stopPropagation();
