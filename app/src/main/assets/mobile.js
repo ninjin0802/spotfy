@@ -159,14 +159,17 @@
     html.m-lib #Desktop_LeftSidebar_Id header button[aria-label="作成"] svg { width: 24px !important; height: 24px !important; }
     #m-lib-avatar { width: 32px; height: 32px; border-radius: 50%; background: #535353 center/cover no-repeat; flex: none; margin-right: 12px;
       border: 0; padding: 0; color: #000; font-weight: 700; font-size: 14px; }
-    html.m-lib #Desktop_LeftSidebar_Id [role="listbox"] [role="option"] > * {
-      border-radius: 16px !important; height: 32px !important; padding: 0 14px !important; font-size: 13px !important;
-    }
+    html.m-lib #Desktop_LeftSidebar_Id [role="listbox"] { display: flex !important; gap: 8px !important; justify-content: flex-start !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [role="listbox"] [role="option"], html.m-lib #Desktop_LeftSidebar_Id [role="listbox"] [role="option"] * { margin: 0 !important; flex: none !important; width: auto !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [role="listbox"] [role="option"] span { padding: 6px 14px !important; border-radius: 16px !important; font-size: 13px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [role="search"]:not(:focus-within) { visibility: hidden !important; }
+    #m-libsearch { width: 40px; height: 40px; background: none; border: 0; color: #fff; display: flex; align-items: center; justify-content: center; }
+    #m-libsearch svg { width: 26px; height: 26px; fill: currentColor; }
     html.m-lib #Desktop_LeftSidebar_Id [role="grid"] { margin: 0 !important; left: 0 !important; width: 100% !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] { padding: 4px 16px !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-testid="entity-image"],
-    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] > div:nth-child(3),
-    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] > div:nth-child(3) * { width: 56px !important; height: 56px !important; min-width: 56px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"]:has([data-testid="entity-image"]) > div:nth-child(3),
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"]:has([data-testid="entity-image"]) > div:nth-child(3) * { width: 56px !important; height: 56px !important; min-width: 56px !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowTitle"] { font-size: 16px !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowSubtitle"] { font-size: 13px !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] [data-testid="play-button"] { display: none !important; }
@@ -1729,6 +1732,20 @@
       la.setAttribute('aria-label', 'アカウント');
       la.addEventListener('click', function (ev) { ev.stopPropagation(); openDrawer(); });
       lh.parentElement.insertBefore(la, lh);
+    }
+    // ライブラリ見出しの右に 🔍（公式アプリと同じ位置）。押すと Spotify のライブラリ内検索を開く
+    var cr = document.querySelector('#Desktop_LeftSidebar_Id header button[aria-label="作成"]');
+    if (cr && !document.getElementById('m-libsearch')) {
+      var ls = document.createElement('button');
+      ls.id = 'm-libsearch';
+      ls.setAttribute('aria-label', 'マイライブラリを検索');
+      ls.innerHTML = ICONS.search;
+      ls.addEventListener('click', function () {
+        var sb = document.querySelector('#Desktop_LeftSidebar_Id [role="search"]');
+        if (sb) sb.style.setProperty('visibility', 'visible', 'important');
+        click('#Desktop_LeftSidebar_Id button[aria-label="マイライブラリを検索"], #Desktop_LeftSidebar_Id [data-testid="expand-button"]');
+      });
+      cr.parentElement.insertBefore(ls, cr);
     }
     var lav = document.getElementById('m-lib-avatar');
     if (lav && !lav.dataset.ready) { var acc = account(); if (acc.name) { setPic(lav, acc); lav.dataset.ready = '1'; } }
