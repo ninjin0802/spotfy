@@ -647,6 +647,7 @@
     #m-devices button.d.on { color: var(--m-accent, #1ed760); }
     #m-devices button.d small { display: block; color: #a7a7a7; font-size: 12px; }
     #m-devices svg { width: 28px; height: 28px; fill: currentColor; flex: none; }
+    #m-devices svg[fill="none"], #m-mini-dev svg[fill="none"], #m-mini-text svg[fill="none"] { fill: none !important; }
     #m-devices .note { color: #a7a7a7; font-size: 13px; margin: 12px 16px 0; line-height: 1.5; }
 
     /* ミニプレーヤーのデバイスボタン */
@@ -1583,15 +1584,15 @@
     add: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 1.6a8.4 8.4 0 1 0 0 16.8 8.4 8.4 0 0 0 0-16.8zM11.2 7h1.6v4.2H17v1.6h-4.2V17h-1.6v-4.2H7v-1.6h4.2z"/></svg>',
     saved: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm4.3 6.3-5.6 5.6-2.9-2.9-1.4 1.4 4.3 4.3 7-7z"/></svg>',
     shuffle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.5c2 0 3.2 1 4.2 2.6l2.6 4.8c1 1.6 2.2 2.6 4.2 2.6H21M3 17h3.5c1.3 0 2.3-.4 3.1-1.2M14.4 8.2c.8-.8 1.8-1.2 3.1-1.2H21M18 4l3 3-3 3M18 14l3 3-3 3"/></svg>',
-    prev: '<svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zm3.5 7L19 5v14z"/></svg>',
-    next: '<svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 5l9.5 7L5 19z"/></svg>',
+    prev: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="2.6" height="16" rx="1"/><path d="M19.5 4.6v14.8a.8.8 0 0 1-1.2.7L7.4 12.7a.8.8 0 0 1 0-1.4l10.9-7.4a.8.8 0 0 1 1.2.7z"/></svg>',
+    next: '<svg viewBox="0 0 24 24"><rect x="17.4" y="4" width="2.6" height="16" rx="1"/><path d="M4.5 4.6v14.8a.8.8 0 0 0 1.2.7l10.9-7.4a.8.8 0 0 0 0-1.4L5.7 3.9a.8.8 0 0 0-1.2.7z"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M7 4.5v15L20 12z"/></svg>',
     pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>',
-    repeat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6h10a4 4 0 0 1 4 4v1M17 18H7a4 4 0 0 1-4-4v-1M14 3l3 3-3 3M10 21l-3-3 3-3"/></svg>',
-    repeatOne: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6h10a4 4 0 0 1 4 4v1M17 18H7a4 4 0 0 1-4-4v-1M14 3l3 3-3 3M10 21l-3-3 3-3M12 10v5"/></svg>',
+    repeat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 18H6.5A3.5 3.5 0 0 1 3 14.5v-5A3.5 3.5 0 0 1 6.5 6h11A3.5 3.5 0 0 1 21 9.5v5a3.5 3.5 0 0 1-3.5 3.5H11"/><path d="M13 15.5 10.5 18l2.5 2.5"/></svg>',
+    repeatOne: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 18H6.5A3.5 3.5 0 0 1 3 14.5v-5A3.5 3.5 0 0 1 6.5 6h11A3.5 3.5 0 0 1 21 9.5v5a3.5 3.5 0 0 1-3.5 3.5H11"/><path d="M13 15.5 10.5 18l2.5 2.5M12 9.5v4"/></svg>',
     device: '<svg viewBox="0 0 24 24"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h11A1.5 1.5 0 0 1 16 4.5V6h-1.5V4.5h-11v10H11V16H3.5A1.5 1.5 0 0 1 2 14.5zM6 18.5h5V20H6z"/><path d="M13 9.5A1.5 1.5 0 0 1 14.5 8h6A1.5 1.5 0 0 1 22 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5zm1.5 0v10h6v-10zM17.5 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 3.5a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5zm0 1.3a.95.95 0 1 0 0 1.9.95.95 0 0 0 0-1.9z"/></svg>',
     share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6.5" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.8 10.7 15.2 6.8M8.8 13.3l6.4 3.9"/></svg>',
-    queue: '<svg viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h12v2H3zm0 6h12v2H3zm14-3 5 3-5 3z"/></svg>',
+    queue: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="3.6" rx="1.8"/><rect x="3.5" y="10.2" width="17" height="3.6" rx="1.8"/><path d="M3.5 18.2h17"/></svg>',
     lyrics: '<svg viewBox="0 0 24 24"><path d="M4 4h16v12H7l-3 3zm3 4v2h10V8zm0 4v2h7v-2z"/></svg>'
   };
 
@@ -1605,7 +1606,7 @@
 
   // ---- デバイス（Spotify Connect）切り替え ----
   var DEV_ICONS = {
-    computer: '<svg viewBox="0 0 24 24"><path d="M3 4h18v12H3zm2 2v8h14V6zM1 18h22v2H1z"/></svg>',
+    computer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4.5" width="16" height="11" rx="1"/><path d="M2 19.5h20"/></svg>',
     smartphone: '<svg viewBox="0 0 24 24"><path d="M7 2h10v20H7zm2 2v14h6V4zm3 15a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>',
     speaker: '<svg viewBox="0 0 24 24"><path d="M6 2h12v20H6zm6 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm0 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>',
     tv: '<svg viewBox="0 0 24 24"><path d="M2 5h20v12H2zm2 2v8h16V7zm4 12h8v2H8z"/></svg>'
