@@ -90,6 +90,7 @@
   window.__mConnect = {
     get: function () { return { self: connect.self, cluster: connect.cluster }; },
     auth: function () { return connect.headers && connect.headers.authorization; },
+    clientToken: function () { return connect.headers && connect.headers['client-token']; },
     onChange: function (f) { connect.listeners.push(f); },
     transfer: function (target) {
       if (!connect.base || !connect.self || !connect.headers) return Promise.reject(new Error('not ready'));

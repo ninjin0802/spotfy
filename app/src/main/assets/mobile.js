@@ -652,26 +652,53 @@
     ['desktop.settings.playlistsOnProfile', 'プレイリスト', 'ほかのユーザーは、あなたがプロフィールに追加したプレイリストを見ることができます。'],
     [null, '最近聴いたアーティスト', 'ほかのユーザーは、あなたが最近聴いたアーティストをあなたのプロフィールで確認できます。（Web Player 版では変更できません）']
   ];
-  // Spotify の設定ページを一瞬開いて、そのスイッチを読み書きする（終わったら元のページへ戻る）
-  function withPreferences(fn) {
-    var back = location.pathname !== '/preferences';
-    // 設定ページへの一時的な切り替えは見せない
-    document.documentElement.classList.add('m-busy');
-    var done = function () { setTimeout(function () { document.documentElement.classList.remove('m-busy'); }, 600); };
-    if (back) spaGo('/preferences');
-    var tries = 0;
-    (function wait() {
-      if (document.getElementById(VIS[0][0]) || ++tries > 40) {
-        Promise.resolve(fn()).then(function () { if (back) setTimeout(function () { history.back(); done(); }, 300); else done(); });
-        return;
-      }
-      setTimeout(wait, 100);
-    })();
+  // プロフィールの公開設定は Spotify の profile-privacy API（protobuf）で直接読み書きする。
+  // 読み出し: フィールド 4 = フォロワー＆フォロー中、5 = プレイリスト
+  // 書き込み: {1: ユーザー名, 3: {1: 項目名}, 値は 読み出し番号 + 1}
+  var PRIV = { follows: { path: 'show_follows', read: 4 }, playlists: { path: 'show_published_playlists', read: 5 } };
+  function privHeaders() {
+    var h = { 'content-type': 'application/x-protobuf', accept: 'application/x-protobuf' };
+    var a = window.__mConnect && __mConnect.auth(), c = window.__mConnect && __mConnect.clientToken && __mConnect.clientToken();
+    if (a) h.authorization = a;
+    if (c) h['client-token'] = c;
+    return h;
   }
-  function prefProps(id) {
-    var i = document.getElementById(id);
-    return i && i[Object.keys(i).find(function (k) { return k.indexOf('__reactProps$') === 0; })];
+  function pbStr(field, str) {
+    var b = new TextEncoder().encode(str);
+    return [(field << 3) | 2, b.length].concat([].slice.call(b));
   }
+  function privCall(op, body) {
+    return fetch('https://spclient.wg.spotify.com/profile-privacy/v2/' + op, { method: 'POST', headers: privHeaders(), body: new Uint8Array(body) })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); });
+  }
+  function privRead() {
+    return new Promise(function (res, rej) { withMyId(function (id) { privCall('read-settings', pbStr(1, id)).then(res, rej); }); })
+      .then(function (buf) {
+        var b = new Uint8Array(buf), out = {}, i = 0;
+        while (i < b.length) {
+          var tag = b[i++], field = tag >> 3, wt = tag & 7, v = 0, shift = 0, x;
+          if (wt !== 0) break;
+          do { x = b[i++]; v |= (x & 127) << shift; shift += 7; } while (x & 128);
+          out[field] = v;
+        }
+        return { follows: !!out[PRIV.follows.read], playlists: !!out[PRIV.playlists.read] };
+      });
+  }
+  function privWrite(key, value) {
+    var s = PRIV[key];
+    return new Promise(function (res, rej) {
+      withMyId(function (id) {
+        var mask = pbStr(1, s.path);
+        var body = pbStr(1, id).concat([(3 << 3) | 2, mask.length], mask, [(s.read + 1) << 3, value ? 1 : 0]);
+        privCall('store-settings', body).then(res, rej);
+      });
+    });
+  }
+  var VIS = [
+    ['follows', 'フォロワー＆フォロー中', 'ほかのユーザーは、あなたのフォロー中のユーザーとフォロワーをあなたのプロフィールで閲覧できます。'],
+    ['playlists', 'プレイリスト', 'ほかのユーザーは、あなたがプロフィールに追加したプレイリストを見ることができます。'],
+    [null, '最近聴いたアーティスト', 'ほかのユーザーは、あなたが最近聴いたアーティストをあなたのプロフィールで確認できます。（Web Player 版では変更できません）']
+  ];
   function openVisibility() {
     var sheet = document.getElementById('m-vis');
     if (!sheet) {
@@ -696,11 +723,8 @@
       if (v[0]) rows[v[0]] = cb;
       cb.addEventListener('change', function () {
         var want = cb.checked;
-        withPreferences(function () {
-          var p = prefProps(v[0]);
-          if (p && p.checked !== want) p.onChange({ target: { checked: want } });
-          return new Promise(function (res) { setTimeout(res, 800); });
-        });
+        cb.disabled = true;
+        privWrite(v[0], want).then(function () { cb.disabled = false; }, function () { cb.checked = !want; cb.disabled = false; });
       });
       sheet.appendChild(r);
     });
@@ -710,14 +734,9 @@
     all.addEventListener('click', function () { closeVisibility(); openSettings(); setTimeout(function () { renderSettingsPage('privacy', 'プライバシーとソーシャル'); }, 3200); });
     sheet.appendChild(all);
     document.documentElement.classList.add('m-vis');
-    // 今の状態を読んでスイッチに反映
-    withPreferences(function () {
-      Object.keys(rows).forEach(function (id) {
-        var p = prefProps(id);
-        rows[id].checked = !!(p && p.checked);
-        rows[id].disabled = !p;
-      });
-    });
+    privRead().then(function (st) {
+      Object.keys(rows).forEach(function (k) { rows[k].checked = st[k]; rows[k].disabled = false; });
+    }, function () {});
   }
   function closeVisibility() { document.documentElement.classList.remove('m-vis'); }
 
