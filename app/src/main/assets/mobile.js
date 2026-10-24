@@ -59,7 +59,8 @@
     html.m-search #global-nav-bar > :has(form), html.m-search #global-nav-bar > :has(form) div:has(form) {
       margin: 0 !important; flex: none !important; max-width: none !important; width: 100% !important; height: 48px !important;
     }
-    html.m-search #global-nav-bar form, html.m-search #global-nav-bar form > div { width: 100% !important; }
+    html.m-search #global-nav-bar form { width: 100% !important; position: relative !important; height: 48px !important; }
+    html.m-search #global-nav-bar form > div:not(:has([data-testid="clear-button"])) { width: 100% !important; }
     html.m-search #global-nav-bar input {
       width: 100% !important; height: 48px !important; background: #fff !important; color: #000 !important;
       border-radius: 6px !important; box-shadow: none !important; font-weight: 600 !important; font-size: 16px !important;
@@ -69,7 +70,7 @@
     html.m-search #m-avatar { display: block; top: calc(var(--m-top, 0px) + 16px); }
     /* 検索ボックスの × は右端に（虫めがねと重ならないように） */
     html.m-search #global-nav-bar form > div:has([data-testid="clear-button"]) {
-      left: auto !important; right: 4px !important; width: auto !important; justify-content: flex-end !important; top: 0 !important; bottom: 0 !important; height: auto !important; align-items: center !important;
+      left: auto !important; right: 4px !important; width: auto !important; justify-content: flex-end !important; top: 50% !important; bottom: auto !important; transform: translateY(-50%) !important; height: 48px !important; align-items: center !important;
     }
     html.m-search #global-nav-bar form > div:has([data-testid="clear-button"]) > div:not(:has([data-testid="clear-button"])) { display: none !important; }
     html.m-search #global-nav-bar input { padding-right: 48px !important; }
