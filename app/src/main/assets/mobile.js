@@ -485,7 +485,13 @@
     #m-settings .row.me .pic { width: 56px; height: 56px; border-radius: 50%; background: #535353 center/cover no-repeat; flex: none;
       display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px; }
     #m-settings .row.me b { font-size: 20px; font-weight: 700; }
-    #m-settings .row.nav { padding: 14px 16px; }
+    #m-settings .row.nav { padding: 12px 16px; gap: 18px; }
+    #m-settings .row.nav .ic { width: 30px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center; }
+    #m-settings .row.nav .ic svg { width: 30px; height: 30px; fill: none !important; }
+    #m-settings .row.nav .t b { font-size: 17px; font-weight: 400; }
+    #m-settings header { justify-content: center; position: relative; min-height: 56px; }
+    #m-settings header button { position: absolute; left: 4px; bottom: 4px; }
+    #m-settings header h1 { font-size: 17px !important; text-align: center; }
 
     /* 全画面プレーヤー */
     #m-player {
@@ -517,7 +523,7 @@
     #m-player button { background: none; border: 0; color: inherit; padding: 0; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
     #m-player button:active { transform: scale(.92); }
     #m-player svg { fill: currentColor; }
-    #m-player svg[fill="none"] { fill: none; }
+    #m-player svg[fill="none"], #m-player svg[fill="none"] * { fill: none !important; }
     #m-player .ib { width: 48px; height: 48px; }
     #m-player .ib svg { width: 24px; height: 24px; }
     #m-player .art { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 20px 0 28px; }
@@ -1182,35 +1188,26 @@
     return b;
   }
 
+  var SI = function (d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; };
   var SETTINGS_PAGES = [
-    ['account', 'アカウント', 'ユーザー名・ログアウト'],
-    ['display', 'コンテンツと表示', 'テーマ・アクセントカラー・Canvas・言語'],
-    ['playback', '再生', '音量の均一化・ギャップレス再生・バックグラウンド再生'],
-    ['privacy', 'プライバシーとソーシャル', 'フォロワー・プレイリストの公開'],
-    ['quality', 'メディアの品質', 'ストリーミングの音質'],
-    ['app', 'アプリとデバイス', 'イコライザー・プレーヤーの再起動'],
-    ['about', 'このアプリについて', 'バージョン情報']
+    ['account', 'アカウント', 'ユーザー名 • ログアウト', SI('<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="10" r="3.2"/><path d="M6.2 18.5c1.3-2.3 3.4-3.5 5.8-3.5s4.5 1.2 5.8 3.5"/>')],
+    ['display', 'コンテンツと表示', 'テーマ • Canvas • 言語', SI('<path d="M9 18V5l10-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>')],
+    ['privacy', 'プライバシーとソーシャル', 'フォロワー • 公開プレイリスト', SI('<rect x="5" y="10.5" width="14" height="10" rx="1.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>')],
+    ['playback', '再生', 'ギャップレス再生 • 音量の均一化', SI('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>')],
+    ['app', 'アプリとデバイス', 'イコライザー • プレーヤーの再起動', SI('<rect x="3" y="4" width="11" height="13" rx="1.5"/><rect x="15" y="7" width="6" height="13" rx="1.5"/><circle cx="18" cy="15.5" r="1.6"/><path d="M6 20h5"/>')],
+    ['quality', 'メディアの音質と画質', 'ストリーミングの音質', SI('<path d="M4 20V14M9 20V9M14 20V4M19 20v-8"/>')],
+    ['about', 'このアプリについて', 'バージョン情報', SI('<circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.5v.1"/>')]
   ];
 
   function renderSettingsHome() {
     settingsPage = null;
     var box = document.getElementById('m-settings');
-    settingsHeader(box, '設定とプライバシー', closeSettings);
-    var a = account();
-    var me = document.createElement('button');
-    me.className = 'row me';
-    me.innerHTML = '<div class="pic"></div><div class="t"><b></b><small>プロフィールを表示</small></div>' + CHEVRON;
-    setPic(me.querySelector('.pic'), a);
-    me.querySelector('b').textContent = a.name;
-    me.addEventListener('click', function () {
-      closeSettings();
-      setTimeout(openProfile, 300);
-    });
-    box.appendChild(me);
+    settingsHeader(box, '設定', closeSettings);
+    box.classList.add('m-set-home');
     SETTINGS_PAGES.forEach(function (pg) {
       var r = document.createElement('button');
       r.className = 'row nav';
-      r.innerHTML = '<div class="t"><b></b><small></small></div>' + CHEVRON;
+      r.innerHTML = '<span class="ic">' + pg[3] + '</span><div class="t"><b></b><small></small></div>';
       r.querySelector('b').textContent = pg[1];
       r.querySelector('small').textContent = pg[2];
       r.addEventListener('click', function () { renderSettingsPage(pg[0], pg[1]); });
@@ -1221,6 +1218,7 @@
   function renderSettingsPage(id, title) {
     settingsPage = id;
     var box = document.getElementById('m-settings');
+    box.classList.remove('m-set-home');
     settingsHeader(box, title, renderSettingsHome);
     var sec = function (name, rows) { settingsSection(box, name, rows); };
     if (id === 'account') {
@@ -1370,13 +1368,13 @@
     heartOff: '<svg viewBox="0 0 24 24"><path d="M12 21 10.6 19.7C5.4 15 2 12 2 8.3 2 5.3 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.3 22 8.3c0 3.7-3.4 6.7-8.6 11.4zM7.4 5C5.5 5 4 6.4 4 8.3c0 2.8 2.9 5.4 8 10 5.1-4.6 8-7.2 8-10C20 6.4 18.5 5 16.6 5c-1.4 0-2.8.9-3.3 2.2h-2.6C10.2 5.9 8.8 5 7.4 5z"/></svg>',
     add: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 1.6a8.4 8.4 0 1 0 0 16.8 8.4 8.4 0 0 0 0-16.8zM11.2 7h1.6v4.2H17v1.6h-4.2V17h-1.6v-4.2H7v-1.6h4.2z"/></svg>',
     saved: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm4.3 6.3-5.6 5.6-2.9-2.9-1.4 1.4 4.3 4.3 7-7z"/></svg>',
-    shuffle: '<svg viewBox="0 0 24 24"><path d="M14.8 4H20v5.2l-1.9-1.9-3.4 3.4-1.4-1.4 3.4-3.4zM4 5.4 5.4 4 20 18.6 18.6 20zm10.7 8 1.4-1.4 2 2L20 12.2V20h-5.2l1.9-1.9z"/></svg>',
+    shuffle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.5c2 0 3.2 1 4.2 2.6l2.6 4.8c1 1.6 2.2 2.6 4.2 2.6H21M3 17h3.5c1.3 0 2.3-.4 3.1-1.2M14.4 8.2c.8-.8 1.8-1.2 3.1-1.2H21M18 4l3 3-3 3M18 14l3 3-3 3"/></svg>',
     prev: '<svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zm3.5 7L19 5v14z"/></svg>',
     next: '<svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 5l9.5 7L5 19z"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M7 4.5v15L20 12z"/></svg>',
     pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>',
-    repeat: '<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg>',
-    repeatOne: '<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2zm-4-2V9h-1l-2 1v1h1.5v4z"/></svg>',
+    repeat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6h10a4 4 0 0 1 4 4v1M17 18H7a4 4 0 0 1-4-4v-1M14 3l3 3-3 3M10 21l-3-3 3-3"/></svg>',
+    repeatOne: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6h10a4 4 0 0 1 4 4v1M17 18H7a4 4 0 0 1-4-4v-1M14 3l3 3-3 3M10 21l-3-3 3-3M12 10v5"/></svg>',
     device: '<svg viewBox="0 0 24 24"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h11A1.5 1.5 0 0 1 16 4.5V6h-1.5V4.5h-11v10H11V16H3.5A1.5 1.5 0 0 1 2 14.5zM6 18.5h5V20H6z"/><path d="M13 9.5A1.5 1.5 0 0 1 14.5 8h6A1.5 1.5 0 0 1 22 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5zm1.5 0v10h6v-10zM17.5 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 3.5a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5zm0 1.3a.95.95 0 1 0 0 1.9.95.95 0 0 0 0-1.9z"/></svg>',
     share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6.5" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.8 10.7 15.2 6.8M8.8 13.3l6.4 3.9"/></svg>',
     queue: '<svg viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h12v2H3zm0 6h12v2H3zm14-3 5 3-5 3z"/></svg>',
@@ -1404,6 +1402,14 @@
     if (/speaker|avr|stb|audio/.test(type)) return DEV_ICONS.speaker;
     if (/tv|cast|game/.test(type)) return DEV_ICONS.tv;
     return DEV_ICONS.computer;
+  }
+
+  function remoteDeviceType() {
+    var st = window.__mConnect && __mConnect.get();
+    var c = st && st.cluster;
+    if (!c || !c.active_device_id || c.active_device_id === st.self) return '';
+    var d = c.devices && c.devices[c.active_device_id];
+    return d ? d.device_type || 'computer' : '';
   }
 
   function activeDeviceName() {
@@ -1593,13 +1599,13 @@
         }
       });
     }
-    el.querySelector('.meta span').textContent = by ? by.textContent : '';
+    el.querySelector('.meta .t > span').textContent = by ? by.textContent : '';
     // 再生元（プレイリスト・アルバムなど）は Connect の状態から
     var st = window.__mConnect && __mConnect.get();
     var ps = st && st.cluster && st.cluster.player_state;
     var cu = ps && ps.context_uri || '';
     var cname = ps && ps.context_metadata && (ps.context_metadata.context_description || ps.context_metadata.title) || '';
-    var kind = /:playlist:/.test(cu) ? 'プレイリスト' : /:album:/.test(cu) ? 'アルバム' : /:artist:/.test(cu) ? 'アーティスト' : /:collection/.test(cu) ? 'お気に入りの曲' : '';
+    var kind = /:playlist:|:list:/.test(cu) ? 'プレイリスト' : /:album:/.test(cu) ? 'アルバム' : /:artist:/.test(cu) ? 'アーティスト' : /:collection/.test(cu) ? 'お気に入りの曲' : /:show:/.test(cu) ? '番組' : cname ? 'プレイリスト' : '';
     el.querySelector('.ctx small').textContent = kind ? kind + 'から再生中' : '再生中';
     el.querySelector('.ctx b').textContent = cname || (kind === 'お気に入りの曲' ? 'お気に入りの曲' : (by ? by.textContent : ''));
     var pp = q('[data-testid="control-button-playpause"]');
@@ -1630,6 +1636,8 @@
     }
     var remote = activeDeviceName();
     el.querySelector('.dev span').textContent = remote || 'このスマホ';
+    var dt = remoteDeviceType();
+    if (el.querySelector('.dev').dataset.t !== dt) { el.querySelector('.dev').dataset.t = dt; el.querySelector('.dev svg').outerHTML = dt ? devIcon(dt) : P.device; }
   }
 
   // Android のメディアコントロールからの操作
