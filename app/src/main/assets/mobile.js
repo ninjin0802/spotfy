@@ -185,12 +185,15 @@
     /* 表示切り替え（リスト／コンパクト）ボタンは公式アプリにないので消す */
     main [data-testid="action-bar-row"] button[aria-haspopup="true"]:not([data-testid]) { display: none !important; }
 
-    /* プロフィール：大きな丸いアイコンを中央に、その下に名前 */
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) { height: auto !important; max-height: none !important; min-height: 0 !important; padding: 64px 16px 16px !important; }
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child { display: flex !important; flex-direction: column !important; align-items: center !important; text-align: center !important; height: auto !important; gap: 12px !important; }
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="user-image"], main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="edit-image-button"] { width: 140px !important; height: 140px !important; }
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="entityTitle"] h1 { font-size: 28px !important; font-weight: 800 !important; }
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child { align-items: center !important; width: 100% !important; }
+    /* プロフィール：公式アプリと同じく、左に大きな丸いアイコン、右に名前とフォロー情報 */
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) { height: auto !important; max-height: none !important; min-height: 0 !important; padding: 64px 16px 20px !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child { display: flex !important; flex-direction: row !important; align-items: center !important; height: auto !important; gap: 16px !important; padding: 0 !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > :first-child { width: 96px !important; height: 96px !important; min-width: 96px !important; margin: 0 !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="user-image"], main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="edit-image-button"] { width: 96px !important; height: 96px !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child { flex: 1 1 auto !important; min-width: 0 !important; width: auto !important; align-items: flex-start !important; text-align: left !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child > span:first-child:not(:has(h1)) { display: none !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="entityTitle"] { width: auto !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="entityTitle"] h1 { font-size: 26px !important; font-weight: 800 !important; line-height: 1.15 !important; white-space: normal !important; word-break: normal !important; }
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
@@ -199,6 +202,8 @@
     }
     #m-back svg { width: 22px; height: 22px; fill: currentColor; }
     html.m-detail #m-back { display: flex; }
+    /* スクロールすると出る上部バーのタイトルが戻るボタンに重ならないように */
+    html.m-detail [data-testid="topbar-content-wrapper"] { padding-left: 44px !important; }
     html.m-lib #m-back, html.m-search #m-back, html.m-player #m-back, html.m-settings #m-back { display: none !important; }
 
     /* コンテンツ */
@@ -225,10 +230,13 @@
     }
     html.m-drawer #m-drawer-bg { display: block; }
     html.m-drawer #m-drawer { transform: none; }
-    #m-drawer .me { display: flex; align-items: center; gap: 12px; padding: 24px 16px 16px; border-bottom: 1px solid #333; }
-    #m-drawer .me .pic { width: 48px; height: 48px; border-radius: 50%; background: #535353 center/cover no-repeat; flex: none; }
-    #m-drawer .me b { display: block; font-size: 18px; }
+    #m-drawer { background: #1f1f1f !important; padding-top: 8px; }
+    #m-drawer .me { display: flex; align-items: center; gap: 12px; padding: 16px 16px 20px !important; border-bottom: 1px solid rgba(255,255,255,.1); }
+    #m-drawer .me .pic { width: 40px; height: 40px; border-radius: 50%; background: #535353 center/cover no-repeat; flex: none;
+      display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; }
+    #m-drawer .me b { display: block; font-size: 17px; font-weight: 700; line-height: 1.2; }
     #m-drawer .me small { color: #b3b3b3; font-size: 13px; }
+    #m-drawer .me + button.item { margin-top: 8px; }
     #m-drawer button.item {
       display: flex; align-items: center; gap: 16px; width: 100%; padding: 16px; background: none; border: 0;
       color: #fff; font-size: 16px; text-align: left;
@@ -434,7 +442,8 @@
   };
 
   var DRAWER_ICONS = {
-    news: '<svg viewBox="0 0 24 24"><path d="M12 2a6 6 0 0 0-6 6v4l-2 3v1h16v-1l-2-3V8a6 6 0 0 0-6-6zm0 20a2.5 2.5 0 0 0 2.4-2H9.6A2.5 2.5 0 0 0 12 22z"/></svg>',
+    news: '<svg viewBox="0 0 24 24"><path d="M12 2a6.5 6.5 0 0 1 6.5 6.5v3.9l1.9 3.1V17H3.6v-1.5l1.9-3.1V8.5A6.5 6.5 0 0 1 12 2zm0 1.8a4.7 4.7 0 0 0-4.7 4.7v4.4l-1.4 2.3h12.2l-1.4-2.3V8.5A4.7 4.7 0 0 0 12 3.8zM9.6 19h4.8a2.5 2.5 0 0 1-4.8 0z"/></svg>',
+    history: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4zM11.1 6h1.8v5.6l4 2.3-.9 1.6-4.9-2.8z"/></svg>',
     friends: '<svg viewBox="0 0 24 24"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-4 0-7 2-7 4.5V20h14v-2.5C16 15 13 13 9 13zm7.5-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm1 2.1c1.9.7 3.5 2.1 3.5 4.4V20h2v-2.5c0-2.1-2.3-3.9-5.5-4.4z"/></svg>',
     settings: '<svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1L11 21h4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>',
     logout: '<svg viewBox="0 0 24 24"><path d="M10 3H4v18h6v-2H6V5h4zm6.6 4.6-1.4 1.4 2 2H9v2h8.2l-2 2 1.4 1.4L21 12z"/></svg>'
@@ -455,14 +464,11 @@
   var myId = null;
   function openProfile() {
     if (myId) return spaGo('/user/' + myId);
-    var auth = window.__mConnect && __mConnect.auth();
-    var viaMenu = function () { userMenu(function (e) { return /^\/user\//.test((e.getAttribute('href') || '').replace(/^\/intl-[a-z-]+/i, '')); }); };
-    if (!auth) return viaMenu();
-    fetch('https://api.spotify.com/v1/me', { headers: { authorization: auth } })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (me) {
-        if (me && me.id) { myId = me.id; spaGo('/user/' + myId); } else viaMenu();
-      }, viaMenu);
+    var api = service('UserAPI');
+    if (!api) return;
+    Promise.resolve(api.getUser()).then(function (u) {
+      if (u && u.username) { myId = u.username; spaGo('/user/' + myId); }
+    }, function () {});
   }
 
   function account() {
@@ -572,9 +578,10 @@
     ['high', '高音質', '約 160 kbps'],
     ['very_high', '最高音質', '約 320 kbps（Spotify Premium のみ）']
   ];
-  var sdkCache = null;
-  function playerSdk() {
-    if (sdkCache) return sdkCache;
+  // Web Player 内部のサービス（PlayerSDK・UserAPI など）を名前で取り出す
+  var registryCache = null;
+  function registry() {
+    if (registryCache) return registryCache;
     var host = document.getElementById('main');
     if (!host) return null;
     var els = [host].concat([].slice.call(host.querySelectorAll('*')));
@@ -585,18 +592,21 @@
       while (stack.length) {
         var f = stack.pop();
         var v = f.memoizedProps && f.memoizedProps.value;
-        if (v && typeof v === 'object' && typeof v.getRegistry === 'function') {
-          var reg = v.getRegistry(), key = null;
-          reg._map.forEach(function (_, rk) { if (rk && rk.description === 'PlayerSDK') key = rk; });
-          sdkCache = key ? reg.resolve(key) : null;
-          return sdkCache;
-        }
+        if (v && typeof v === 'object' && typeof v.getRegistry === 'function') return (registryCache = v.getRegistry());
         if (f.sibling) stack.push(f.sibling);
         if (f.child) stack.push(f.child);
       }
     }
     return null;
   }
+  function service(name) {
+    var reg = registry();
+    if (!reg) return null;
+    var key = null;
+    reg._map.forEach(function (_, rk) { if (rk && rk.description === name) key = rk; });
+    return key ? reg.resolve(key) : null;
+  }
+  function playerSdk() { return service('PlayerSDK'); }
   function streamer() {
     var sdk = playerSdk();
     return sdk && sdk.harmony && sdk.harmony._streamer;
@@ -699,10 +709,10 @@
   }
 
   var SETTINGS_PAGES = [
-    ['account', 'アカウント', 'ログイン情報・ログアウト'],
+    ['account', 'アカウント', 'ユーザー名・ログアウト'],
     ['display', 'コンテンツと表示', 'テーマ・アクセントカラー・Canvas・言語'],
-    ['playback', '再生', '音量の均一化・自動再生・バックグラウンド再生'],
-    ['privacy', 'プライバシーとソーシャル', '再生状況・フォロワーの公開'],
+    ['playback', '再生', '音量の均一化・バックグラウンド再生'],
+    ['privacy', 'プライバシーとソーシャル', 'フォロワー・プレイリストの公開'],
     ['quality', 'メディアの品質', 'ストリーミングの音質'],
     ['app', 'アプリとデバイス', 'イコライザー・プレーヤーの再起動'],
     ['about', 'このアプリについて', 'バージョン情報']
@@ -1303,10 +1313,9 @@
       openProfile();
     });
     [
-      ['news', '最新情報', function () { click('[data-testid="whats-new-feed-button"]'); }],
-      ['friends', '再生状況（フレンド）', function () { click('[data-testid="friend-activity-button"]'); document.documentElement.classList.add('m-np'); }],
-      ['settings', '設定', openSettings],
-      ['logout', 'ログアウト', function () { userMenu(function (e) { return /ログアウト|Log out/.test(e.textContent); }); }]
+      ['news', '最新情報', function () { spaGo('/content-feed'); }],
+      ['history', '再生履歴', function () { spaGo('/genre/recently-played'); }],
+      ['settings', '設定とプライバシー', openSettings]
     ].forEach(function (it) {
       var b = document.createElement('button');
       b.className = 'item';
@@ -1314,7 +1323,7 @@
       b.innerHTML = DRAWER_ICONS[it[0]] + '<span>' + it[1] + '</span>';
       b.addEventListener('click', function () {
         closeDrawer();
-        if (it[0] !== 'friends' && it[0] !== 'settings') setTab('home');
+        if (it[0] !== 'settings') setTab('home');
         it[2]();
       });
       d.appendChild(b);
