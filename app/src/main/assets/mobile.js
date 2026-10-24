@@ -85,6 +85,32 @@
       z-index: 9000 !important; background: #121212 !important; margin: 0 !important;
     }
     html.m-lib #Desktop_LeftSidebar_Id button[aria-label*="全画面"], html.m-lib #Desktop_LeftSidebar_Id button[aria-label*="拡大"] { display: none !important; }
+    /* ライブラリ：公式アプリ風（アイコン＋大きな見出し、丸いフィルター、大きめのサムネイル） */
+    html.m-lib #Desktop_LeftSidebar_Id header { padding: 8px 16px 0 !important; }
+    html.m-lib #Desktop_LeftSidebar_Id header h1 { margin-left: 12px !important; font-size: 24px !important; font-weight: 800 !important; line-height: 32px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id header button[aria-label*="折りたたむ"] > span:first-child,
+    html.m-lib #Desktop_LeftSidebar_Id header button[aria-label*="展開"],
+    html.m-lib #Desktop_LeftSidebar_Id header button[aria-label="作成"] > span,
+    html.m-lib #Desktop_LeftSidebar_Id [data-testid="carousel-previous-button"],
+    html.m-lib #Desktop_LeftSidebar_Id [data-testid="carousel-next-button"] { display: none !important; }
+    html.m-lib #Desktop_LeftSidebar_Id header button[aria-label*="折りたたむ"] { pointer-events: none; padding-left: 0 !important; margin-left: 0 !important; }
+    html.m-lib #Desktop_LeftSidebar_Id header button[aria-label="作成"] {
+      width: 40px !important; height: 40px !important; padding: 0 !important; justify-content: center !important; background: none !important;
+    }
+    html.m-lib #Desktop_LeftSidebar_Id header button[aria-label="作成"] svg { width: 24px !important; height: 24px !important; }
+    #m-lib-avatar { width: 32px; height: 32px; border-radius: 50%; background: #535353 center/cover no-repeat; flex: none; margin-right: 12px;
+      border: 0; padding: 0; color: #000; font-weight: 700; font-size: 14px; }
+    html.m-lib #Desktop_LeftSidebar_Id [role="listbox"] [role="option"] > * {
+      border-radius: 16px !important; height: 32px !important; padding: 0 14px !important; font-size: 13px !important;
+    }
+    html.m-lib #Desktop_LeftSidebar_Id [role="grid"] { margin: 0 !important; left: 0 !important; width: 100% !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] { padding: 4px 16px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-testid="entity-image"],
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] > div:nth-child(3),
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] > div:nth-child(3) * { width: 56px !important; height: 56px !important; min-width: 56px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowTitle"] { font-size: 16px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowSubtitle"] { font-size: 13px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] [data-testid="play-button"] { display: none !important; }
     /* ライブラリ表示中もミニプレーヤーは見せる */
     html.m-lib #Desktop_LeftSidebar_Id { height: calc(100vh - ${NAV_H}px - 64px) !important; }
     html.m-lib #Desktop_LeftSidebar_Id *, html.m-np .m-right > * { max-width: none !important; }
@@ -211,15 +237,25 @@
     /* 全画面プレーヤー */
     #m-player {
       position: fixed; inset: 0; z-index: 10010; color: #fff; font-family: inherit; display: flex; flex-direction: column;
-      padding: 4px 24px 20px; box-sizing: border-box; transform: translateY(100%); overflow: hidden;
-      transition: transform .32s cubic-bezier(.2,.8,.2,1); background: #121212; touch-action: none;
+      padding: 0; box-sizing: border-box; transform: translateY(100%); overflow-x: hidden; overflow-y: auto;
+      transition: transform .32s cubic-bezier(.2,.8,.2,1); background: #121212; overscroll-behavior: contain;
     }
+    /* 公式アプリと同じく、ジャケットの色をそのまま背景に。下の方だけ暗くする */
+    #m-player .page {
+      min-height: 100%; display: flex; flex-direction: column; padding: 4px 24px 20px; box-sizing: border-box; flex: none;
+      background: linear-gradient(to bottom, var(--m-tint2, #535353) 0%, var(--m-tint2, #535353) 35%, var(--m-tint, #404040) 100%);
+    }
+    #m-player .extras { padding: 8px 16px 32px; display: flex; flex-direction: column; gap: 16px; background: var(--m-tint, #404040); }
+    #m-player .card { border-radius: 10px; padding: 16px; background: rgba(0,0,0,.28); text-align: left; color: #fff; display: block; width: 100%; box-sizing: border-box; }
+    #m-player .card h3 { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
+    #m-player .card p { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; color: rgba(255,255,255,.85); }
+    #m-player .card.artist p { font-size: 22px; }
+    #m-player .card small { display: block; margin-top: 10px; font-size: 13px; color: rgba(255,255,255,.7); }
     #m-player.dragging { transition: none; }
+    #m-player::-webkit-scrollbar { display: none; }
     html.m-player #m-player { transform: none; }
     /* ジャケットをぼかした背景＋色のグラデーション */
-    #m-player .bg { position: absolute; inset: -40px; z-index: -2; background: center/cover no-repeat; filter: blur(60px) saturate(1.4); opacity: .45; }
-    #m-player .shade { position: absolute; inset: 0; z-index: -1;
-      background: linear-gradient(to bottom, var(--m-tint, #404040) 0%, rgba(18,18,18,.55) 55%, #121212 100%); opacity: .92; }
+
     #m-player .grab { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.35); margin: 6px auto 0; flex: none; }
     #m-player .top { display: flex; align-items: center; height: 52px; margin: 0 -12px; flex: none; }
     #m-player .top .ctx { flex: 1; text-align: center; min-width: 0; }
@@ -232,8 +268,8 @@
     #m-player .ib svg { width: 24px; height: 24px; }
     #m-player .art { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 20px 0 28px; }
     #m-player .art img {
-      width: 100%; max-height: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px;
-      box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.35);
+      width: 100%; max-height: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px;
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
       transition: transform .45s cubic-bezier(.2,.8,.2,1);
     }
     #m-player.paused .art img { transform: scale(.88); }
@@ -243,6 +279,7 @@
     #m-player .meta span { display: block; color: rgba(255,255,255,.7); font-size: 16px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #m-player .like svg { width: 28px; height: 28px; }
     #m-player .like.on { color: var(--m-accent, #1ed760); }
+    #m-player .like.on svg { color: var(--m-accent, #1ed760); }
     #m-player .seek { margin-top: 18px; flex: none; }
     #m-player input[type=range] {
       width: 100%; height: 4px; -webkit-appearance: none; appearance: none; border-radius: 2px; margin: 10px 0 6px; outline: none;
@@ -637,7 +674,8 @@
         var n = d.length / 4, k = 0.45;
         var rgb = 'rgb(' + Math.round(r / n * k) + ',' + Math.round(gr / n * k) + ',' + Math.round(b / n * k) + ')';
         bar.style.setProperty('background-color', rgb, 'important');
-        document.documentElement.style.setProperty('--m-tint', 'rgb(' + Math.round(r / n * 0.7) + ',' + Math.round(gr / n * 0.7) + ',' + Math.round(b / n * 0.7) + ')');
+        document.documentElement.style.setProperty('--m-tint', 'rgb(' + Math.round(r / n * 0.5) + ',' + Math.round(gr / n * 0.5) + ',' + Math.round(b / n * 0.5) + ')');
+        document.documentElement.style.setProperty('--m-tint2', 'rgb(' + Math.round(r / n * 0.8) + ',' + Math.round(gr / n * 0.8) + ',' + Math.round(b / n * 0.8) + ')');
       } catch (e) {}
     };
     probe.src = img.src;
@@ -649,6 +687,8 @@
     more: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
     heart: '<svg viewBox="0 0 24 24"><path d="M12 21 10.6 19.7C5.4 15 2 12 2 8.3 2 5.3 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.3 22 8.3c0 3.7-3.4 6.7-8.6 11.4z"/></svg>',
     heartOff: '<svg viewBox="0 0 24 24"><path d="M12 21 10.6 19.7C5.4 15 2 12 2 8.3 2 5.3 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.3 22 8.3c0 3.7-3.4 6.7-8.6 11.4zM7.4 5C5.5 5 4 6.4 4 8.3c0 2.8 2.9 5.4 8 10 5.1-4.6 8-7.2 8-10C20 6.4 18.5 5 16.6 5c-1.4 0-2.8.9-3.3 2.2h-2.6C10.2 5.9 8.8 5 7.4 5z"/></svg>',
+    add: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 1.6a8.4 8.4 0 1 0 0 16.8 8.4 8.4 0 0 0 0-16.8zM11.2 7h1.6v4.2H17v1.6h-4.2V17h-1.6v-4.2H7v-1.6h4.2z"/></svg>',
+    saved: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm4.3 6.3-5.6 5.6-2.9-2.9-1.4 1.4 4.3 4.3 7-7z"/></svg>',
     shuffle: '<svg viewBox="0 0 24 24"><path d="M14.8 4H20v5.2l-1.9-1.9-3.4 3.4-1.4-1.4 3.4-3.4zM4 5.4 5.4 4 20 18.6 18.6 20zm10.7 8 1.4-1.4 2 2L20 12.2V20h-5.2l1.9-1.9z"/></svg>',
     prev: '<svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zm3.5 7L19 5v14z"/></svg>',
     next: '<svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 5l9.5 7L5 19z"/></svg>',
@@ -767,11 +807,11 @@
     var el = document.createElement('section');
     el.id = 'm-player';
     el.innerHTML =
-      '<div class="bg"></div><div class="shade"></div><div class="grab"></div>' +
+      '<div class="page"><div class="grab"></div>' +
       '<div class="top"><button class="ib down" aria-label="閉じる">' + P.down + '</button>' +
       '<div class="ctx"><small>再生中</small><b></b></div><button class="ib more" aria-label="その他">' + P.more + '</button></div>' +
       '<div class="art"><img alt=""></div>' +
-      '<div class="meta"><div class="t"><b></b><span></span></div><button class="ib like" aria-label="お気に入り">' + P.heartOff + '</button></div>' +
+      '<div class="meta"><div class="t"><b></b><span></span></div><button class="ib like" aria-label="お気に入りに追加">' + P.add + '</button></div>' +
       '<div class="seek"><input type="range" min="0" max="1000" value="0"><div class="times"><span class="pos">0:00</span><span class="dur">0:00</span></div></div>' +
       '<div class="ctrls"><button class="ib s shuffle" aria-label="シャッフル">' + P.shuffle + '</button>' +
       '<button class="ib m prev" aria-label="前へ">' + P.prev + '</button>' +
@@ -781,7 +821,9 @@
       '<div class="bottom"><button class="dev">' + P.device + '<span>このデバイス</span></button>' +
       '<button class="ib lyrics" aria-label="歌詞">' + P.lyrics + '</button>' +
       '<button class="ib share" aria-label="共有">' + P.share + '</button>' +
-      '<button class="ib queue" aria-label="キュー">' + P.queue + '</button></div>';
+      '<button class="ib queue" aria-label="キュー">' + P.queue + '</button></div></div>' +
+      '<div class="extras"><button class="card lyrics-card"><h3>歌詞</h3><p>タップして歌詞を表示</p></button>' +
+      '<button class="card artist"><h3>アーティストについて</h3><p></p><small>アーティストのページを開く</small></button></div>';
     document.body.appendChild(el);
 
     var close = document.createElement('button');
@@ -801,6 +843,8 @@
     on('.like', function () { var b = q('[data-testid="now-playing-widget-v2"] button[aria-checked]'); if (b) b.click(); });
     on('.dev', openDevices);
     on('.queue', function () { openPanel(q('[data-testid="control-button-queue"]')); });
+    on('.lyrics-card', function () { closePlayer(); var b = q('[data-testid="lyrics-button"]'); if (b) b.click(); });
+    on('.extras .artist', function () { closePlayer(); var a = q('[data-testid="now-playing-widget-v2"] a[href*="/artist/"]'); if (a) a.click(); });
     on('.lyrics', function () { closePlayer(); var b = q('[data-testid="lyrics-button"]'); if (b) b.click(); });
     on('.more', function () { closePlayer(); var a = q('[data-testid="now-playing-widget-v2"] a[href*="/album/"]'); if (a) a.click(); });
     on('.share', function () {
@@ -812,13 +856,14 @@
     // 下にスワイプして閉じる
     var startY = null, dy = 0;
     el.addEventListener('touchstart', function (e) {
-      if (e.target.closest('input, .ctrls, .bottom')) return;
+      if (e.target.closest('input, .ctrls, .bottom, .extras') || el.scrollTop > 0) return;
       startY = e.touches[0].clientY; dy = 0;
       el.classList.add('dragging');
     }, { passive: true });
     el.addEventListener('touchmove', function (e) {
       if (startY == null) return;
       dy = Math.max(0, e.touches[0].clientY - startY);
+      if (el.scrollTop > 0) { dy = 0; return; }
       el.style.transform = 'translateY(' + dy + 'px)';
     }, { passive: true });
     el.addEventListener('touchend', function () {
@@ -853,7 +898,6 @@
     var pic = el.querySelector('.art img');
     if (src && pic.getAttribute('src') !== src) {
       pic.src = src;
-      el.querySelector('.bg').style.backgroundImage = 'url("' + src + '")';
     }
     el.querySelector('.meta b').textContent = title ? title.textContent : '';
     el.querySelector('.meta span').textContent = by ? by.textContent : '';
@@ -865,7 +909,9 @@
     var like = q('[data-testid="now-playing-widget-v2"] button[aria-checked]');
     var liked = like && like.getAttribute('aria-checked') === 'true';
     el.querySelector('.like').classList.toggle('on', !!liked);
-    el.querySelector('.like').innerHTML = liked ? P.heart : P.heartOff;
+    el.querySelector('.like').innerHTML = liked ? P.saved : P.add;
+    var ln = el.querySelector('.extras .artist p');
+    if (ln) ln.textContent = by ? by.textContent : '';
     var rep = q('[data-testid="control-button-repeat"]');
     var rs = rep ? rep.getAttribute('aria-checked') : 'false';
     el.querySelector('.repeat').classList.toggle('on', rs === 'true' || rs === 'mixed');
@@ -972,6 +1018,17 @@
   function updateMini() {
     sendMeta();
     renderMiniText();
+    // ライブラリの見出しの左に自分のアイコン（タップでドロワー）
+    var lh = document.querySelector('#Desktop_LeftSidebar_Id header button[aria-label*="折りたたむ"], #Desktop_LeftSidebar_Id header button[aria-label*="Collapse"]');
+    if (lh && !document.getElementById('m-lib-avatar')) {
+      var la = document.createElement('button');
+      la.id = 'm-lib-avatar';
+      la.setAttribute('aria-label', 'アカウント');
+      la.addEventListener('click', function (ev) { ev.stopPropagation(); openDrawer(); });
+      lh.parentElement.insertBefore(la, lh);
+    }
+    var lav = document.getElementById('m-lib-avatar');
+    if (lav && !lav.dataset.ready) { var acc = account(); if (acc.name) { setPic(lav, acc); lav.dataset.ready = '1'; } }
     var pp = q('[data-testid="control-button-playpause"]');
     var btn = document.getElementById('m-mini-pp');
     if (btn && pp) {
