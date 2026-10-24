@@ -203,16 +203,23 @@
     #main-view [data-testid="carousel-scroller"] * { scroll-snap-align: none !important; }
 
     /* ホーム：公式アプリ風のショートカットと棚 */
+    .m-sticky { padding-top: 0 !important; }
+    html.m-home .m-nobg { background: none !important; background-color: transparent !important; }
+    /* 棚は左に 16px の余白から始める（Web 版の矢印用の負の余白をなくす） */
+    #main-view div:has(> [data-testid="carousel-scroller"]) { margin-left: 0 !important; margin-right: 0 !important; }
+    main [data-testid="component-shelf"] [data-testid="carousel-scroller"] { padding: 0 !important; margin-left: -28px !important; width: calc(100% + 44px) !important; }
+    main [data-testid="component-shelf"] [data-testid="see-all-link"]:not(h2 *), main [data-testid="rich-title-row-shelf-header"] a[href]:not(h2 a) { display: none !important; }
     main [data-testid="carousel-previous-button"], main [data-testid="carousel-next-button"] { display: none !important; }
-    main [data-testid="shortcut-background"] { height: 56px !important; border-radius: 4px !important; background: rgba(255,255,255,.1) !important; }
-    main [data-testid="shortcut-image"] { width: 56px !important; height: 56px !important; }
+    main div:has(> [data-testid="shortcut-background"]), main div:has(> div > [data-testid="shortcut-background"]) { height: 42px !important; min-height: 0 !important; }
+    main [data-testid="shortcut-background"] { height: 42px !important; border-radius: 4px !important; background: rgba(255,255,255,.1) !important; }
+    main [data-testid="shortcut-image"] { width: 42px !important; height: 42px !important; }
     main [data-testid="home-page"] [data-testid="component-shelf"] h2 { font-size: 22px !important; font-weight: 800 !important; letter-spacing: -.01em; }
     main [data-testid="home-page"] [data-testid="component-shelf"] [role="listitem"] { padding: 0 12px 0 0 !important; background: none !important; }
     main [data-testid="home-page"] [data-testid="component-shelf"] [data-testid="card-image"] { border-radius: 4px !important; }
     main [data-testid="home-page"] [data-testid="component-shelf"] [data-testid="play-button"] { display: none !important; }
 
     /* アーティストページ：大きな写真の上に名前、操作は「フォロー・…」左／シャッフル・再生 右 */
-    main [data-testid="artist-page"] [data-testid="entity-header"] { min-height: 340px !important; }
+    main [data-testid="artist-page"] [data-testid="entity-header"] { min-height: 270px !important; height: 270px !important; }
     main [data-testid="artist-page"] [data-testid="entityTitle"] h1 { font-size: 44px !important; line-height: 1.05 !important; font-weight: 900 !important; }
     main [data-testid="artist-page"] [data-testid="action-bar-row"] { display: flex !important; align-items: center !important; gap: 12px !important; }
     main [data-testid="artist-page"] [data-testid="action-bar-row"] > :first-child { order: 10; margin-left: auto !important; }
@@ -222,12 +229,12 @@
     main [data-testid="artist-page"] h2 { font-size: 20px !important; font-weight: 800 !important; }
     main [data-testid="artist-page"] [data-testid="tracklist-row"] { padding: 0 !important; }
     /* アルバム・プレイリスト：ジャケットを中央に大きく、その下に左寄せでタイトルと情報 */
-    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] { height: auto !important; min-height: 0 !important; max-height: none !important; padding-top: calc(var(--m-top, 0px) + 56px) !important; padding-bottom: 8px !important; margin-top: calc(-1 * var(--m-top, 0px)) !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] { height: auto !important; min-height: 0 !important; max-height: none !important; padding-top: calc(var(--m-top, 0px) + 10px) !important; padding-bottom: 8px !important; margin-top: calc(-1 * var(--m-top, 0px)) !important; }
     main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child {
       display: flex !important; flex-direction: column !important; align-items: stretch !important; height: auto !important; padding: 0 16px !important; gap: 12px !important;
     }
     main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child > :not(:has(h1)):has(img) {
-      align-self: center !important; width: 64vw !important; height: 64vw !important; margin: 0 0 8px !important;
+      align-self: center !important; width: 58vw !important; height: 58vw !important; margin: 0 0 8px !important;
     }
     main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child > :not(:has(h1)):has(img) * { width: 100% !important; height: 100% !important; }
     main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] img { box-shadow: 0 8px 32px rgba(0,0,0,.5) !important; border-radius: 4px !important; object-fit: cover; }
@@ -350,6 +357,16 @@
     .m-bigcard [data-testid="add-button"] svg { width: 30px !important; height: 30px !important; }
     .m-bigcard .m-card-play { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 0; color: #000; display: flex; align-items: center; justify-content: center; }
     .m-bigcard .m-card-play svg { width: 20px; height: 20px; fill: #000; }
+
+    /* 操作の並びは公式アプリと同じく、右端に「シャッフル・再生」 */
+    main [data-testid="action-bar-row"] button[aria-label*="シャッフル"], main [data-testid="action-bar-row"] button[aria-label*="huffle"] { order: 9 !important; margin-left: auto !important; }
+    main [data-testid="action-bar-row"]:has(button[aria-label*="シャッフル"]) > :first-child { margin-left: 12px !important; }
+    /* 曲の行は ⊕ と再生時間を出さず、縦の「⋮」だけ（公式アプリと同じ） */
+    main [data-testid="tracklist-row"] button[aria-checked]:not([data-testid]), main [data-testid="tracklist-row"] [aria-colindex]:last-child > div[data-encore-id="text"],
+    main [data-testid="tracklist-row"] [data-testid="tracklist-duration"] { display: none !important; }
+    main [data-testid="tracklist-row"] [data-testid="more-button"] { opacity: 1 !important; visibility: visible !important; transform: rotate(90deg); }
+    main [data-testid="artist-page"] [data-testid="tracklist-row"] { grid-template-columns: [index] 24px [first] minmax(0,1fr) [last] 40px !important; }
+    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] { display: flex !important; }
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
@@ -1951,6 +1968,16 @@
     tidyEditDialog();
     tidyBigCards();
     // main の中で position: sticky のもの（ホームのフィルター欄など）に目印を付ける
+    // ホーム上部の色付きグラデーション背景は公式アプリにないので消す
+    if (document.documentElement.classList.contains('m-home')) {
+      document.querySelectorAll('#main-view > div div, .main-view-container__scroll-node-child > div').forEach(function (e) {
+        if (e.classList.contains('m-nobg') || e.closest('main')) return;
+        var r = e.getBoundingClientRect();
+        if (r.top > 320 || r.width < 300) return;
+        var cs = getComputedStyle(e);
+        if (cs.backgroundImage.indexOf('gradient') >= 0 || /^rgb\(/.test(cs.backgroundColor) && cs.backgroundColor !== 'rgb(18, 18, 18)' && cs.backgroundColor !== 'rgb(0, 0, 0)') e.classList.add('m-nobg');
+      });
+    }
     if (!document.querySelector('#main-view .m-sticky')) document.querySelectorAll('#main-view [data-encore-id="chip"]').forEach(function (ch) {
       for (var p = ch.parentElement; p && p.id !== 'main-view'; p = p.parentElement) {
         if (p.classList.contains('m-sticky')) break;
