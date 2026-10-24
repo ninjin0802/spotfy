@@ -1452,6 +1452,18 @@
     }
   });
 
+  // 未ログインならログインページへ（ページの表示が落ち着いてから判定する）
+  setTimeout(function check() {
+    var loginBtn = document.querySelector('[data-testid="login-button"]');
+    var user = document.querySelector('[data-testid="user-widget-link"]');
+    if (user) return;
+    if (loginBtn) {
+      location.href = 'https://accounts.spotify.com/ja/login?continue=' + encodeURIComponent('https://open.spotify.com/');
+      return;
+    }
+    setTimeout(check, 1000);
+  }, 2500);
+
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
   window.__mobileBack = function () {
     var h = document.documentElement.classList;
