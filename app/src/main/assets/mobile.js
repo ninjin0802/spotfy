@@ -1267,6 +1267,10 @@
     setPic(d.querySelector('.pic'), a);
     d.querySelector('b').textContent = a.name || 'ログインしていません';
     d.querySelector('small').textContent = a.name ? 'プロフィールを表示' : 'タップしてログイン';
+    // 未ログインのときはログインが前提の項目（ログアウト・最新情報・フレンド）を出さない
+    d.querySelectorAll('button.item[data-item]').forEach(function (b) {
+      b.style.display = a.name || b.dataset.item === 'settings' ? '' : 'none';
+    });
     document.documentElement.classList.add('m-drawer');
   }
 
@@ -1299,6 +1303,7 @@
     ].forEach(function (it) {
       var b = document.createElement('button');
       b.className = 'item';
+      b.dataset.item = it[0];
       b.innerHTML = DRAWER_ICONS[it[0]] + '<span>' + it[1] + '</span>';
       b.addEventListener('click', function () {
         closeDrawer();
