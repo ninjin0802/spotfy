@@ -258,6 +258,15 @@
     main section [data-testid="shortcut-background"], html.m-home main section div:has(> div > [data-testid="shortcut-background"]) { height: 40px !important; }
     html.m-home main [data-testid="home-page"] section:first-child > div { grid-template-rows: none !important; grid-auto-rows: 40px !important; row-gap: 8px !important; }
     html.m-home main [data-testid="home-page"] section:first-child p { font-size: 13px !important; line-height: 16px !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; white-space: normal !important; }
+    /* スクロールしたとき、フィルター欄の裏に Spotify がジャケットの色を敷くが、公式アプリは背景色のまま */
+    .m-sticky > div[style*="--background-base"] { display: none !important; }
+    /* 「最近」の棚は公式アプリと同じく小さいカードで並べる */
+    html.m-home main section[aria-label="最近"] div:has(> [data-encore-id="card"]),
+    html.m-home main section[aria-label="最近"] [data-encore-id="card"] { width: 112px !important; min-width: 112px !important; max-width: 112px !important; flex: none !important; }
+    html.m-home main section[aria-label="最近"] [data-encore-id="card"] { padding: 0 6px !important; }
+    /* 大きなおすすめカードの棚は、PC 版の行の高さ（動画用）を使わず中身の高さで詰めて並べる */
+    main [data-testid="grid-container"]:has(.m-bigcard) { grid-template-rows: none !important; grid-auto-rows: auto !important; row-gap: 12px !important; }
+    main [data-testid="grid-container"]:has(.m-bigcard) > * { height: auto !important; }
     /* ホーム上部の灰色のグラデーションは公式アプリにはないので消す */
     html.m-home main > div > div[style^="background-color"] { display: none !important; }
     main [data-testid="home-page"] [data-testid="component-shelf"] h2 { font-size: 22px !important; font-weight: 800 !important; letter-spacing: -.01em; }
