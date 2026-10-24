@@ -546,7 +546,17 @@
     #m-player .card { border-radius: 10px; padding: 16px; background: rgba(0,0,0,.28); text-align: left; color: #fff; display: block; width: 100%; box-sizing: border-box; }
     #m-player .card h3 { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
     #m-player .card p { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; color: rgba(255,255,255,.85); }
-    #m-player .card.artist p { font-size: 22px; }
+    #m-player .card.artist { padding: 0; overflow: hidden; background: #242424; cursor: pointer; }
+    #m-player .card.artist .aimg { height: 210px; background: #333 center 25%/cover no-repeat; position: relative; }
+    #m-player .card.artist .aimg span { position: absolute; left: 16px; top: 14px; font-size: 16px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+    #m-player .card.artist .ab { padding: 16px; }
+    #m-player .card.artist .arow { display: flex; align-items: center; gap: 12px; }
+    #m-player .card.artist .arow > div { flex: 1; min-width: 0; }
+    #m-player .card.artist .an { display: flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 700; }
+    #m-player .card.artist .an svg { width: 20px; height: 20px; }
+    #m-player .card.artist .al { display: block; margin-top: 4px; font-size: 13px; color: #b3b3b3; }
+    #m-player .card.artist .afol { height: 32px; padding: 0 16px; border-radius: 16px; border: 1px solid #878787; color: #fff; font-weight: 700; font-size: 13px; flex: none; }
+    #m-player .card.artist .abio { margin: 14px 0 0; font-size: 14px; font-weight: 400; line-height: 1.6; color: #b3b3b3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     /* 歌詞カード：公式アプリと同じく、曲の色の背景に同期した歌詞を数行 */
     #m-player .lyrics-card { position: relative; height: 330px; overflow: hidden; background: var(--m-lyr, rgba(0,0,0,.28)); }
     #m-player .lyrics-card .lyw { position: absolute; left: 16px; right: 16px; top: 52px; bottom: 12px; overflow: hidden; }
@@ -1713,7 +1723,7 @@
       '<button class="ib share" aria-label="共有">' + P.share + '</button>' +
       '<button class="ib queue" aria-label="キュー">' + P.queue + '</button></div></div>' +
       '<div class="extras"><button class="card lyrics-card"><h3>歌詞</h3><span class="exp"><svg viewBox="0 0 16 16"><path d="M9.5 2.5H13.5V6.5M6.5 13.5H2.5V9.5M13.5 2.5 9 7M2.5 13.5 7 9"/></svg></span><div class="lyw"><div class="ly"><p>タップして歌詞を表示</p></div></div></button>' +
-      '<button class="card artist"><h3>アーティストについて</h3><p></p><small>アーティストのページを開く</small></button></div>';
+      '<div class="card artist"><div class="aimg"><span>アーティストについて</span></div><div class="ab"><div class="arow"><div><b class="an"></b><small class="al"></small></div><button class="afol">フォローする</button></div><p class="abio"></p></div></div></div>';
     document.body.appendChild(el);
 
     var close = document.createElement('button');
@@ -1734,7 +1744,6 @@
     on('.dev', openDevices);
     on('.queue', function () { openPanel(q('[data-testid="control-button-queue"]')); });
     on('.lyrics-card', function () { closePlayer(); var b = q('[data-testid="lyrics-button"]'); if (b) b.click(); });
-    on('.extras .artist', function () { closePlayer(); var a = q('[data-testid="now-playing-widget-v2"] a[href*="/artist/"]'); if (a) a.click(); });
     on('.more', function () {
       var w = q('[data-testid="now-playing-widget-v2"]');
       var st = window.__mConnect && __mConnect.get(), ps = st && st.cluster && st.cluster.player_state, tr = ps && ps.track;
@@ -1823,6 +1832,38 @@
     box.style.transform = 'translateY(' + (-(target ? target.offsetTop : 0)) + 'px)';
   }
 
+  // ---- アーティストについて（公式アプリと同じカード）----
+  var artCard = { uri: '' };
+  function loadArtistCard(uri) {
+    var card = document.querySelector('#m-player .card.artist');
+    if (!card || !uri || uri === artCard.uri) return;
+    artCard.uri = uri;
+    gql('queryArtistOverview', { uri: uri, locale: '', includePrerelease: false }).then(function (r) {
+      var a = r && r.data && r.data.artistUnion;
+      if (!a || artCard.uri !== uri) return;
+      var hi = a.headerImage && a.headerImage.data && a.headerImage.data.sources || [];
+      var av = a.visuals && a.visuals.avatarImage && a.visuals.avatarImage.sources || [];
+      var img = (hi[0] || av[0] || {}).url || '';
+      card.querySelector('.aimg').style.backgroundImage = img ? 'url("' + img + '")' : '';
+      var nm = card.querySelector('.an');
+      nm.textContent = a.profile && a.profile.name || '';
+      if ((a.profile && a.profile.verified) || (a.onPlatformReputationTrait && a.onPlatformReputationTrait.verification && a.onPlatformReputationTrait.verification.isVerified)) nm.insertAdjacentHTML('beforeend', VERIFIED);
+      var ml = a.stats && a.stats.monthlyListeners;
+      card.querySelector('.al').textContent = ml ? (ml >= 10000 ? (Math.round(ml / 1000) / 10) + '万' : ml.toLocaleString()) + '人の月間リスナー' : '';
+      var bio = a.profile && a.profile.biography && a.profile.biography.text || '';
+      card.querySelector('.abio').textContent = bio.replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, ' ');
+      var fb = card.querySelector('.afol');
+      var paint = function (on) { fb.dataset.on = on ? '1' : ''; fb.textContent = on ? 'フォロー中' : 'フォローする'; };
+      paint(a.saved);
+      fb.onclick = function (ev) {
+        ev.stopPropagation();
+        var lib = service('LibraryAPI'), on = fb.dataset.on === '1';
+        if (lib) Promise.resolve(on ? lib.remove({ uris: [uri] }) : lib.add({ uris: [uri] })).then(function () { paint(!on); });
+      };
+      card.onclick = function () { closePlayer(); spaGo(uriPath(uri)); };
+    }, function () { artCard.uri = ''; });
+  }
+
   function updatePlayer() {
     var el = document.getElementById('m-player');
     if (!el || !document.documentElement.classList.contains('m-player')) return;
@@ -1869,8 +1910,8 @@
     var liked = like && like.getAttribute('aria-checked') === 'true';
     el.querySelector('.like').classList.toggle('on', !!liked);
     el.querySelector('.like').innerHTML = liked ? P.saved : P.add;
-    var ln = el.querySelector('.extras .artist p');
-    if (ln) ln.textContent = by ? by.textContent : '';
+    var cst3 = window.__mConnect && __mConnect.get(), tr3 = cst3 && cst3.cluster && cst3.cluster.player_state && cst3.cluster.player_state.track;
+    if (tr3) loadArtistCard(tr3.metadata && tr3.metadata.artist_uri);
     var rep = q('[data-testid="control-button-repeat"]');
     var rs = rep ? rep.getAttribute('aria-checked') : 'false';
     el.querySelector('.repeat').classList.toggle('on', rs === 'true' || rs === 'mixed');
@@ -2428,6 +2469,7 @@
     recentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     saveRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     removeRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    queryArtistOverview: '9f8134ef565e78621f1e1793555bd6633c5ac144ae0f89604ed3ae3f80b3c8e6',
     getAlbum: '0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f',
     getTrack: 'fe16b8083eec2305854db612ca75589bcb71e009dc7a4d014f29bd534a4c01f5',
     searchTopResultsList: 'dd78eaff943eba629ed70ee25517b9cea0dcaa41193e2592ae2727660b21892c'
