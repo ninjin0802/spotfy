@@ -188,12 +188,29 @@
     /* プロフィール：公式アプリと同じく、左に大きな丸いアイコン、右に名前とフォロー情報 */
     main [data-testid="entity-header"]:has([data-testid="user-image"]) { height: auto !important; max-height: none !important; min-height: 0 !important; padding: 64px 16px 20px !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child { display: flex !important; flex-direction: row !important; align-items: center !important; height: auto !important; gap: 16px !important; padding: 0 !important; }
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > :first-child { width: 96px !important; height: 96px !important; min-width: 96px !important; margin: 0 !important; }
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="user-image"], main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="edit-image-button"] { width: 96px !important; height: 96px !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > :first-child { width: 112px !important; height: 112px !important; min-width: 112px !important; margin: 0 !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="user-image"], main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="edit-image-button"] { width: 112px !important; height: 112px !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child { flex: 1 1 auto !important; min-width: 0 !important; width: auto !important; align-items: flex-start !important; text-align: left !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child > span:first-child:not(:has(h1)) { display: none !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="entityTitle"] { width: auto !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="entityTitle"] h1 { font-size: 26px !important; font-weight: 800 !important; line-height: 1.15 !important; white-space: normal !important; word-break: normal !important; }
+
+    /* プロフィールの下は公式アプリと同じく「プレイリスト」の一覧だけ */
+    main .m-hide-shelf { display: none !important; }
+    main .m-pl-shelf [data-testid="grid-container"] { display: flex !important; flex-direction: column !important; margin: 0 !important; gap: 0 !important; }
+    main .m-pl-shelf [data-encore-id="card"] {
+      display: flex !important; flex-direction: row !important; align-items: center !important; gap: 14px !important;
+      width: 100% !important; height: auto !important; padding: 6px 0 !important; background: none !important; position: relative !important;
+    }
+    main .m-pl-shelf [data-encore-id="card"] > div:has(img) { width: 56px !important; height: 56px !important; min-width: 56px !important; padding: 0 !important; margin: 0 !important; }
+    main .m-pl-shelf [data-encore-id="card"] > div:has(img) *, main .m-pl-shelf [data-testid="card-image"] { width: 56px !important; height: 56px !important; border-radius: 2px !important; }
+    main .m-pl-shelf [data-encore-id="card"] > div:last-of-type { flex: 1 !important; min-width: 0 !important; padding: 0 !important; }
+    main .m-pl-shelf [data-encore-id="cardTitle"] { font-size: 16px !important; font-weight: 400 !important; }
+    main .m-pl-shelf [data-testid="play-button"] { display: none !important; }
+    .m-row-more { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; background: none; border: 0; color: #b3b3b3; z-index: 2;
+      display: flex; align-items: center; justify-content: center; }
+    .m-row-more svg { width: 22px; height: 22px; fill: currentColor; }
+    #m-edit { height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid #878787; background: none; color: #fff; font-weight: 700; font-size: 13px; }
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
@@ -441,18 +458,6 @@
     main [role="checkbox"][aria-checked="true"] > *, main button[role="checkbox"][aria-checked="true"] {
       background-color: var(--m-accent, #1ed760) !important; color: #000 !important;
     }
-    /* 作成メニュー */
-    #m-create-bg { position: fixed; inset: 0; z-index: 10030; background: rgba(0,0,0,.6); display: none; }
-    #m-create { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10031; background: #282828; border-radius: 12px 12px 0 0;
-      padding: 8px 0 28px; transform: translateY(100%); transition: transform .22s ease; color: #fff; font-family: inherit; }
-    html.m-create #m-create-bg { display: block; }
-    html.m-create #m-create { transform: none; }
-    #m-create .grip { width: 36px; height: 4px; border-radius: 2px; background: #727272; margin: 4px auto 12px; }
-    #m-create button.c { display: flex; align-items: center; gap: 16px; width: 100%; padding: 12px 16px; background: none; border: 0; color: #fff; text-align: left; }
-    #m-create .ic { width: 48px; height: 48px; border-radius: 50%; background: #3e3e3e; display: flex; align-items: center; justify-content: center; flex: none; }
-    #m-create .ic svg { width: 24px; height: 24px; fill: #fff; }
-    #m-create b { display: block; font-size: 16px; }
-    #m-create small { display: block; color: #a7a7a7; font-size: 13px; margin-top: 2px; }
     /* ミニプレーヤーの追加ボタン */
     #m-mini-add { width: 40px; height: 40px; background: none; border: 0; color: #fff; display: flex; align-items: center; justify-content: center; }
     #m-mini-add svg { width: 24px; height: 24px; fill: currentColor; }
@@ -466,7 +471,7 @@
       -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     }
     #m-tabbar button {
-      flex: 1; background: none; border: 0; color: #b3b3b3; font-size: 10px; white-space: nowrap;
+      flex: 1; background: none; border: 0; color: #b3b3b3; font-size: 11px;
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
     }
     #m-tabbar button.on { color: #fff; font-weight: 700; }
@@ -477,7 +482,6 @@
     home: '<svg viewBox="0 0 24 24"><path d="M12 3 2 11h3v10h6v-6h2v6h6V11h3z"/></svg>',
     search: '<svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>',
     lib: '<svg viewBox="0 0 24 24"><path d="M4 3h2v18H4zm5 0h2v18H9zm4.7.6 1.9-.6 5.6 17.5-1.9.6z"/></svg>',
-    premium: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm4.3 14.4a.6.6 0 0 0-.2-.9c-2.4-1.5-5.4-1.8-8.9-1a.6.6 0 1 0 .3 1.2c3.2-.7 5.9-.4 8 .9.3.2.7.1.8-.2zm1.2-2.7a.8.8 0 0 0-.3-1.1c-2.8-1.7-6.9-2.2-10.1-1.2a.8.8 0 1 0 .4 1.5c2.8-.8 6.4-.4 8.9 1.1.4.2.9.1 1.1-.3zm.1-2.8a.9.9 0 0 0-.3-1.3C14 7.6 8.7 7.4 5.7 8.3a.9.9 0 1 0 .5 1.8c2.6-.8 7.2-.6 10.1 1.1.4.3 1 .1 1.3-.3z"/></svg>',
     create: '<svg viewBox="0 0 24 24"><path d="M11 3h2v8h8v2h-8v8h-2v-8H3v-2h8z"/></svg>'
   };
 
@@ -499,6 +503,51 @@
       for (var i = 0; i < items.length; i++) if (match(items[i])) return items[i].click();
       if (++tries < 20) setTimeout(pick, 100);
     })();
+  }
+
+  // プロフィールページを公式アプリの構成に（プレイリストの一覧だけ、編集ボタン、行の「…」）
+  function tidyProfile() {
+    if (!/^\/user\/[^/]+\/?$/.test(location.pathname.replace(/^\/intl-[a-z-]+/i, ''))) return;
+    var shelves = document.querySelectorAll('main [data-testid="component-shelf"]');
+    for (var i = 0; i < shelves.length; i++) {
+      var sh = shelves[i];
+      if (sh.dataset.mDone) continue;
+      var h = sh.querySelector('h2');
+      if (!h) continue;
+      sh.dataset.mDone = '1';
+      if (/公開プレイリスト|Public Playlists/i.test(h.textContent)) {
+        sh.classList.add('m-pl-shelf');
+        var link = h.querySelector('a') || h;
+        link.textContent = 'プレイリスト';
+      } else sh.classList.add('m-hide-shelf');
+    }
+    var pl = document.querySelector('main .m-pl-shelf');
+    if (pl) pl.querySelectorAll('[data-encore-id="card"]').forEach(function (card) {
+      var sub = card.querySelector('[data-encore-id="cardSubtitle"] [data-encore-id="text"], [data-encore-id="cardSubtitle"]');
+      if (sub && /人のフォロワー/.test(sub.textContent)) sub.textContent = sub.textContent.replace(/([\d,]+)\s*人のフォロワー/, '$1件の保存');
+      if (!card.querySelector('.m-row-more')) {
+        var mb = document.createElement('button');
+        mb.className = 'm-row-more';
+        mb.setAttribute('aria-label', 'その他');
+        mb.innerHTML = P.more;
+        mb.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          ev.preventDefault();
+          var r = card.getBoundingClientRect();
+          card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.right - 40, clientY: r.top + r.height / 2 }));
+        });
+        card.appendChild(mb);
+      }
+    });
+    var bar = document.querySelector('main [data-testid="action-bar-row"]');
+    var edit = document.querySelector('main [data-testid="edit-image-button"]');
+    if (bar && edit && !document.getElementById('m-edit')) {
+      var eb = document.createElement('button');
+      eb.id = 'm-edit';
+      eb.textContent = '編集';
+      eb.addEventListener('click', function () { edit.click(); });
+      bar.insertBefore(eb, bar.firstChild);
+    }
   }
 
   // 自分のプロフィールを開く（公式アプリの「プロフィールを表示」）
@@ -1434,13 +1483,11 @@
   function buildTabbar() {
     var bar = document.createElement('nav');
     bar.id = 'm-tabbar';
-    [['home', 'ホーム'], ['search', '検索'], ['lib', 'マイライブラリ'], ['premium', 'Premium'], ['create', '作成']].forEach(function (t) {
+    [['home', 'ホーム'], ['search', '検索'], ['lib', 'ライブラリ']].forEach(function (t) {
       var b = document.createElement('button');
       b.dataset.tab = t[0];
       b.innerHTML = ICONS[t[0]] + '<span>' + t[1] + '</span>';
       b.addEventListener('click', function () {
-        if (t[0] === 'premium') return openExternal('https://www.spotify.com/jp/premium/');
-        if (t[0] === 'create') return openCreate();
         if (t[0] === 'home') {
           click('[data-testid="home-button"]') || (location.href = '/');
         } else if (t[0] === 'search') {
@@ -1456,46 +1503,6 @@
     document.body.appendChild(bar);
     setTab(currentTab());
   }
-
-  // Premium など Spotify のサイトは外部ブラウザで開く
-  function openExternal(url) {
-    if (window.__native && __native.send) __native.send({ type: 'open', url: url });
-  }
-
-  // 「作成」：公式アプリと同じく下から作成メニュー
-  function openCreate() {
-    var sheet = document.getElementById('m-create');
-    if (!sheet) {
-      var bg = document.createElement('div');
-      bg.id = 'm-create-bg';
-      bg.addEventListener('click', closeCreate);
-      document.body.appendChild(bg);
-      sheet = document.createElement('section');
-      sheet.id = 'm-create';
-      sheet.innerHTML = '<div class="grip"></div>' +
-        '<button class="c" data-k="playlist"><span class="ic">' + P.queue + '</span><span><b>プレイリスト</b><small>曲やエピソードでプレイリストを作成</small></span></button>' +
-        '<button class="c" data-k="folder"><span class="ic">' + ICONS.lib + '</span><span><b>フォルダ</b><small>プレイリストを整理する</small></span></button>';
-      sheet.querySelectorAll('button.c').forEach(function (b) {
-        b.addEventListener('click', function () {
-          closeCreate();
-          var k = b.dataset.k;
-          if (!click('#Desktop_LeftSidebar_Id header button[aria-label="作成"], #Desktop_LeftSidebar_Id header button[aria-label="Create"]')) return;
-          var tries = 0;
-          (function pick() {
-            var items = document.querySelectorAll('[role="menu"] button, [role="menuitem"]');
-            for (var i = 0; i < items.length; i++) {
-              var t = items[i].textContent;
-              if ((k === 'playlist' && /プレイリスト|playlist/i.test(t) && !/フォルダ|folder/i.test(t)) || (k === 'folder' && /フォルダ|folder/i.test(t))) return items[i].click();
-            }
-            if (++tries < 20) setTimeout(pick, 100);
-          })();
-        });
-      });
-      document.body.appendChild(sheet);
-    }
-    document.documentElement.classList.add('m-create');
-  }
-  function closeCreate() { document.documentElement.classList.remove('m-create'); }
 
   function currentTab() { return location.pathname.indexOf('/search') === 0 ? 'search' : 'home'; }
 
@@ -1557,6 +1564,7 @@
       document.body.appendChild(bb);
     }
     applySavedQuality();
+    tidyProfile();
     applySavedLeveling();
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
     var h = document.documentElement.classList;
@@ -1638,7 +1646,6 @@
   window.__mobileBack = function () {
     var h = document.documentElement.classList;
     if (h.contains('m-devices')) { closeDevices(); return true; }
-    if (h.contains('m-create')) { closeCreate(); return true; }
     if (h.contains('m-searching')) { var si = document.querySelector('#global-nav-bar input'); if (si) si.blur(); h.remove('m-searching'); return true; }
     if (h.contains('m-drawer')) { closeDrawer(); return true; }
     if (h.contains('m-player') && h.contains('m-np')) { closePanel(); return true; }
