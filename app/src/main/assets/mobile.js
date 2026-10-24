@@ -525,8 +525,19 @@
 
     /* ページ下部の「会社情報」などのフッターは公式アプリにないので消す */
     .main-view-container__mh-footer-container, main [data-testid="footer-div"], main nav[aria-label*="フッター"] { display: none !important; }
+    /* フィルターは公式アプリと同じく、1 つずつ独立した丸いボタン（Web 版のように「音楽」と「フォロー中」をくっつけない） */
+    main [data-testid="carousel-scroller"] [data-carousel-item] { margin: 0 8px 0 0 !important; padding: 0 !important; }
+    main [data-encore-id="chip"] { border-radius: 32px !important; margin: 0 !important; padding: 0 14px !important; height: 32px !important; background-color: #2a2a2a; color: #fff; }
+    main [data-encore-id="chip"] > span { border-radius: 32px !important; padding: 0 !important; background: none !important; }
+    /* 何か絞り込んでいるときは「すべて」の代わりに × を出す（押すと解除） */
+    main [data-testid="carousel-scroller"]:has([data-encore-id="chip"][aria-checked="true"]:not([aria-label="すべて"])) [data-encore-id="chip"][aria-label="すべて"] {
+      width: 32px !important; padding: 0 !important; justify-content: center !important; font-size: 0 !important;
+    }
+    main [data-testid="carousel-scroller"]:has([data-encore-id="chip"][aria-checked="true"]:not([aria-label="すべて"])) [data-encore-id="chip"][aria-label="すべて"]::before {
+      content: "✕"; font-size: 14px; color: #fff;
+    }
     /* 選択中のフィルター（すべて／音楽…）は公式アプリと同じ緑 */
-    main [role="checkbox"][aria-checked="true"] > *, main button[role="checkbox"][aria-checked="true"] {
+    main button[role="checkbox"][aria-checked="true"] {
       background-color: var(--m-accent, #1ed760) !important; color: #000 !important;
     }
     /* ミニプレーヤーの追加ボタン */
@@ -1858,7 +1869,7 @@
     applySavedLeveling();
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
     var h = document.documentElement.classList;
-    h.toggle('m-home', /^\/(intl-[a-z-]+\/?)?$/i.test(location.pathname) && !h.contains('m-lib') && !h.contains('m-search'));
+    h.toggle('m-home', /^\/(intl-[a-z-]+\/?)?(home\/?)?$/i.test(location.pathname) && !h.contains('m-lib') && !h.contains('m-search'));
     var av = document.getElementById('m-avatar');
     if (av && !av.dataset.ready) {
       var a = account();
