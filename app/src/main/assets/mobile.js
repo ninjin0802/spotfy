@@ -417,6 +417,7 @@
     #m-player button { background: none; border: 0; color: inherit; padding: 0; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
     #m-player button:active { transform: scale(.92); }
     #m-player svg { fill: currentColor; }
+    #m-player svg[fill="none"] { fill: none; }
     #m-player .ib { width: 48px; height: 48px; }
     #m-player .ib svg { width: 24px; height: 24px; }
     #m-player .art { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 20px 0 28px; }
@@ -534,7 +535,7 @@
     #m-invite p { text-align: center; font-size: 13px; color: #b3b3b3; margin: 0 16px 16px; }
     #m-invite .send { display: flex; align-items: center; gap: 16px; width: 100%; padding: 8px 16px; background: none; border: 0; color: #fff; font-size: 16px; font-family: inherit; }
     #m-invite .send .ic { width: 52px; height: 52px; border-radius: 50%; background: #3e3e3e; display: flex; align-items: center; justify-content: center; }
-    #m-invite .send svg { width: 24px; height: 24px; fill: #fff; }
+    #m-invite .send svg { width: 24px; height: 24px; color: #fff; }
 
     /* 下部タブバー（固定） */
     #m-tabbar {
@@ -1253,7 +1254,7 @@
     repeat: '<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg>',
     repeatOne: '<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2zm-4-2V9h-1l-2 1v1h1.5v4z"/></svg>',
     device: '<svg viewBox="0 0 24 24"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h11A1.5 1.5 0 0 1 16 4.5V6h-1.5V4.5h-11v10H11V16H3.5A1.5 1.5 0 0 1 2 14.5zM6 18.5h5V20H6z"/><path d="M13 9.5A1.5 1.5 0 0 1 14.5 8h6A1.5 1.5 0 0 1 22 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5zm1.5 0v10h6v-10zM17.5 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 3.5a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5zm0 1.3a.95.95 0 1 0 0 1.9.95.95 0 0 0 0-1.9z"/></svg>',
-    share: '<svg viewBox="0 0 24 24"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.7-3.4a3 3 0 0 0 0-1.6l6.7-3.4A3 3 0 1 0 15 7l-6.7 3.4a3 3 0 1 0 0 3.2L15 17a3 3 0 1 0 3-1z"/></svg>',
+    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6.5" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.8 10.7 15.2 6.8M8.8 13.3l6.4 3.9"/></svg>',
     queue: '<svg viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h12v2H3zm0 6h12v2H3zm14-3 5 3-5 3z"/></svg>',
     lyrics: '<svg viewBox="0 0 24 24"><path d="M4 4h16v12H7l-3 3zm3 4v2h10V8zm0 4v2h7v-2z"/></svg>'
   };
