@@ -132,8 +132,9 @@
     html.m-lib #Desktop_LeftSidebar_Id [role="listbox"] [role="option"] span { padding: 8px 16px !important; font-size: 14px !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"]:has([data-testid="entity-image"]) > div:nth-child(3),
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"]:has([data-testid="entity-image"]) > div:nth-child(3) *,
-    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] [data-testid="entity-image"] { width: 84px !important; height: 84px !important; min-width: 84px !important; }
-    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] { padding: 6px 16px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] [data-testid="entity-image"] { width: 72px !important; height: 72px !important; min-width: 72px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [role="row"]:has([data-encore-id="listRow"]) { height: 80px !important; display: flex !important; align-items: center !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] { padding: 0 16px !important; width: 100% !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowTitle"] { font-size: 17px !important; }
     html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowSubtitle"] { font-size: 14px !important; }
     html.m-search form:has(input:placeholder-shown) [data-testid="clear-button"] { display: none !important; }
