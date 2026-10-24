@@ -156,6 +156,10 @@
     .m-hide { display: none !important; }
     [data-testid="signup-bar"] { padding: 8px !important; }
 
+    /* 棚の横スクロールは公式アプリと同じく指の動きどおりに（Web 版の 1 枚ずつ吸い付くスナップをやめる） */
+    #main-view [data-testid="carousel-scroller"] { scroll-snap-type: none !important; scroll-behavior: auto !important; -webkit-overflow-scrolling: touch; }
+    #main-view [data-testid="carousel-scroller"] * { scroll-snap-align: none !important; }
+
     /* ホーム：公式アプリ風のショートカットと棚 */
     main [data-testid="carousel-previous-button"], main [data-testid="carousel-next-button"] { display: none !important; }
     main [data-testid="shortcut-background"] { height: 56px !important; border-radius: 4px !important; background: rgba(255,255,255,.1) !important; }
