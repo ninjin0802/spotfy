@@ -158,6 +158,30 @@
     main [data-testid="artist-page"] [data-encore-id="buttonSecondary"] { height: 32px !important; padding: 0 14px !important; font-size: 13px !important; }
     main [data-testid="artist-page"] h2 { font-size: 20px !important; font-weight: 800 !important; }
     main [data-testid="artist-page"] [data-testid="tracklist-row"] { padding: 0 !important; }
+    /* アルバム・プレイリスト：ジャケットを中央に大きく、その下に左寄せでタイトルと情報 */
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] { height: auto !important; min-height: 0 !important; max-height: none !important; padding-top: 56px !important; padding-bottom: 8px !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child {
+      display: flex !important; flex-direction: column !important; align-items: stretch !important; height: auto !important; padding: 0 16px !important; gap: 12px !important;
+    }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child > :not(:has(h1)):has(img) {
+      align-self: center !important; width: 64vw !important; height: 64vw !important; margin: 0 0 8px !important;
+    }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child > :not(:has(h1)):has(img) * { width: 100% !important; height: 100% !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] img { box-shadow: 0 8px 32px rgba(0,0,0,.5) !important; border-radius: 4px !important; object-fit: cover; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child > div:last-child { width: 100% !important; padding: 0 !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entityTitle"] h1 { font-size: 24px !important; line-height: 1.2 !important; font-weight: 800 !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child > div:last-child > span:first-child:not(:has(h1)) { display: none !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="action-bar-row"] { display: flex !important; align-items: center !important; gap: 16px !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="action-bar-row"] > :first-child { order: 10; margin-left: auto !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="action-bar-row"] [data-testid="play-button"] { width: 56px !important; height: 56px !important; }
+    /* 曲一覧は見出し行・番号・再生時間を消して、曲名とアーティスト＋「…」だけ */
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="track-list"] > div:first-child:has([role="columnheader"]) { display: none !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="tracklist-row"] { grid-template-columns: [first] minmax(0,1fr) [last] 80px !important; padding: 0 !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="tracklist-row"] > [aria-colindex="1"] { display: none !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="tracklist-row"] [aria-colindex]:last-child > div[data-encore-id="text"] { display: none !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="tracklist-row"] [aria-colindex]:last-child { justify-content: flex-end !important; gap: 4px !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="tracklist-row"] [data-testid="more-button"] { opacity: 1 !important; visibility: visible !important; }
+
     /* 詳細ページ左上の戻るボタン */
     #m-back {
       position: fixed; top: 12px; left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
