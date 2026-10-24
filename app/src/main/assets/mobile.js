@@ -90,12 +90,14 @@
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="search-icon"] { display: none !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] svg { fill: #fff !important; color: #fff !important; }
     /* 公式アプリと同じ、丸い灰色の検索ボックスと小さな ⓧ */
-    html.m-search:is(.m-results, .m-searching) #global-nav-bar > :has(form), html.m-search:is(.m-results, .m-searching) #global-nav-bar form { height: 40px !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar > :has(form), html.m-search:is(.m-results, .m-searching) #global-nav-bar form,
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form *:has(> input), html.m-search:is(.m-results, .m-searching) #global-nav-bar > :has(form) div:has(form) { height: 40px !important; min-height: 0 !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar input { height: 40px !important; border-radius: 20px !important; font-size: 15px !important; font-weight: 400 !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar { padding-top: calc(var(--m-top, 0px) + 12px) !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] { width: 32px !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] span { width: 20px !important; height: 20px !important; border-radius: 50%; background: #b3b3b3; display: flex !important; align-items: center; justify-content: center; }
-    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] svg { width: 12px !important; height: 12px !important; fill: #2a2a2a !important; color: #2a2a2a !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] svg { display: none !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] span::after { content: "✕"; font-size: 11px; font-weight: 700; color: #2a2a2a; line-height: 1; }
     /* 結果の絞り込み（曲・アーティスト…）は上に貼りつけず普通に並べ、「すべて」は出さない */
     .m-schips { position: relative !important; top: auto !important; background: none !important; box-shadow: none !important; margin: 4px 0 8px !important; padding: 0 !important; height: auto !important; }
     .m-schips [role="presentation"] > [role="presentation"]:first-child { display: none !important; }
@@ -229,7 +231,7 @@
     html.m-home .m-nobg { background: none !important; background-color: transparent !important; }
     /* 棚は左に 16px の余白から始める（Web 版の矢印用の負の余白をなくす） */
     #main-view div:has(> [data-testid="carousel-scroller"]) { margin-left: 0 !important; margin-right: 0 !important; }
-    main [data-testid="component-shelf"] [data-testid="carousel-scroller"] { padding: 0 !important; margin-left: -28px !important; width: calc(100% + 44px) !important; }
+    html.m-home main [data-testid="component-shelf"] [data-testid="carousel-scroller"] { padding: 0 !important; margin-left: -28px !important; width: calc(100% + 44px) !important; }
     main [data-testid="component-shelf"] [data-testid="see-all-link"]:not(h2 *), main [data-testid="rich-title-row-shelf-header"] a[href]:not(h2 a) { display: none !important; }
     main [data-testid="carousel-previous-button"], main [data-testid="carousel-next-button"] { display: none !important; }
     main div:has(> [data-testid="shortcut-background"]), main div:has(> div > [data-testid="shortcut-background"]) { height: 42px !important; min-height: 0 !important; }
@@ -388,7 +390,9 @@
     main [data-testid="tracklist-row"] [data-testid="tracklist-duration"] { display: none !important; }
     main [data-testid="tracklist-row"] [data-testid="more-button"] { opacity: 1 !important; visibility: visible !important; transform: rotate(90deg); }
     main [data-testid="artist-page"] [data-testid="tracklist-row"] { grid-template-columns: [index] 24px [first] minmax(0,1fr) [last] 40px !important; }
-    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] { display: flex !important; }
+    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] { display: flex !important; align-items: center !important; justify-content: center !important; color: #b3b3b3 !important; }
+    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] * { visibility: visible !important; opacity: 1 !important; }
+    main [data-testid="artist-page"] [data-testid="tracklist-row"] > [aria-colindex="1"] button { display: none !important; }
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
@@ -494,6 +498,11 @@
     #m-settings .sw span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: .2s; }
     #m-settings .sw input:checked + span { background: var(--m-accent, #1ed760); }
     #m-settings .sw input:checked + span::after { transform: translateX(20px); }
+    #m-settings .xf-bar { display: flex; align-items: center; gap: 12px; padding: 0 16px 14px; font-size: 13px; color: #b3b3b3; }
+    #m-settings .xf-bar .v { min-width: 36px; color: #fff; }
+    #m-settings .xf-bar input[type=range] { flex: 1; height: 4px; -webkit-appearance: none; appearance: none; border-radius: 2px; outline: none;
+      background: linear-gradient(to right, var(--m-accent, #1ed760) var(--p, 0%), #535353 var(--p, 0%)); }
+    #m-settings .xf-bar input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
     #m-settings .colors { display: flex; gap: 12px; }
     #m-settings .colors button { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; }
     #m-settings .colors button.on { border-color: #fff; }
@@ -1314,10 +1323,31 @@
           try { localStorage.setItem('m.gapless', v ? '1' : '0'); } catch (e) {}
           gap.key = '';
         })),
-                row('クロスフェード', '曲の終わりと次の曲の始まりをなめらかにフェードさせる', selectEl([['0', 'オフ'], ['2', '2 秒'], ['4', '4 秒'], ['6', '6 秒'], ['8', '8 秒'], ['12', '12 秒']], pref('crossfade', '0'), function (v) {
-          try { localStorage.setItem('m.crossfade', v); } catch (e) {}
-        })),
-                row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
+                (function () {
+          var wrap = document.createElement('div');
+          wrap.className = 'xf';
+          var cur = parseInt(pref('crossfade', '0'), 10) || 0;
+          wrap.innerHTML = '<div class="row"><div class="t"><b>クロスフェード</b><small>曲と曲のあいだを指定した秒数でフェードさせる</small></div>' +
+            '<label class="sw"><input type="checkbox"><span></span></label></div>' +
+            '<div class="xf-bar"><span class="v">0 秒</span><input type="range" min="1" max="12" step="1"><span>12 秒</span></div>';
+          var cb = wrap.querySelector('input[type=checkbox]'), rg = wrap.querySelector('input[type=range]'), lb = wrap.querySelector('.v');
+          var secs = parseInt(pref('crossfade-sec', '5'), 10) || 5;
+          cb.checked = cur > 0; rg.value = cur || secs;
+          var paint = function () {
+            lb.textContent = rg.value + ' 秒';
+            rg.style.setProperty('--p', ((rg.value - 1) / 11 * 100) + '%');
+            wrap.querySelector('.xf-bar').style.display = cb.checked ? '' : 'none';
+            try {
+              localStorage.setItem('m.crossfade', cb.checked ? rg.value : '0');
+              localStorage.setItem('m.crossfade-sec', rg.value);
+            } catch (e) {}
+          };
+          cb.addEventListener('change', paint);
+          rg.addEventListener('input', paint);
+          paint();
+          return wrap;
+        })(),
+        row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
       ]);
     } else if (id === 'privacy') {
       sec(null, [
