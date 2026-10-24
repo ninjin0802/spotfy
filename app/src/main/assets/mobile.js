@@ -224,7 +224,7 @@
     html.m-home main [data-testid="carousel-scroller"]:has([role="checkbox"]) { padding-left: 44px !important; }
     #m-drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 10002; display: none; }
     #m-drawer {
-      position: fixed; top: 0; bottom: 0; left: 0; width: 82vw; max-width: 340px; z-index: 10003;
+      position: fixed; top: 0; bottom: 0; left: 0; width: 90vw; max-width: 380px; z-index: 10003;
       background: #1f1f1f; transform: translateX(-100%); transition: transform .22s ease; color: #fff;
       display: flex; flex-direction: column; font-family: inherit;
     }
@@ -236,7 +236,22 @@
       display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; }
     #m-drawer .me b { display: block; font-size: 17px; font-weight: 700; line-height: 1.2; }
     #m-drawer .me small { color: #b3b3b3; font-size: 13px; }
-    #m-drawer .me + button.item { margin-top: 8px; }
+    #m-drawer .card { margin: 16px 12px 8px; background: #2a2a2a; border-radius: 8px; overflow: hidden; }
+    #m-drawer .card .me { border-bottom: 1px solid rgba(255,255,255,.12); padding: 12px 14px !important; }
+    #m-drawer .card .me .pic { width: 52px; height: 52px; }
+    #m-drawer .card .me b { font-size: 20px; }
+    #m-drawer .card .add { padding: 12px 14px; font-size: 16px; gap: 14px; }
+    #m-drawer .card .add .plus { width: 32px; height: 32px; border-radius: 50%; background: #3e3e3e; display: flex; align-items: center; justify-content: center; }
+    #m-drawer .card .add .plus svg { width: 18px; height: 18px; fill: #b3b3b3; }
+    #m-drawer button.item svg { width: 26px; height: 26px; }
+    #m-drawer .social { display: flex; gap: 20px; padding: 16px 20px; }
+    #m-drawer .social button { background: none; border: 0; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 72px; padding: 0; font-family: inherit; }
+    #m-drawer .social .ring { position: relative; width: 60px; height: 60px; border-radius: 50%; border: 2px solid #b3b3b3; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+    #m-drawer .social .ring .pic { width: 50px; height: 50px; border-radius: 50%; background: #535353 center/cover no-repeat; display: flex; align-items: center; justify-content: center; color: #000; font-weight: 700; }
+    #m-drawer .social .ring .np { position: absolute; right: -8px; bottom: -6px; width: 30px; height: 30px; border-radius: 3px; object-fit: cover; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+    #m-drawer .social .ring.plus { border: 0; background: #2a2a2a; }
+    #m-drawer .social .ring.plus svg { width: 26px; height: 26px; fill: #fff; }
+    #m-drawer .social .lbl { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 72px; }
     #m-drawer button.item {
       display: flex; align-items: center; gap: 16px; width: 100%; padding: 16px; background: none; border: 0;
       color: #fff; font-size: 16px; text-align: left;
@@ -393,7 +408,7 @@
     /* ミニプレーヤーのデバイスボタン */
     /* ミニプレーヤーの操作ボタンは自前で描く（Spotify の操作部は隠して裏で操作） */
     [data-testid="now-playing-bar"] > div > div:nth-child(2) { display: none !important; }
-    [data-testid="now-playing-bar"] > div > div:first-child { padding-right: 96px !important; }
+    [data-testid="now-playing-bar"] > div > div:first-child { padding-right: 136px !important; }
     #m-mini-ctl { position: absolute; right: 8px; top: 8px; height: 40px !important; padding: 0 !important; width: auto !important; display: flex; align-items: center; gap: 4px; z-index: 2; }
     #m-mini-pp { width: 40px; height: 40px; background: none; border: 0; color: #fff; display: flex; align-items: center; justify-content: center; }
     #m-mini-pp svg { width: 26px; height: 26px; fill: currentColor; }
@@ -420,6 +435,29 @@
     /* ミニプレーヤーに再生位置の細いバー（Myspoti 風） */
     [data-testid="playback-progressbar"] [data-testid="progress-bar-background"] { background: rgba(255,255,255,.25) !important; }
 
+    /* ページ下部の「会社情報」などのフッターは公式アプリにないので消す */
+    .main-view-container__mh-footer-container, main [data-testid="footer-div"], main nav[aria-label*="フッター"] { display: none !important; }
+    /* 選択中のフィルター（すべて／音楽…）は公式アプリと同じ緑 */
+    main [role="checkbox"][aria-checked="true"] > *, main button[role="checkbox"][aria-checked="true"] {
+      background-color: var(--m-accent, #1ed760) !important; color: #000 !important;
+    }
+    /* 作成メニュー */
+    #m-create-bg { position: fixed; inset: 0; z-index: 10030; background: rgba(0,0,0,.6); display: none; }
+    #m-create { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10031; background: #282828; border-radius: 12px 12px 0 0;
+      padding: 8px 0 28px; transform: translateY(100%); transition: transform .22s ease; color: #fff; font-family: inherit; }
+    html.m-create #m-create-bg { display: block; }
+    html.m-create #m-create { transform: none; }
+    #m-create .grip { width: 36px; height: 4px; border-radius: 2px; background: #727272; margin: 4px auto 12px; }
+    #m-create button.c { display: flex; align-items: center; gap: 16px; width: 100%; padding: 12px 16px; background: none; border: 0; color: #fff; text-align: left; }
+    #m-create .ic { width: 48px; height: 48px; border-radius: 50%; background: #3e3e3e; display: flex; align-items: center; justify-content: center; flex: none; }
+    #m-create .ic svg { width: 24px; height: 24px; fill: #fff; }
+    #m-create b { display: block; font-size: 16px; }
+    #m-create small { display: block; color: #a7a7a7; font-size: 13px; margin-top: 2px; }
+    /* ミニプレーヤーの追加ボタン */
+    #m-mini-add { width: 40px; height: 40px; background: none; border: 0; color: #fff; display: flex; align-items: center; justify-content: center; }
+    #m-mini-add svg { width: 24px; height: 24px; fill: currentColor; }
+    #m-mini-add.on { color: var(--m-accent, #1ed760); }
+
     /* 下部タブバー（固定） */
     #m-tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; height: ${NAV_H}px; z-index: 9999;
@@ -428,7 +466,7 @@
       -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     }
     #m-tabbar button {
-      flex: 1; background: none; border: 0; color: #b3b3b3; font-size: 11px;
+      flex: 1; background: none; border: 0; color: #b3b3b3; font-size: 10px; white-space: nowrap;
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
     }
     #m-tabbar button.on { color: #fff; font-weight: 700; }
@@ -438,14 +476,17 @@
   var ICONS = {
     home: '<svg viewBox="0 0 24 24"><path d="M12 3 2 11h3v10h6v-6h2v6h6V11h3z"/></svg>',
     search: '<svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>',
-    lib: '<svg viewBox="0 0 24 24"><path d="M4 3h2v18H4zm5 0h2v18H9zm4.7.6 1.9-.6 5.6 17.5-1.9.6z"/></svg>'
+    lib: '<svg viewBox="0 0 24 24"><path d="M4 3h2v18H4zm5 0h2v18H9zm4.7.6 1.9-.6 5.6 17.5-1.9.6z"/></svg>',
+    premium: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm4.3 14.4a.6.6 0 0 0-.2-.9c-2.4-1.5-5.4-1.8-8.9-1a.6.6 0 1 0 .3 1.2c3.2-.7 5.9-.4 8 .9.3.2.7.1.8-.2zm1.2-2.7a.8.8 0 0 0-.3-1.1c-2.8-1.7-6.9-2.2-10.1-1.2a.8.8 0 1 0 .4 1.5c2.8-.8 6.4-.4 8.9 1.1.4.2.9.1 1.1-.3zm.1-2.8a.9.9 0 0 0-.3-1.3C14 7.6 8.7 7.4 5.7 8.3a.9.9 0 1 0 .5 1.8c2.6-.8 7.2-.6 10.1 1.1.4.3 1 .1 1.3-.3z"/></svg>',
+    create: '<svg viewBox="0 0 24 24"><path d="M11 3h2v8h8v2h-8v8h-2v-8H3v-2h8z"/></svg>'
   };
 
   var DRAWER_ICONS = {
-    news: '<svg viewBox="0 0 24 24"><path d="M12 2a6.5 6.5 0 0 1 6.5 6.5v3.9l1.9 3.1V17H3.6v-1.5l1.9-3.1V8.5A6.5 6.5 0 0 1 12 2zm0 1.8a4.7 4.7 0 0 0-4.7 4.7v4.4l-1.4 2.3h12.2l-1.4-2.3V8.5A4.7 4.7 0 0 0 12 3.8zM9.6 19h4.8a2.5 2.5 0 0 1-4.8 0z"/></svg>',
+    news: '<svg viewBox="0 0 24 24"><path d="M19 4v16l-6-3H8l1.5 5H7.6L6 17H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9zm-1.8 2.9L13.4 8.8H4v6.4h9.4l3.8 1.9zM21 9.5h1.5v5H21z"/></svg>',
+    report: '<svg viewBox="0 0 24 24"><path d="M3 3h1.8v16.2H21V21H3zm15.6 3.4 1.5 1-5 7.4-3.6-3-3.2 4.6-1.5-1 4.3-6.2 3.6 3z"/></svg>',
     history: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4zM11.1 6h1.8v5.6l4 2.3-.9 1.6-4.9-2.8z"/></svg>',
     friends: '<svg viewBox="0 0 24 24"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-4 0-7 2-7 4.5V20h14v-2.5C16 15 13 13 9 13zm7.5-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm1 2.1c1.9.7 3.5 2.1 3.5 4.4V20h2v-2.5c0-2.1-2.3-3.9-5.5-4.4z"/></svg>',
-    settings: '<svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1L11 21h4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>',
+    settings: '<svg viewBox="0 0 24 24"><path d="M10.6 2h2.8l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.4 2.4-2 1.8a7 7 0 0 1 0 2.4l2 1.8-1.4 2.4-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-2.8l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.4-2.4 2-1.8a7 7 0 0 1 0-2.4l-2-1.8 1.4-2.4 2.5.9c.5-.4 1.1-.7 1.7-.9zm1.4 1.8h-.1l-.4 2.2-.9.3c-.7.2-1.3.6-1.8 1l-.7.6-2.1-.8-.2.3 1.7 1.5-.2.9a5.3 5.3 0 0 0 0 2l.2.9-1.7 1.5.2.3 2.1-.8.7.6c.5.4 1.1.8 1.8 1l.9.3.4 2.2h.2l.4-2.2.9-.3c.7-.2 1.3-.6 1.8-1l.7-.6 2.1.8.2-.3-1.7-1.5.2-.9a5.3 5.3 0 0 0 0-2l-.2-.9 1.7-1.5-.2-.3-2.1.8-.7-.6c-.5-.4-1.1-.8-1.8-1l-.9-.3zM12 8.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" transform="translate(0 3)"/></svg>',
     logout: '<svg viewBox="0 0 24 24"><path d="M10 3H4v18h6v-2H6V5h4zm6.6 4.6-1.4 1.4 2 2H9v2h8.2l-2 2 1.4 1.4L21 12z"/></svg>'
   };
 
@@ -462,6 +503,13 @@
 
   // 自分のプロフィールを開く（公式アプリの「プロフィールを表示」）
   var myId = null;
+  function withMyId(fn) {
+    if (myId) return fn(myId);
+    var api = service('UserAPI');
+    if (!api) return;
+    Promise.resolve(api.getUser()).then(function (u) { if (u && u.username) { myId = u.username; fn(myId); } }, function () {});
+  }
+
   function openProfile() {
     if (myId) return spaGo('/user/' + myId);
     var api = service('UserAPI');
@@ -1240,6 +1288,12 @@
 
   function updateMini() {
     sendMeta();
+    var ab = document.getElementById('m-mini-add');
+    if (ab) {
+      var lk = q('[data-testid="now-playing-widget-v2"] button[aria-checked]');
+      var on = !!lk && lk.getAttribute('aria-checked') === 'true';
+      if (ab.dataset.on !== String(on)) { ab.dataset.on = String(on); ab.classList.toggle('on', on); ab.innerHTML = on ? P.saved : P.add; }
+    }
     renderMiniText();
     // ライブラリの見出しの左に自分のアイコン（タップでドロワー）
     var lh = document.querySelector('#Desktop_LeftSidebar_Id header button[aria-label*="折りたたむ"], #Desktop_LeftSidebar_Id header button[aria-label*="Collapse"]');
@@ -1281,13 +1335,18 @@
   function openDrawer() {
     var a = account();
     var d = document.getElementById('m-drawer');
-    setPic(d.querySelector('.pic'), a);
-    d.querySelector('b').textContent = a.name || 'ログインしていません';
-    d.querySelector('small').textContent = a.name ? 'プロフィールを表示' : 'タップしてログイン';
+    setPic(d.querySelector('.me .pic'), a);
+    d.querySelector('.me b').textContent = a.name || 'ログインしていません';
+    d.querySelector('.me small').textContent = a.name ? 'プロフィールを表示' : 'タップしてログイン';
     // 未ログインのときはログインが前提の項目（ログアウト・最新情報・フレンド）を出さない
-    d.querySelectorAll('button.item[data-item]').forEach(function (b) {
+    d.querySelectorAll('[data-item]').forEach(function (b) {
       b.style.display = a.name || b.dataset.item === 'settings' ? '' : 'none';
     });
+    var sp = d.querySelector('.social .pic');
+    if (sp) setPic(sp, a);
+    var np = q('[data-testid="cover-art-image"]');
+    var npi = d.querySelector('.social .np');
+    if (npi) { npi.src = np ? np.src : ''; npi.style.display = np ? '' : 'none'; }
     document.documentElement.classList.add('m-drawer');
   }
 
@@ -1305,16 +1364,22 @@
 
     var d = document.createElement('nav');
     d.id = 'm-drawer';
-    d.innerHTML = '<button class="me item"><div class="pic"></div><div><b></b><small>プロフィールを表示</small></div></button>';
+    d.innerHTML = '<div class="card"><button class="me item"><div class="pic"></div><div><b></b><small>プロフィールを表示</small></div></button>' +
+      '<button class="add item" data-item="add"><span class="plus">' + ICONS.create + '</span><span>アカウントを追加する</span></button></div>';
     d.querySelector('.me').addEventListener('click', function () {
       closeDrawer();
       if (!account().name) { if (!click('[data-testid="login-button"]')) location.href = 'https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F'; return; }
       setTab('home');
       openProfile();
     });
+    d.querySelector('.add').addEventListener('click', function () {
+      closeDrawer();
+      location.href = 'https://accounts.spotify.com/ja/login?continue=' + encodeURIComponent('https://open.spotify.com/');
+    });
     [
-      ['news', '最新情報', function () { spaGo('/content-feed'); }],
-      ['history', '再生履歴', function () { spaGo('/genre/recently-played'); }],
+      ['report', 'リスニングレポート', function () { withMyId(function (id) { spaGo('/user/' + id + '/top/artists'); }); }],
+      ['history', '最近', function () { spaGo('/genre/recently-played'); }],
+      ['news', 'あなたへのおすすめ新着', function () { spaGo('/content-feed'); }],
       ['settings', '設定とプライバシー', openSettings]
     ].forEach(function (it) {
       var b = document.createElement('button');
@@ -1328,6 +1393,21 @@
       });
       d.appendChild(b);
     });
+    // アクティビティ（自分のアイコンに再生中のジャケット）と友達を招待
+    var social = document.createElement('div');
+    social.className = 'social';
+    social.dataset.item = 'social';
+    social.innerHTML = '<button class="act"><span class="ring"><span class="pic"></span><img class="np" alt=""></span><span class="lbl">アクティビティ</span></button>' +
+      '<button class="invite"><span class="ring plus">' + ICONS.create + '</span><span class="lbl">友達を招待</span></button>';
+    social.querySelector('.act').addEventListener('click', function () { closeDrawer(); setTab('home'); openProfile(); });
+    social.querySelector('.invite').addEventListener('click', function () {
+      withMyId(function (id) {
+        var url = 'https://open.spotify.com/user/' + id;
+        if (navigator.share) navigator.share({ title: 'Spotify', url: url }).catch(function () {});
+        else if (navigator.clipboard) navigator.clipboard.writeText(url);
+      });
+    });
+    d.appendChild(social);
     document.body.appendChild(d);
 
     var st = document.createElement('section');
@@ -1354,11 +1434,13 @@
   function buildTabbar() {
     var bar = document.createElement('nav');
     bar.id = 'm-tabbar';
-    [['home', 'ホーム'], ['search', '検索'], ['lib', 'ライブラリ']].forEach(function (t) {
+    [['home', 'ホーム'], ['search', '検索'], ['lib', 'マイライブラリ'], ['premium', 'Premium'], ['create', '作成']].forEach(function (t) {
       var b = document.createElement('button');
       b.dataset.tab = t[0];
       b.innerHTML = ICONS[t[0]] + '<span>' + t[1] + '</span>';
       b.addEventListener('click', function () {
+        if (t[0] === 'premium') return openExternal('https://www.spotify.com/jp/premium/');
+        if (t[0] === 'create') return openCreate();
         if (t[0] === 'home') {
           click('[data-testid="home-button"]') || (location.href = '/');
         } else if (t[0] === 'search') {
@@ -1374,6 +1456,46 @@
     document.body.appendChild(bar);
     setTab(currentTab());
   }
+
+  // Premium など Spotify のサイトは外部ブラウザで開く
+  function openExternal(url) {
+    if (window.__native && __native.send) __native.send({ type: 'open', url: url });
+  }
+
+  // 「作成」：公式アプリと同じく下から作成メニュー
+  function openCreate() {
+    var sheet = document.getElementById('m-create');
+    if (!sheet) {
+      var bg = document.createElement('div');
+      bg.id = 'm-create-bg';
+      bg.addEventListener('click', closeCreate);
+      document.body.appendChild(bg);
+      sheet = document.createElement('section');
+      sheet.id = 'm-create';
+      sheet.innerHTML = '<div class="grip"></div>' +
+        '<button class="c" data-k="playlist"><span class="ic">' + P.queue + '</span><span><b>プレイリスト</b><small>曲やエピソードでプレイリストを作成</small></span></button>' +
+        '<button class="c" data-k="folder"><span class="ic">' + ICONS.lib + '</span><span><b>フォルダ</b><small>プレイリストを整理する</small></span></button>';
+      sheet.querySelectorAll('button.c').forEach(function (b) {
+        b.addEventListener('click', function () {
+          closeCreate();
+          var k = b.dataset.k;
+          if (!click('#Desktop_LeftSidebar_Id header button[aria-label="作成"], #Desktop_LeftSidebar_Id header button[aria-label="Create"]')) return;
+          var tries = 0;
+          (function pick() {
+            var items = document.querySelectorAll('[role="menu"] button, [role="menuitem"]');
+            for (var i = 0; i < items.length; i++) {
+              var t = items[i].textContent;
+              if ((k === 'playlist' && /プレイリスト|playlist/i.test(t) && !/フォルダ|folder/i.test(t)) || (k === 'folder' && /フォルダ|folder/i.test(t))) return items[i].click();
+            }
+            if (++tries < 20) setTimeout(pick, 100);
+          })();
+        });
+      });
+      document.body.appendChild(sheet);
+    }
+    document.documentElement.classList.add('m-create');
+  }
+  function closeCreate() { document.documentElement.classList.remove('m-create'); }
 
   function currentTab() { return location.pathname.indexOf('/search') === 0 ? 'search' : 'home'; }
 
@@ -1398,7 +1520,13 @@
       var box = document.createElement('div');
       box.id = 'm-mini-ctl';
       box.innerHTML = '<button id="m-mini-dev" aria-label="デバイスに接続">' + P.device + '</button>' +
+        '<button id="m-mini-add" aria-label="お気に入りに追加">' + P.add + '</button>' +
         '<button id="m-mini-pp" aria-label="再生">' + P.play + '</button>';
+      box.querySelector('#m-mini-add').addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var lb = q('[data-testid="now-playing-widget-v2"] button[aria-checked]');
+        if (lb) lb.click();
+      });
       box.querySelector('#m-mini-dev').addEventListener('click', function (ev) { ev.stopPropagation(); openDevices(); });
       box.querySelector('#m-mini-pp').addEventListener('click', function (ev) {
         ev.stopPropagation();
@@ -1510,6 +1638,7 @@
   window.__mobileBack = function () {
     var h = document.documentElement.classList;
     if (h.contains('m-devices')) { closeDevices(); return true; }
+    if (h.contains('m-create')) { closeCreate(); return true; }
     if (h.contains('m-searching')) { var si = document.querySelector('#global-nav-bar input'); if (si) si.blur(); h.remove('m-searching'); return true; }
     if (h.contains('m-drawer')) { closeDrawer(); return true; }
     if (h.contains('m-player') && h.contains('m-np')) { closePanel(); return true; }

@@ -251,6 +251,13 @@ class MainActivity : Activity() {
                 if (name == "orientation") applyOrientation()
             }
             "playing" -> setPlaying(m.optBoolean("value"))
+            "open" -> {
+                // spotify.com のページ（Premium など）だけ外部ブラウザで開く
+                val uri = Uri.parse(m.optString("url"))
+                if (uri.scheme == "https" && (uri.host == "www.spotify.com" || uri.host == "spotify.com")) {
+                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                }
+            }
             "meta" -> media.update(
                 m.optString("title"), m.optString("artist"), m.optString("album"), m.optString("art"),
                 m.optBoolean("playing"), m.optLong("pos"), m.optLong("dur"),
