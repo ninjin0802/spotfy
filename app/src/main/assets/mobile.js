@@ -731,6 +731,7 @@
     #m-mini-text .l2 { font-size: 13px; color: rgba(255,255,255,.7); display: flex; align-items: center; gap: 4px; }
     #m-mini-text .l2.dev { color: var(--m-accent, #1ed760); font-weight: 600; }
     #m-mini-text .l2 svg { width: 14px; height: 14px; fill: currentColor; flex: none; }
+    #m-mini-text .l2 svg[stroke], #m-devices svg[stroke] { fill: none !important; }
     #m-mini-text .l2 span { overflow: hidden; text-overflow: ellipsis; }
     /* ミニプレーヤーの曲名が長いときは横に流す */
     @keyframes m-marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--m-dist)); } }
@@ -1770,6 +1771,16 @@
     return d ? d.name : '';
   }
 
+  // ---- このスマホの出力先（Bluetooth イヤホンなど。アプリ側から名前が届く） ----
+  var audioOutput = '';
+  var HEADPHONES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.5"/></svg>';
+  var SPEAKER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" stroke-linecap="round"/></svg>';
+  window.__mSetOutput = function (name) {
+    audioOutput = name || '';
+    var box = document.getElementById('m-mini-text'); if (box) box.dataset.key = '';
+    renderMiniText();
+    if (document.documentElement.classList.contains('m-devices')) renderDevices();
+  };
   function renderDevices() {
     var box = document.getElementById('m-devices');
     var st = window.__mConnect ? __mConnect.get() : { cluster: null };
@@ -1785,7 +1796,7 @@
       b.className = 'd' + (d.device_id === active ? ' on' : '');
       b.innerHTML = devIcon(mine ? 'smartphone' : d.device_type) + '<span><span class="n"></span><small></small></span>';
       b.querySelector('.n').textContent = mine ? 'このスマホ' : d.name;
-      b.querySelector('small').textContent = d.device_id === active ? '再生中' : (mine ? 'Spotify Web Player' : 'Spotify Connect');
+      b.querySelector('small').textContent = d.device_id === active ? (mine && audioOutput ? '再生中 • ' + audioOutput : '再生中') : (mine ? 'Spotify Web Player' : 'Spotify Connect');
       b.addEventListener('click', function () {
         if (d.device_id === active) return closeDevices();
         b.querySelector('small').textContent = '接続中…';
@@ -1795,6 +1806,14 @@
       });
       box.appendChild(b);
     });
+    // 公式アプリと同じく、このスマホで再生するときの出力先（スピーカー／Bluetooth イヤホン）を切り替えられるように
+    var sw = document.createElement('button');
+    sw.className = 'd out';
+    sw.innerHTML = (audioOutput ? HEADPHONES : SPEAKER) + '<span><span class="n"></span><small>タップして出力先を切り替え</small></span>';
+    sw.querySelector('.n').textContent = audioOutput || 'スマホのスピーカー';
+    sw.addEventListener('click', function () { closeDevices(); if (window.__native && __native.send) __native.send({ type: 'outputSwitch' }); });
+    var first = box.querySelector('button.d');
+    if (first) first.after(sw); else box.appendChild(sw);
     if (!devices.length) {
       var p = document.createElement('p');
       p.className = 'note';
@@ -2138,16 +2157,18 @@
     var by = w.querySelector('[data-testid="now-playing-widget-v2-byline"]');
     var title = t ? t.textContent : '', artist = by ? by.textContent : '';
     var remote = activeDeviceName();
-    var l1 = remote ? title + ' • ' + artist : title;
+    // このスマホで Bluetooth イヤホンなどに出しているときは、公式アプリと同じく2行目に機器名
+    var out = !remote && audioOutput ? audioOutput : '';
+    var l1 = remote || out ? title + ' • ' + artist : title;
     var span = box.querySelector('.l1 span');
     var l2 = box.querySelector('.l2');
-    var key = l1 + '|' + remote;
+    var key = l1 + '|' + remote + '|' + out;
     if (box.dataset.key === key) return;
     box.dataset.key = key;
     span.textContent = l1;
-    l2.className = 'l2' + (remote ? ' dev' : '');
-    l2.innerHTML = remote ? P.device + '<span></span>' : '<span></span>';
-    l2.querySelector('span').textContent = remote || artist;
+    l2.className = 'l2' + (remote || out ? ' dev' : '');
+    l2.innerHTML = remote ? P.device + '<span></span>' : out ? HEADPHONES + '<span></span>' : '<span></span>';
+    l2.querySelector('span').textContent = remote || out || artist;
     // はみ出すときだけ横に流す
     span.classList.remove('m-marquee');
     requestAnimationFrame(function () {

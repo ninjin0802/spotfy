@@ -1,5 +1,11 @@
 package com.ninjin.spotifyweb
 
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -51,6 +57,8 @@ class MainActivity : Activity() {
             addView(webView)
         }
         setContentView(root)
+        audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
+        registerReceiver(noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
         // 設定の「開発者向けデバッグ」をオンにしたときだけ、PC から WebView を調べられるようにする
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG || settings.getString("webdebug", "false") == "true")
         // targetSdk 35+ は edge-to-edge 強制なので、ステータスバー/ナビバー分の余白を確保する
@@ -238,7 +246,56 @@ class MainActivity : Activity() {
     private fun injectMobileUi(view: WebView) {
         view.evaluateJavascript(mobileUiJs, null)
         pushStatusBar()
+        pushAudioOutput()
     }
+
+    // ---- Bluetooth イヤホンなどの出力先（公式アプリと同じく、ミニプレーヤーに機器名を出す） ----
+    private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
+
+    private fun currentOutputName(): String {
+        val wireless = setOf(
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLE_HEADSET,
+            AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_HEARING_AID,
+        )
+        val wired = setOf(AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET)
+        val outs = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        outs.firstOrNull { it.type in wireless }?.let { return it.productName?.toString().orEmpty().ifBlank { "Bluetooth" } }
+        outs.firstOrNull { it.type in wired }?.let { return it.productName?.toString().orEmpty().ifBlank { "ヘッドホン" } }
+        return ""
+    }
+
+    // スピーカー／イヤホンの切り替え（Android の出力切り替え画面を開く。公式アプリと同じく端末の一覧から選ぶ）
+    private fun showOutputSwitcher() {
+        if (Build.VERSION.SDK_INT >= 34 &&
+            runCatching { android.media.MediaRouter2.getInstance(this).showSystemOutputSwitcher() }.getOrDefault(false)
+        ) return
+        val dialog = Intent("com.android.systemui.action.LAUNCH_MEDIA_OUTPUT_DIALOG")
+            .setPackage("com.android.systemui").putExtra("package_name", packageName)
+        if (Build.VERSION.SDK_INT >= 30 && runCatching { sendBroadcast(dialog) }.isSuccess) return
+        runCatching { startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)) }
+    }
+
+    private fun pushAudioOutput() = webView.evaluateJavascript(
+        "window.__mSetOutput && __mSetOutput(${JSONObject.quote(currentOutputName())})", null,
+    )
+
+    private val audioDeviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(added: Array<out AudioDeviceInfo>) = pushAudioOutput()
+        override fun onAudioDevicesRemoved(removed: Array<out AudioDeviceInfo>) = pushAudioOutput()
+    }
+
+    // イヤホンが外れたら一時停止（スピーカーから急に音が出ないように）
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) pausePlayback()
+        }
+    }
+
+    private fun pausePlayback() = webView.evaluateJavascript(
+        "(function(){var b=document.querySelector('[data-testid=\"control-button-playpause\"]');" +
+            "if(b&&/一時停止|Pause/.test(b.getAttribute('aria-label')||''))b.click();})()",
+        null,
+    )
 
     private fun handleBack() {
         webView.evaluateJavascript("window.__mobileBack && window.__mobileBack()") { closed ->
@@ -289,6 +346,7 @@ class MainActivity : Activity() {
                 if (name == "orientation") applyOrientation()
             }
             "playing" -> setPlaying(m.optBoolean("value"))
+            "outputSwitch" -> showOutputSwitcher()
             "hideKeyboard" -> getSystemService(android.view.inputmethod.InputMethodManager::class.java)
                 .hideSoftInputFromWindow(webView.windowToken, 0)
             "share" -> {
@@ -346,13 +404,7 @@ class MainActivity : Activity() {
     override fun onStop() {
         super.onStop()
         // バックグラウンド再生をオフにしている場合は裏に回ったら一時停止する
-        if (!backgroundPlayback) {
-            webView.evaluateJavascript(
-                "(function(){var b=document.querySelector('[data-testid=\"control-button-playpause\"]');" +
-                    "if(b&&/一時停止|Pause/.test(b.getAttribute('aria-label')||''))b.click();})()",
-                null,
-            )
-        }
+        if (!backgroundPlayback) pausePlayback()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -361,6 +413,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
+        unregisterReceiver(noisyReceiver)
         PlaybackService.stop(this)
         media.release()
         CookieManager.getInstance().flush()
