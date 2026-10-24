@@ -936,19 +936,52 @@
   }
 
   // ---- ギャップレス再生 ----
-  // Web Player には曲間をつなぐ設定がないため、次の曲を早めに先読みして曲間の無音を減らす
-  var gaplessKey = '';
+  // Web Player は 1 つの再生要素で曲を順番に切り替えるため、曲が終わってから次の曲の読み込み・
+  // 復号・再生開始まで無音ができる。公式アプリに近づけるため、
+  //  1) 曲が始まったら次の曲を先読みし、
+  //  2) 曲の残りが「切り替えにかかる時間」を切ったところで次の曲へ進める。
+  // 切り替えにかかる時間は実際に測って少しずつ合わせる（初期値 0.4 秒）。
+  var gap = { key: '', latency: 0.4, skippedAt: 0, el: null, timer: null };
+  function gaplessOn() { return pref('gapless', '0') === '1'; }
   function gaplessTick() {
-    if (pref('gapless', '0') !== '1') return;
+    if (!gaplessOn()) return;
     var w = q('[data-testid="now-playing-widget-v2"]');
     var key = w ? w.getAttribute('aria-label') : '';
-    if (!key || key === gaplessKey) return;
-    gaplessKey = key;
+    if (!key || key === gap.key) return;
+    gap.key = key;
     setTimeout(function () {
       var st = streamer();
       var lp = st && st._listPlayer;
       if (lp && typeof lp._preloadUpcomingTrack === 'function') { try { lp._preloadUpcomingTrack(); } catch (e) {} }
-    }, 4000);
+    }, 3000);
+  }
+  function gaplessWatch() {
+    if (gap.timer) return;
+    gap.timer = setInterval(function () {
+      if (!gaplessOn()) return;
+      audioElement().then(function (p) {
+        var el = p && p._player;
+        if (!el) return;
+        // 自分で次へ進めたあと、次の曲の音が実際に出始めるまでの時間を測って次回に生かす
+        if (gap.skippedAt) {
+          var waited = (performance.now() - gap.skippedAt) / 1000;
+          if (!el.paused && el.currentTime > 0 && el.currentTime < 2) {
+            var took = Math.max(0, waited - el.currentTime);
+            if (took < 3) gap.latency = Math.min(1.5, Math.max(0.1, gap.latency * 0.6 + took * 0.4));
+            gap.skippedAt = 0;
+          } else if (waited > 5) gap.skippedAt = 0;
+          return;
+        }
+        if (el.paused || !isFinite(el.duration) || el.duration < 10) return;
+        var rest = el.duration - el.currentTime;
+        var rep = q('[data-testid="control-button-repeat"]');
+        if (rep && rep.getAttribute('aria-checked') === 'mixed') return; // 1 曲リピート中は何もしない
+        if (rest > 0 && rest <= gap.latency && !gap.skippedAt) {
+          var next = q('[data-testid="control-button-skip-forward"]');
+          if (next && !next.disabled) { gap.skippedAt = performance.now(); next.click(); }
+        }
+      });
+    }, 50);
   }
 
   var qualityApplied = false;
@@ -1079,9 +1112,9 @@
           try { localStorage.setItem('m.normalize', v ? '1' : '0'); } catch (e) {}
           applyLeveling(v);
         })),
-        row('ギャップレス再生', '次の曲を早めに読み込んで、曲と曲のあいだの無音を減らす', switchEl(pref('gapless', '0') === '1', function (v) {
+        row('ギャップレス再生', '曲と曲のあいだの無音をなくして、続けて再生する', switchEl(pref('gapless', '0') === '1', function (v) {
           try { localStorage.setItem('m.gapless', v ? '1' : '0'); } catch (e) {}
-          gaplessKey = '';
+          gap.key = '';
         })),
                 row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
       ]);
@@ -1756,6 +1789,7 @@
     }
     applySavedQuality();
     gaplessTick();
+    gaplessWatch();
     tidyProfile();
     tidyEditDialog();
     applySavedLeveling();
