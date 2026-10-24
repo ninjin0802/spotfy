@@ -709,7 +709,7 @@
     #m-devices button.d.on { color: var(--m-accent, #1ed760); }
     #m-devices button.d small { display: block; color: #a7a7a7; font-size: 12px; }
     #m-devices svg { width: 28px; height: 28px; fill: currentColor; flex: none; }
-    #m-devices svg[fill="none"], #m-mini-dev svg[fill="none"], #m-mini-text svg[fill="none"] { fill: none !important; }
+    #m-devices svg[fill="none"], #m-mini-dev svg[fill="none"], #m-player .dev svg[fill="none"], #m-mini-text svg[fill="none"] { fill: none !important; }
     #m-devices .note { color: #a7a7a7; font-size: 13px; margin: 12px 16px 0; line-height: 1.5; }
 
     /* ミニプレーヤーのデバイスボタン */
@@ -2092,8 +2092,9 @@
       loadLyrics(ps2.track);
       syncLyrics(pos ? toSec(pos.textContent) * 1000 + 500 : 0);
     }
-    var dt = remoteDeviceType();
-    if (el.querySelector('.dev').dataset.t !== dt) { el.querySelector('.dev').dataset.t = dt; el.querySelector('.dev svg').outerHTML = dt ? devIcon(dt) : P.device; }
+    var dt = remoteDeviceType(), dk = remote ? dt || 'r' : audioOutput ? 'bt' : 'phone';
+    if (el.querySelector('.dev').dataset.t !== dk) { el.querySelector('.dev').dataset.t = dk; el.querySelector('.dev svg').outerHTML = remote ? (dt ? devIcon(dt) : P.device) : audioOutput ? HEADPHONES : DEV_ICONS.smartphone; }
+    if (!remote && audioOutput) el.querySelector('.dev span').textContent = audioOutput;
   }
 
   // Android のメディアコントロールからの操作
@@ -2445,7 +2446,12 @@
     }
     updateMini();
     var mdv = document.getElementById('m-mini-dev');
-    if (mdv) mdv.classList.toggle('on', !!activeDeviceName());
+    if (mdv) {
+      // このスマホで再生中はスマホ（イヤホンならヘッドホン）、ほかの機器ならその機器のマーク
+      var rmt = !!activeDeviceName(), ik = rmt ? 'r:' + remoteDeviceType() : audioOutput ? 'bt' : 'phone';
+      mdv.classList.toggle('on', rmt || !!audioOutput);
+      if (mdv.dataset.ik !== ik) { mdv.dataset.ik = ik; mdv.innerHTML = rmt ? (remoteDeviceType() ? devIcon(remoteDeviceType()) : P.device) : audioOutput ? HEADPHONES : DEV_ICONS.smartphone; }
+    }
     updatePlayer();
     tintMiniPlayer();
     // アーティスト・アルバム・プレイリストなどの詳細ページでは左上に戻るボタン
