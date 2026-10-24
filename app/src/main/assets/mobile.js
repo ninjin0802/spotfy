@@ -123,9 +123,18 @@
     .m-follow { margin-left: auto; height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid #878787; background: none; color: #fff; font-weight: 700; font-size: 13px; flex: none; position: relative; z-index: 2; white-space: nowrap; }
     html.m-results main [role="grid"] [role="group"]:has(.m-follow) [data-testid="trailing"] { margin-left: auto !important; display: flex !important; align-items: center !important; }
     /* ライブラリの並べ替え行：公式アプリと同じ「⇅ 再生履歴」表記 */
-    html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] { flex-direction: row-reverse !important; gap: 6px !important; color: #fff !important; font-weight: 700 !important; }
-    html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] > span:last-child svg { display: none !important; }
-    html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] > span:last-child::before { content: "⇅"; font-size: 16px; }
+    html.m-lib #Desktop_LeftSidebar_Id div:has(> [role="combobox"]):has(> [role="search"]),
+    html.m-lib #Desktop_LeftSidebar_Id div:has(> div > [role="combobox"]):has([role="search"]) { position: absolute !important; opacity: 0 !important; height: 0 !important; overflow: hidden !important; pointer-events: none !important; }
+    #m-libbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px 12px; width: 100%; box-sizing: border-box; border-top: 1px solid #2a2a2a; }
+    #m-libbar button { background: none; border: 0; color: #fff; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; font-family: inherit; padding: 4px; }
+    #m-libbar svg { width: 22px; height: 22px; }
+    html.m-lib #Desktop_LeftSidebar_Id [role="listbox"] [role="option"] span { padding: 8px 16px !important; font-size: 14px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"]:has([data-testid="entity-image"]) > div:nth-child(3),
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"]:has([data-testid="entity-image"]) > div:nth-child(3) *,
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] [data-testid="entity-image"] { width: 84px !important; height: 84px !important; min-width: 84px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRow"] { padding: 6px 16px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowTitle"] { font-size: 17px !important; }
+    html.m-lib #Desktop_LeftSidebar_Id [data-encore-id="listRowSubtitle"] { font-size: 14px !important; }
     html.m-search form:has(input:placeholder-shown) [data-testid="clear-button"] { display: none !important; }
     #m-sback { position: fixed; left: 8px; top: calc(var(--m-top, 0px) + 12px); width: 40px; height: 40px; border: 0; background: none; color: #fff; z-index: 8200; display: none; align-items: center; justify-content: center; }
     #m-sback svg { width: 24px; height: 24px; fill: currentColor; }
@@ -2366,6 +2375,7 @@
       abm.after(shb);
     }
     document.documentElement.classList.toggle('m-coll', /^\/(album|playlist)\//.test(location.pathname.replace(/^\/intl-[a-z-]+/i, '')));
+    tidyLibrary();
     applySavedQuality();
     gaplessTick();
     gaplessWatch();
@@ -3094,6 +3104,66 @@
       sheet.appendChild(off);
     }
     document.documentElement.classList.add('m-tm');
+  }
+
+  // ==== ライブラリの並べ替え・表示形式（公式アプリと同じ「⇅ 再生履歴」と表示切替） ====
+  var SORTS = [['最近', '再生履歴'], ['最近追加した順', '最近追加した順'], ['アルファベット順', 'アルファベット順'], ['クリエーター', 'クリエーター']];
+  function libMenu(fn) {
+    var cb = document.querySelector('#Desktop_LeftSidebar_Id [role="combobox"]');
+    if (!cb) return;
+    cb.click();
+    var n = 0;
+    (function wait() {
+      var items = document.querySelectorAll('[role="menuitemradio"]');
+      if (items.length) { fn(items); setTimeout(function () { if (document.querySelector('[role="menuitemradio"]')) cb.click(); }, 150); return; }
+      if (++n < 20) setTimeout(wait, 80);
+    })();
+  }
+  function setLibView(label) { libMenu(function (items) { [].forEach.call(items, function (b) { if (b.getAttribute('aria-label') === label) b.click(); }); }); }
+  function openLibSort() {
+    var sheet = document.getElementById('m-tm');
+    if (!sheet) {
+      var bg = document.createElement('div'); bg.id = 'm-tm-bg'; bg.addEventListener('click', closeTrackMenu); document.body.appendChild(bg);
+      sheet = document.createElement('section'); sheet.id = 'm-tm'; document.body.appendChild(sheet);
+    }
+    var cur = ((document.querySelector('#Desktop_LeftSidebar_Id [role="combobox"]') || {}).textContent || '').trim();
+    sheet.innerHTML = '<div class="grip"></div><div class="hd"><div><b>並べ替え</b></div></div>';
+    SORTS.forEach(function (o) {
+      var b = document.createElement('button'); b.className = 'it';
+      b.innerHTML = '<span class="lbl"></span>'; b.querySelector('.lbl').textContent = o[1];
+      if (cur === o[0]) b.style.color = 'var(--m-accent, #1ed760)';
+      b.onclick = function () { closeTrackMenu(); libMenu(function (items) { [].forEach.call(items, function (x) { if (x.textContent.trim() === o[0]) x.click(); }); }); };
+      sheet.appendChild(b);
+    });
+    document.documentElement.classList.add('m-tm');
+  }
+  var GRID_I = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg>';
+  var LIST_I = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
+  var libFixed = false;
+  function tidyLibrary() {
+    var side = document.getElementById('Desktop_LeftSidebar_Id');
+    if (!side || !document.documentElement.classList.contains('m-lib')) return;
+    var ex = side.querySelector('button[aria-label="マイライブラリを開く"], button[aria-label="Open Your Library"]');
+    if (ex) { ex.click(); return; }
+    var cb = side.querySelector('[role="combobox"]');
+    if (!cb) return;
+    var grid = /グリッド|grid/i.test(cb.getAttribute('aria-label') || '');
+    // 最初の一度だけ、公式アプリと同じリスト表示にそろえる
+    if (!libFixed) { libFixed = true; if (grid || /Compact|コンパクト/i.test(cb.getAttribute('aria-label') || '')) { setLibView('デフォルトのリスト'); return; } }
+    var host = cb.parentElement;
+    var bar = document.getElementById('m-libbar');
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'm-libbar';
+      bar.innerHTML = '<button class="srt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3.5 7.5 7 4l3.5 3.5M17 20V4M13.5 16.5 17 20l3.5-3.5"/></svg><span></span></button><button class="vw"></button>';
+      bar.querySelector('.srt').onclick = openLibSort;
+      bar.querySelector('.vw').onclick = function () { setLibView(bar.dataset.grid === '1' ? 'デフォルトのリスト' : 'デフォルトのグリッド'); };
+    }
+    var anchor = host.parentElement;
+    if (bar.parentElement !== anchor.parentElement) anchor.parentElement.insertBefore(bar, anchor);
+    var label = cb.textContent.trim();
+    SORTS.forEach(function (o) { if (o[0] === label) label = o[1]; });
+    bar.querySelector('.srt span').textContent = label;
+    if (bar.dataset.grid !== (grid ? '1' : '')) { bar.dataset.grid = grid ? '1' : ''; bar.querySelector('.vw').innerHTML = grid ? LIST_I : GRID_I; }
   }
 
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
