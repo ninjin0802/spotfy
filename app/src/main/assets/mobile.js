@@ -372,13 +372,16 @@
     /* 「フォロー中」の最新リリース：公式アプリと同じ、ジャケット色のカード（動画なし） */
     .m-bigcard { height: auto !important; min-height: 0 !important; max-height: none !important; aspect-ratio: auto !important; position: relative !important; border-radius: 8px !important;
       overflow: hidden !important; display: flex !important; flex-direction: column !important; padding: 20px !important; gap: 14px !important; box-sizing: border-box !important;
-      background: var(--m-card, #2a2a2a) !important; margin-bottom: 16px !important; }
+      background: var(--m-card, #2a2a2a) !important; margin: 0 12px !important; width: auto !important; }
     .m-bigcard > div:not(:has(header)):not(:has(footer)) { display: none !important; }
     div:has(> .m-bigcard), div:has(> div > .m-bigcard) { height: auto !important; aspect-ratio: auto !important; }
+    /* カードの間隔は公式アプリと同じ約 32px（Web 版の小見出しと余白は消す） */
+    div:has(> .m-bigcard) { padding: 0 !important; gap: 0 !important; margin-bottom: 32px !important; }
+    div:has(> .m-bigcard) > header { display: none !important; }
     .m-bigcard { --background-color: var(--m-card) !important; }
     .m-bigcard > header, .m-bigcard > footer { position: relative !important; inset: auto !important; z-index: 1 !important; width: auto !important; padding: 0 !important; margin: 0 !important; height: auto !important; }
     .m-bigcard > header { display: flex !important; gap: 16px !important; align-items: flex-start !important; padding-right: 32px !important; }
-    .m-bigcard > header > div:first-child, .m-bigcard > header > div:first-child * { width: 116px !important; height: 116px !important; min-width: 116px !important; border-radius: 2px; }
+    .m-bigcard > header > div:first-child, .m-bigcard > header > div:first-child * { width: 88px !important; height: 88px !important; min-width: 88px !important; border-radius: 2px; }
     .m-bigcard > header > div:not(:first-child):not(.m-bc-t) { display: none !important; }
     .m-bigcard .m-bc-t b { display: block; font-size: 15px; font-weight: 700; color: #fff; }
     .m-bigcard .m-bc-t span { display: block; font-size: 14px; color: rgba(255,255,255,.75); margin-top: 3px; }
@@ -950,10 +953,12 @@
 
   // 最新リリースのカードを公式アプリ風に（再生ボタンを足す）
   function tidyBigCards() {
-    document.querySelectorAll('main [data-testid="big-card-toggle-preview-button"]').forEach(function (pv) {
-      var card = pv.closest('footer');
-      card = card && card.parentElement;
+    // 再生中かどうかで中身が変わるので、プレビューボタンではなく「ジャケット付きの header と footer を持つ箱」で探す
+    document.querySelectorAll('main footer').forEach(function (ft) {
+      var card = ft.parentElement;
       if (!card || card.classList.contains('m-bigcard')) return;
+      var hdr = card.querySelector(':scope > header');
+      if (!hdr || !hdr.querySelector('img') || !card.querySelector('[data-testid="carousel-scroller"], video')) return;
       card.classList.add('m-bigcard');
       // 見出し：公式アプリと同じく「アーティスト（太字） / 種類 • タイトル」
       var hd = card.querySelector(':scope > header');
@@ -990,8 +995,10 @@
         pb.className = 'm-card-play';
         pb.setAttribute('aria-label', '再生');
         pb.innerHTML = P.play;
+        pb.dataset.uri = (function () { var m0 = (link.getAttribute('href') || '').match(/\/(album|playlist|track|artist|show|episode)\/([A-Za-z0-9]+)/); return m0 ? 'spotify:' + m0[1] + ':' + m0[2] : ''; })();
         pb.addEventListener('click', function (ev) {
           ev.stopPropagation();
+          if (pb.dataset.playing === '1') { var ppb = q('[data-testid="control-button-playpause"]'); if (ppb) ppb.click(); return; }
           var m = (link.getAttribute('href') || '').match(/\/(album|playlist|track|artist|show|episode)\/([A-Za-z0-9]+)/);
           var api = service('PlayerAPI');
           if (m && api && api.play) api.play({ uri: 'spotify:' + m[1] + ':' + m[2] }, {});
@@ -1900,6 +1907,14 @@
 
   function updateMini() {
     sendMeta();
+    // 「フォロー中」カードの再生ボタン：再生中のアルバムなら一時停止アイコン
+    var cst = window.__mConnect && __mConnect.get(), cps = cst && cst.cluster && cst.cluster.player_state;
+    var curCtx = cps && (cps.context_uri || ''), curAlb = cps && cps.track && cps.track.metadata && cps.track.metadata.album_uri;
+    var ppl = q('[data-testid="control-button-playpause"]'), isPl = !!ppl && /一時停止|Pause/.test(ppl.getAttribute('aria-label') || '');
+    document.querySelectorAll('.m-card-play').forEach(function (b) {
+      var on = isPl && !!b.dataset.uri && (b.dataset.uri === curCtx || b.dataset.uri === curAlb) ? '1' : '';
+      if (b.dataset.playing !== on) { b.dataset.playing = on; b.innerHTML = on ? P.pause : P.play; }
+    });
     var ab = document.getElementById('m-mini-add');
     if (ab) {
       var lk = q('[data-testid="now-playing-widget-v2"] button[aria-checked]');
@@ -2677,6 +2692,19 @@
     var mb = e.target.closest && e.target.closest('main [data-testid="action-bar-row"] [data-testid="more-button"]');
     if (!mb) return;
     if (openCollectionMenu()) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+
+  // ページの中に差し込んだ自前のボタンを押しても、下にある Spotify のカードや行が反応しないようにする
+  // （カードは pointerdown / mousedown の段階で画面遷移の準備を始めるため、click だけ止めても一瞬開こうとする）
+  var OWN_BTN = '.m-card-play, .m-ab-share, .m-follow, .m-row-more, #m-mini-ctl button, #m-edit, #m-gear';
+  ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup'].forEach(function (type) {
+    document.addEventListener(type, function (e) {
+      if (e.target.closest && e.target.closest(OWN_BTN)) e.stopPropagation();
+    }, { capture: true, passive: true });
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest(OWN_BTN);
+    if (b && b.closest('a, [role="button"], [data-encore-id="card"], .m-bigcard')) e.preventDefault();
   }, true);
 
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
