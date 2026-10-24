@@ -614,6 +614,7 @@
     #m-player .ctrls .s svg { width: 24px; height: 24px; }
     #m-player .ctrls .m svg { width: 34px; height: 34px; }
     #m-player .ctrls .on { color: var(--m-accent, #1ed760); }
+    #m-player .ctrls .dis, #m-q .qbar button.dis { opacity: .35; }
     #m-player .ctrls .s.on::after { content: ""; position: absolute; bottom: 6px; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
     #m-player .ctrls .pp { width: 72px; height: 72px; border-radius: 50%; background: #fff; color: #000; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
     #m-player .ctrls .pp svg { width: 30px; height: 30px; }
@@ -1778,8 +1779,8 @@
     on('.pp', function () { var b = q('[data-testid="control-button-playpause"]'); if (b) b.click(); });
     on('.prev', function () { var b = q('[data-testid="control-button-skip-back"]'); if (b) b.click(); });
     on('.next', function () { var b = q('[data-testid="control-button-skip-forward"]'); if (b) b.click(); });
-    on('.repeat', function () { var b = q('[data-testid="control-button-repeat"]'); if (b) b.click(); });
-    on('.shuffle', function () { var b = q('[data-testid="general-controls"] button[aria-label*="シャッフル"], [data-testid="general-controls"] button[aria-label*="shuffle" i]'); if (b) b.click(); });
+    on('.repeat', toggleRepeat);
+    on('.shuffle', toggleShuffle);
     on('.like', function () { var b = q('[data-testid="now-playing-widget-v2"] button[aria-checked]'); if (b) b.click(); });
     on('.dev', openDevices);
     on('.queue', openQueue);
@@ -1952,13 +1953,12 @@
     el.querySelector('.like').innerHTML = liked ? P.saved : P.add;
     var cst3 = window.__mConnect && __mConnect.get(), tr3 = cst3 && cst3.cluster && cst3.cluster.player_state && cst3.cluster.player_state.track;
     if (tr3) loadArtistCard(tr3.metadata && tr3.metadata.artist_uri);
-    var rep = q('[data-testid="control-button-repeat"]');
-    var rs = rep ? rep.getAttribute('aria-checked') : 'false';
-    el.querySelector('.repeat').classList.toggle('on', rs === 'true' || rs === 'mixed');
-    el.querySelector('.repeat').innerHTML = rs === 'mixed' ? P.repeatOne : P.repeat;
-    var sh = q('[data-testid="general-controls"] button[aria-label*="シャッフル"], [data-testid="general-controls"] button[aria-label*="shuffle" i]');
-    var shOn = sh && (sh.getAttribute('aria-checked') === 'true' || /無効|disable/i.test(sh.getAttribute('aria-label') || ''));
-    el.querySelector('.shuffle').classList.toggle('on', !!shOn);
+    var rm = repeatMode();
+    el.querySelector('.repeat').classList.toggle('on', rm > 0);
+    el.querySelector('.repeat').classList.toggle('dis', !repeatAllowed());
+    if (el.querySelector('.repeat').dataset.m !== String(rm)) { el.querySelector('.repeat').dataset.m = String(rm); el.querySelector('.repeat').innerHTML = rm === 2 ? P.repeatOne : P.repeat; }
+    el.querySelector('.shuffle').classList.toggle('on', shuffleOn());
+    el.querySelector('.shuffle').classList.toggle('dis', !shuffleAllowed());
     var pos = q('[data-testid="playback-position"]'), dur = q('[data-testid="playback-duration"]');
     el.querySelector('.pos').textContent = pos ? pos.textContent : '0:00';
     el.querySelector('.dur').textContent = dur ? dur.textContent : '0:00';
@@ -2902,6 +2902,30 @@
     if (b && b.closest('a, [role="button"], [data-encore-id="card"], .m-bigcard')) e.preventDefault();
   }, true);
 
+  // ==== シャッフル・リピート（Spotify のボタンではなく再生エンジンに直接指示） ====
+  function playState() { var p = service('PlayerAPI'); try { return p && p.getState(); } catch (e) { return null; } }
+  function toggleShuffle() {
+    var p = service('PlayerAPI'), st = playState();
+    if (!p || !st) return;
+    if (st.restrictions && !st.restrictions.canToggleShuffle) return toast('自動再生中の曲ではシャッフルを使えません');
+    Promise.resolve(p.setShuffle(!st.shuffle)).then(function () { toast(!st.shuffle ? 'シャッフルをオンにしました' : 'シャッフルをオフにしました'); });
+  }
+  function toggleRepeat() {
+    var p = service('PlayerAPI'), st = playState();
+    if (!p || !st) return;
+    var r = st.restrictions || {};
+    // 0: オフ → 1: 全曲 → 2: 1 曲 → 0
+    var next = st.repeat === 0 ? 1 : st.repeat === 1 ? 2 : 0;
+    if (next === 1 && !r.canToggleRepeatContext) next = r.canToggleRepeatTrack ? 2 : -1;
+    if (next === 2 && !r.canToggleRepeatTrack) next = 0;
+    if (next < 0) return toast('自動再生中の曲ではリピートを使えません');
+    Promise.resolve(p.setRepeat(next)).catch(function () {});
+  }
+  function shuffleOn() { var st = playState(); return !!(st && st.shuffle); }
+  function repeatMode() { var st = playState(); return st ? st.repeat : 0; }
+  function shuffleAllowed() { var st = playState(); return !st || !st.restrictions || st.restrictions.canToggleShuffle; }
+  function repeatAllowed() { var st = playState(); return !st || !st.restrictions || st.restrictions.canToggleRepeatContext || st.restrictions.canToggleRepeatTrack; }
+
   // ==== 再生リスト（キュー）：公式アプリと同じボトムシート ====
   // 最初は画面の半分ほど。上に引っぱる（または一覧をスクロールする）と全画面に広がる
   var HANDLE = '<svg viewBox="0 0 24 24"><path d="M4 7h16v1.6H4zm0 4.2h16v1.6H4zm0 4.2h16V17H4z"/></svg>';
@@ -2952,16 +2976,16 @@
     sh.querySelector('.dv span').textContent = rd || 'このスマホ';
     // 下のボタン（シャッフル・リピート・タイマー）
     function paintBar() {
-      var sb = q('[data-testid="general-controls"] button[aria-label*="シャッフル"], [data-testid="general-controls"] button[aria-label*="huffle"]');
-      var rb = q('[data-testid="control-button-repeat"]');
-      sh.querySelector('.sh').classList.toggle('on', !!sb && (sb.getAttribute('aria-checked') === 'true' || /無効|disable/i.test(sb.getAttribute('aria-label') || '')));
-      var rs = rb ? rb.getAttribute('aria-checked') : 'false';
-      sh.querySelector('.rp').classList.toggle('on', rs === 'true' || rs === 'mixed');
+      sh.querySelector('.sh').classList.toggle('on', shuffleOn());
+      sh.querySelector('.sh').classList.toggle('dis', !shuffleAllowed());
+      sh.querySelector('.rp').classList.toggle('on', repeatMode() > 0);
+      sh.querySelector('.rp').classList.toggle('dis', !repeatAllowed());
+      sh.querySelector('.rp').querySelector('svg').outerHTML = repeatMode() === 2 ? P.repeatOne : P.repeat;
       sh.querySelector('.tm').classList.toggle('on', !!sleepTimer);
     }
     paintBar();
-    sh.querySelector('.sh').onclick = function () { var b = q('[data-testid="general-controls"] button[aria-label*="シャッフル"], [data-testid="general-controls"] button[aria-label*="huffle"]'); if (b) b.click(); setTimeout(function () { paintBar(); render(); }, 700); };
-    sh.querySelector('.rp').onclick = function () { var b = q('[data-testid="control-button-repeat"]'); if (b) b.click(); setTimeout(paintBar, 500); };
+    sh.querySelector('.sh').onclick = function () { toggleShuffle(); setTimeout(function () { paintBar(); render(); }, 800); };
+    sh.querySelector('.rp').onclick = function () { toggleRepeat(); setTimeout(paintBar, 600); };
     sh.querySelector('.tm').onclick = function () { openSleepTimer(paintBar); };
     var editing = false;
     sh.querySelector('.edit').onclick = function () { editing = !editing; this.textContent = editing ? '完了' : '編集'; sh.classList.toggle('editing', editing); };
