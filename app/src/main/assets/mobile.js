@@ -370,34 +370,34 @@
     #m-vis .sw input:checked + span::after { transform: translateX(20px); background: #000; }
 
     /* 「フォロー中」の最新リリース：公式アプリと同じ、ジャケット色のカード（動画なし） */
-    .m-bigcard { height: auto !important; min-height: 0 !important; max-height: none !important; aspect-ratio: auto !important; position: relative !important; border-radius: 8px !important;
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) { height: auto !important; min-height: 0 !important; max-height: none !important; aspect-ratio: auto !important; position: relative !important; border-radius: 8px !important;
       overflow: hidden !important; display: flex !important; flex-direction: column !important; padding: 20px !important; gap: 14px !important; box-sizing: border-box !important;
       background: var(--m-card, #2a2a2a) !important; margin: 0 12px !important; width: auto !important; }
-    .m-bigcard > div:not(:has(header)):not(:has(footer)) { display: none !important; }
-    div:has(> .m-bigcard), div:has(> div > .m-bigcard) { height: auto !important; aspect-ratio: auto !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > div:not(:has(header)):not(:has(footer)) { display: none !important; }
+    div:has(> main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])), div:has(> div > :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"]))) { height: auto !important; aspect-ratio: auto !important; }
     /* カードの間隔は公式アプリと同じ約 32px（Web 版の小見出しと余白は消す） */
-    div:has(> .m-bigcard) { padding: 0 !important; gap: 0 !important; margin-bottom: 32px !important; }
-    div:has(> .m-bigcard) > header { display: none !important; }
-    .m-bigcard { --background-color: var(--m-card) !important; }
-    .m-bigcard > header, .m-bigcard > footer { position: relative !important; inset: auto !important; z-index: 1 !important; width: auto !important; padding: 0 !important; margin: 0 !important; height: auto !important; }
-    .m-bigcard > header { display: flex !important; gap: 16px !important; align-items: flex-start !important; padding-right: 32px !important; }
-    .m-bigcard > header > div:first-child, .m-bigcard > header > div:first-child * { width: 88px !important; height: 88px !important; min-width: 88px !important; border-radius: 2px; }
-    .m-bigcard > header > div:not(:first-child):not(.m-bc-t) { display: none !important; }
-    .m-bigcard .m-bc-t b { display: block; font-size: 15px; font-weight: 700; color: #fff; }
-    .m-bigcard .m-bc-t span { display: block; font-size: 14px; color: rgba(255,255,255,.75); margin-top: 3px; }
-    .m-bigcard > footer > div:first-child { display: none !important; }
-    .m-bigcard .m-bc-sub { font-size: 14px; color: rgba(255,255,255,.85); }
-    .m-bigcard > footer { position: static !important; transform: none !important; width: 100% !important; left: auto !important; display: block !important; }
-    .m-bigcard > footer > div:last-child > div:first-child { flex: none !important; }
-    .m-bigcard [data-testid="big-card-toggle-preview-button"] { width: auto !important; gap: 8px !important; white-space: nowrap !important; }
-    .m-bigcard [data-testid="big-card-toggle-preview-button"] > span { position: static !important; margin: 0 !important; }
-    .m-bigcard > footer > div:last-child { opacity: 1 !important; display: flex !important; align-items: center !important; gap: 12px !important; }
-    .m-bigcard > footer > div:last-child > div:last-child { margin-left: auto !important; display: flex !important; align-items: center !important; gap: 14px !important; }
-    .m-bigcard [data-testid="big-card-toggle-preview-button"] { background: rgba(0,0,0,.25) !important; border-radius: 20px !important; height: 40px !important; padding: 0 16px !important; color: rgba(255,255,255,.75) !important; }
-    .m-bigcard [data-testid="more-button"] { position: absolute !important; top: 16px !important; right: 12px !important; transform: rotate(90deg); }
-    .m-bigcard [data-testid="add-button"] svg { width: 30px !important; height: 30px !important; }
-    .m-bigcard .m-card-play { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 0; color: #000; display: flex; align-items: center; justify-content: center; }
-    .m-bigcard .m-card-play svg { width: 20px; height: 20px; fill: #000; }
+    div:has(> main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) { padding: 0 !important; gap: 0 !important; margin-bottom: 32px !important; }
+    div:has(> main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > header { display: none !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) { --background-color: var(--m-card) !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > header, :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > footer { position: relative !important; inset: auto !important; z-index: 1 !important; width: auto !important; padding: 0 !important; margin: 0 !important; height: auto !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > header { display: flex !important; gap: 16px !important; align-items: flex-start !important; padding-right: 32px !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > header > div:first-child, :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > header > div:first-child * { width: 88px !important; height: 88px !important; min-width: 88px !important; border-radius: 2px; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > header:has(.m-bc-t) > div:not(:first-child):not(.m-bc-t) { display: none !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) .m-bc-t b { display: block; font-size: 15px; font-weight: 700; color: #fff; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) .m-bc-t span { display: block; font-size: 14px; color: rgba(255,255,255,.75); margin-top: 3px; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > footer > div:first-child { display: none !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) .m-bc-sub { font-size: 14px; color: rgba(255,255,255,.85); }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > footer { position: static !important; transform: none !important; width: 100% !important; left: auto !important; display: block !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > footer > div:last-child > div:first-child { flex: none !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) [data-testid="big-card-toggle-preview-button"] { width: auto !important; gap: 8px !important; white-space: nowrap !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) [data-testid="big-card-toggle-preview-button"] > span { position: static !important; margin: 0 !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > footer > div:last-child { opacity: 1 !important; display: flex !important; align-items: center !important; gap: 12px !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) > footer > div:last-child > div:last-child { margin-left: auto !important; display: flex !important; align-items: center !important; gap: 14px !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) [data-testid="big-card-toggle-preview-button"] { background: rgba(0,0,0,.25) !important; border-radius: 20px !important; height: 40px !important; padding: 0 16px !important; color: rgba(255,255,255,.75) !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) [data-testid="more-button"] { position: absolute !important; top: 16px !important; right: 12px !important; transform: rotate(90deg); }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) [data-testid="add-button"] svg { width: 30px !important; height: 30px !important; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) .m-card-play { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 0; color: #000; display: flex; align-items: center; justify-content: center; }
+    :is(.m-bigcard, main div:has(> header img):has(> footer):has(video, [data-testid="carousel-scroller"])) .m-card-play svg { width: 20px; height: 20px; fill: #000; }
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
@@ -952,13 +952,26 @@
   function closeVisibility() { document.documentElement.classList.remove('m-vis'); }
 
   // 最新リリースのカードを公式アプリ風に（再生ボタンを足す）
+  // カードの色は、Spotify が style 属性を書き換えても消えないよう、リンク先ごとの CSS ルールで当てる
+  var cardTint = {};
+  function setCardTint(key, rgb) {
+    if (!key) return;
+    var st = document.getElementById('m-tints');
+    if (!st) { st = document.createElement('style'); st.id = 'm-tints'; document.head.appendChild(st); }
+    st.textContent += 'main div:has(> header a[href$="' + key.replace(/"/g, '') + '"]) { --m-card: ' + rgb + ' !important; }\n';
+  }
   function tidyBigCards() {
     // 再生中かどうかで中身が変わるので、プレビューボタンではなく「ジャケット付きの header と footer を持つ箱」で探す
     document.querySelectorAll('main footer').forEach(function (ft) {
       var card = ft.parentElement;
       if (!card || card.classList.contains('m-bigcard')) return;
       var hdr = card.querySelector(':scope > header');
-      if (!hdr || !hdr.querySelector('img') || !card.querySelector('[data-testid="carousel-scroller"], video')) return;
+      if (!hdr || !card.querySelector('[data-testid="carousel-scroller"], video')) return;
+      // ジャケット画像の読み込みが済んでから処理する（色を取るため）。見た目は CSS が先に当たる
+      var hlink = hdr.querySelector('a[href]');
+      var tkey = hlink ? hlink.getAttribute('href').replace(/^\/intl-[a-z-]+/i, '') : '';
+      var himg = hdr.querySelector('img');
+      if (!himg || !/^https:/.test(himg.currentSrc || himg.src)) return;
       card.classList.add('m-bigcard');
       // 見出し：公式アプリと同じく「アーティスト（太字） / 種類 • タイトル」
       var hd = card.querySelector(':scope > header');
@@ -974,7 +987,9 @@
       }
       // カードの色はジャケットから
       var cimg = hd && hd.querySelector('img');
-      if (cimg) {
+      var csrc = cimg && (cimg.currentSrc || cimg.src);
+      // 再生・一時停止でカードが作り直されても色が一瞬消えないよう、ジャケットごとに色を覚えておく
+      if (!(tkey && cardTint[tkey]) && cimg) {
         var pr = new Image(); pr.crossOrigin = 'anonymous';
         pr.onload = function () {
           try {
@@ -983,10 +998,11 @@
             var d = g.getImageData(0, 0, 8, 8).data, r = 0, gg = 0, bb = 0;
             for (var i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; bb += d[i + 2]; }
             var n = d.length / 4, k = 0.42;
-            card.style.setProperty('--m-card', 'rgb(' + Math.round(r / n * k) + ',' + Math.round(gg / n * k) + ',' + Math.round(bb / n * k) + ')');
+            cardTint[tkey] = 'rgb(' + Math.round(r / n * k) + ',' + Math.round(gg / n * k) + ',' + Math.round(bb / n * k) + ')';
+            setCardTint(tkey, cardTint[tkey]);
           } catch (e) {}
         };
-        pr.src = cimg.src;
+        pr.src = cimg.currentSrc || cimg.src;
       }
       var link = card.querySelector('header a[href]');
       var add = card.querySelector('[data-testid="add-button"]');
@@ -2350,6 +2366,7 @@
     recentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     saveRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     removeRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    getAlbum: '0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f',
     getTrack: 'fe16b8083eec2305854db612ca75589bcb71e009dc7a4d014f29bd534a4c01f5',
     searchTopResultsList: 'dd78eaff943eba629ed70ee25517b9cea0dcaa41193e2592ae2727660b21892c'
   };
@@ -2642,14 +2659,33 @@
       return 'spotify:track:' + a.getAttribute('href').split('/track/')[1].split(/[/?#]/)[0];
     }).filter(function (u, i, arr) { return arr.indexOf(u) === i; });
   }
-  function openCollectionMenu() {
-    var m = location.pathname.replace(/^\/intl-[a-z-]+/i, '').match(/^\/(album|playlist)\/([A-Za-z0-9]+)/);
-    if (!m) return false;
-    var uri = 'spotify:' + m[1] + ':' + m[2];
-    var head = document.querySelector('main [data-testid="entity-header"]');
-    var title = head && head.querySelector('h1') ? head.querySelector('h1').textContent : '';
-    var img = head && head.querySelector('img') ? bigArt(head.querySelector('img').src) : '';
-    var arA = head && head.querySelector('a[href*="/artist/"], a[href*="/user/"]');
+  function openCollectionMenu(o) {
+    var m, uri, title, img, arA, artistName, artistHref, tracks;
+    if (o && o.uri) {
+      m = [null].concat(o.uri.split(':').slice(1));
+      uri = o.uri; title = o.title; img = o.img; artistName = o.artist; artistHref = o.artistHref;
+    } else {
+      m = location.pathname.replace(/^\/intl-[a-z-]+/i, '').match(/^\/(album|playlist)\/([A-Za-z0-9]+)/);
+      if (!m) return false;
+      uri = 'spotify:' + m[1] + ':' + m[2];
+      var head = document.querySelector('main [data-testid="entity-header"]');
+      title = head && head.querySelector('h1') ? head.querySelector('h1').textContent : '';
+      img = head && head.querySelector('img') ? bigArt(head.querySelector('img').src) : '';
+      arA = head && head.querySelector('a[href*="/artist/"], a[href*="/user/"]');
+      artistName = arA ? arA.textContent : '';
+      artistHref = arA && /\/artist\//.test(arA.getAttribute('href')) ? arA.getAttribute('href') : '';
+    }
+    // アルバムの曲（ページ上の一覧、なければ GraphQL を使わずアルバムをそのままキュー／追加に使う）
+    var fromPage = !(o && o.uri);
+    function withTracks(fn) {
+      if (fromPage) return fn(pageTracks());
+      var lib = service('LibraryAPI');
+      var al = service('AlbumAPI') || null;
+      gql('getAlbum', { uri: uri, locale: '', offset: 0, limit: 50 }).then(function (r) {
+        var items = (((r.data || {}).albumUnion || {}).tracksV2 || ((r.data || {}).albumUnion || {}).tracks || {}).items || [];
+        fn(items.map(function (x) { return (x.track || x).uri; }).filter(Boolean));
+      }, function () { fn([]); });
+    }
     var sheet = document.getElementById('m-tm');
     if (!sheet) {
       var bg = document.createElement('div'); bg.id = 'm-tm-bg'; bg.addEventListener('click', closeTrackMenu); document.body.appendChild(bg);
@@ -2659,7 +2695,7 @@
     sheet.innerHTML = '<div class="grip"></div><div class="hd"><img alt=""><div><b></b><small></small></div></div>';
     sheet.querySelector('.hd img').src = img;
     sheet.querySelector('.hd b').textContent = title;
-    sheet.querySelector('.hd small').textContent = arA ? arA.textContent : '';
+    sheet.querySelector('.hd small').textContent = artistName || '';
     function item(icon, label, fn) {
       var b = document.createElement('button'); b.className = 'it';
       b.innerHTML = icon + '<span class="lbl"></span>'; b.querySelector('.lbl').textContent = label;
@@ -2673,20 +2709,35 @@
     if (lib) Promise.resolve(lib.contains(uri)).then(function (x) {
       if (x && x[0]) { lb.dataset.on = '1'; lb.querySelector('.lbl').textContent = 'マイライブラリから削除'; lb.querySelector('svg').outerHTML = P.saved; }
     }, function () {});
-    if (arA && /\/artist\//.test(arA.getAttribute('href'))) item(TM_ICONS.artist, 'アーティストに移動', function () { closeTrackMenu(); spaGo(arA.getAttribute('href').replace(/^\/intl-[a-z-]+/i, '')); });
+    if (artistHref) item(TM_ICONS.artist, 'アーティストに移動', function () { closeTrackMenu(); spaGo(artistHref.replace(/^\/intl-[a-z-]+/i, '')); });
     item(TM_ICONS.next, '[次に再生] に追加', function () {
       closeTrackMenu();
-      var t = pageTracks();
-      if (player && t.length) Promise.resolve(player.addToQueue(t.map(function (u) { return { uri: u }; }))).then(function () { toast('[次に再生] に追加しました'); });
+      withTracks(function (t) {
+        if (player && t.length) Promise.resolve(player.addToQueue(t.map(function (u) { return { uri: u }; }))).then(function () { toast('[次に再生] に追加しました'); });
+      });
     });
     item(TM_ICONS.playlist, 'プレイリストに追加', function () {
-      var t = pageTracks();
-      openPlaylistPicker({ uri: t[0], uris: t });
+      withTracks(function (t) { openPlaylistPicker({ uri: t[0], uris: t }); });
     });
     sheet.scrollTop = 0;
     document.documentElement.classList.add('m-tm');
     return true;
   }
+  // 「フォロー中」カードの ⋮ も公式アプリと同じボトムシート
+  document.addEventListener('click', function (e) {
+    var mb = e.target.closest && e.target.closest('main [data-testid="more-button"]');
+    var card = mb && mb.closest('.m-bigcard, main div:has(> header img):has(> footer)');
+    if (!card) return;
+    var a = card.querySelector(':scope > header a[href*="/album/"], :scope > header a[href*="/playlist/"]');
+    if (!a) return;
+    e.preventDefault(); e.stopPropagation();
+    var mm = a.getAttribute('href').match(/\/(album|playlist)\/([A-Za-z0-9]+)/);
+    var ar = card.querySelector(':scope > header a[href*="/artist/"]');
+    var im = card.querySelector(':scope > header img');
+    openCollectionMenu({ uri: 'spotify:' + mm[1] + ':' + mm[2], title: a.textContent, img: im ? bigArt(im.src) : '',
+      artist: ar ? ar.textContent : '', artistHref: ar ? ar.getAttribute('href') : '' });
+  }, true);
+
   // アクションバーの「…」と、右上の ⋮
   document.addEventListener('click', function (e) {
     var mb = e.target.closest && e.target.closest('main [data-testid="action-bar-row"] [data-testid="more-button"]');
@@ -2736,7 +2787,7 @@
   }
   document.addEventListener('scroll', function () { scrolling = Date.now(); }, { capture: true, passive: true });
   document.addEventListener('touchmove', function () { scrolling = Date.now(); }, { capture: true, passive: true });
-  new MutationObserver(function () { schedule(120); })
+  new MutationObserver(function () { tidyBigCards(); schedule(120); })
     .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label'] });
   tidy();
 })();
