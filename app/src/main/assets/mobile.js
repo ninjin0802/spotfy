@@ -113,6 +113,15 @@
     .m-hide { display: none !important; }
     [data-testid="signup-bar"] { padding: 8px !important; }
 
+    /* ホーム：公式アプリ風のショートカットと棚 */
+    main [data-testid="carousel-previous-button"], main [data-testid="carousel-next-button"] { display: none !important; }
+    main [data-testid="shortcut-background"] { height: 56px !important; border-radius: 4px !important; background: rgba(255,255,255,.1) !important; }
+    main [data-testid="shortcut-image"] { width: 56px !important; height: 56px !important; }
+    main [data-testid="home-page"] [data-testid="component-shelf"] h2 { font-size: 22px !important; font-weight: 800 !important; letter-spacing: -.01em; }
+    main [data-testid="home-page"] [data-testid="component-shelf"] [role="listitem"] { padding: 0 12px 0 0 !important; background: none !important; }
+    main [data-testid="home-page"] [data-testid="component-shelf"] [data-testid="card-image"] { border-radius: 4px !important; }
+    main [data-testid="home-page"] [data-testid="component-shelf"] [data-testid="play-button"] { display: none !important; }
+
     /* コンテンツ */
     .contentSpacing { padding-left: 16px !important; padding-right: 16px !important; }
     h1 { word-break: break-word; }
@@ -191,6 +200,13 @@
     #m-settings .colors button { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; }
     #m-settings .colors button.on { border-color: #fff; }
     #m-settings .link { color: #a7a7a7; }
+    #m-settings button.row { width: 100%; background: none; border: 0; color: #fff; text-align: left; font-family: inherit; }
+    #m-settings button.row svg { width: 20px; height: 20px; fill: #a7a7a7; flex: none; }
+    #m-settings .row.me { padding: 16px; gap: 14px; }
+    #m-settings .row.me .pic { width: 56px; height: 56px; border-radius: 50%; background: #535353 center/cover no-repeat; flex: none;
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px; }
+    #m-settings .row.me b { font-size: 20px; font-weight: 700; }
+    #m-settings .row.nav { padding: 14px 16px; }
 
     /* 全画面プレーヤー */
     #m-player {
@@ -286,6 +302,15 @@
     #m-mini-prog i { display: block; height: 100%; width: 0; background: #fff; }
     /* 「〜で再生中」の緑のバーは、ミニプレーヤーのデバイスボタンの色で示す */
     [data-testid="now-playing-bar"] > div:not(:first-child):not([id^="m-mini"]) { display: none !important; }
+    /* ミニプレーヤーの文字は自前で描く：1 行目に曲名（・アーティスト）、2 行目にアーティストか接続先デバイス */
+    [data-testid="now-playing-widget-v2"] > :not([data-testid="cover-art-container"]):not(#m-mini-text) { display: none !important; }
+    #m-mini-text { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; overflow: hidden; }
+    #m-mini-text .l1, #m-mini-text .l2 { overflow: hidden; white-space: nowrap; }
+    #m-mini-text .l1 span { display: inline-block; font-size: 14px; font-weight: 700; color: #fff; }
+    #m-mini-text .l2 { font-size: 13px; color: rgba(255,255,255,.7); display: flex; align-items: center; gap: 4px; }
+    #m-mini-text .l2.dev { color: var(--m-accent, #1ed760); font-weight: 600; }
+    #m-mini-text .l2 svg { width: 14px; height: 14px; fill: currentColor; flex: none; }
+    #m-mini-text .l2 span { overflow: hidden; text-overflow: ellipsis; }
     /* ミニプレーヤーの曲名が長いときは横に流す */
     @keyframes m-marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--m-dist)); } }
     [data-testid="now-playing-bar"] a { text-decoration: none !important; }
@@ -434,67 +459,144 @@
     return row(title, detail, selectEl(opts, c.value, function (v) { setSelect(c, v); }));
   }
 
-  function renderSettings() {
-    var box = document.getElementById('m-settings');
-    box.innerHTML = '<header><button aria-label="戻る">' + BACK + '</button><h1>設定</h1></header>';
-    box.querySelector('header button').addEventListener('click', closeSettings);
-    function section(name, rows) {
-      rows = rows.filter(Boolean);
-      if (!rows.length) return;
+  // 設定は公式アプリと同じく「カテゴリ一覧 → 各ページ」の 2 階層
+  var settingsPage = null;
+  var CHEVRON = '<svg viewBox="0 0 24 24"><path d="M8.6 5.4 10 4l8 8-8 8-1.4-1.4 6.6-6.6z"/></svg>';
+
+  function settingsHeader(box, title, onBack) {
+    box.innerHTML = '<header><button aria-label="戻る">' + BACK + '</button><h1></h1></header>';
+    box.querySelector('h1').textContent = title;
+    box.querySelector('header button').addEventListener('click', onBack);
+    box.scrollTop = 0;
+  }
+
+  function settingsSection(box, name, rows) {
+    rows = rows.filter(Boolean);
+    if (!rows.length) return;
+    if (name) {
       var h = document.createElement('h2');
       h.textContent = name;
       box.appendChild(h);
-      rows.forEach(function (r) { box.appendChild(r); });
     }
-
-    var quality = spotifyControl(/ストリーミングの音質|Streaming quality/);
-    var lossless = quality && [].some.call(quality.options, function (o) { return /ロスレス|Lossless/i.test(o.text); });
-    section('再生', [
-      spotifySelect('ストリーミングの音質', lossless ? 'ロスレスは Premium で選べます' : 'ロスレスは Spotify Premium のみ（このアカウントでは選べません）', /ストリーミングの音質|Streaming quality/),
-      spotifySwitch('音量の均一化', 'すべての曲を同じ音量で再生する', /音量の均一|Normalize volume/),
-      spotifySwitch('自動再生', '曲が終わったら似た曲を再生する', /自動再生|Autoplay/),
-      row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
-    ]);
-    var colors = document.createElement('div');
-    colors.className = 'colors';
-    Object.keys(ACCENTS).forEach(function (k) {
-      var b = document.createElement('button');
-      b.style.background = ACCENTS[k];
-      b.setAttribute('aria-label', k);
-      if (pref('accent', 'green') === k) b.className = 'on';
-      b.addEventListener('click', function () {
-        setPref('accent', k);
-        colors.querySelectorAll('button').forEach(function (x) { x.className = x === b ? 'on' : ''; });
-      });
-      colors.appendChild(b);
-    });
-    section('表示', [
-      row('AMOLED ブラック', '背景を真っ黒にして電池を節約', switchEl(pref('amoled', '0') === '1', function (v) { setPref('amoled', v ? '1' : '0'); })),
-      row('アクセントカラー', null, colors),
-      row('画面の向き', null, selectEl([['portrait', '縦に固定'], ['auto', '自動回転']], nativeValue('orientation', 'portrait'), function (v) { nativeSetting('orientation', v); })),
-      spotifySwitch('Canvas', '曲の再生中に短いループ動画を表示', /^Canvas$/),
-      spotifySwitch('ミュージックビデオ', 'オフにすると音声のみで再生', /ミュージックビデオ|Music videos/)
-    ]);
-    section('ソーシャル', [
-      spotifySwitch('再生状況を公開', 'フォロワーに聴いている曲を表示', /再生状況|listening activity/i),
-      spotifySwitch('フォロワーとフォロー中を公開', null, /フォロワー＆フォロー中|followers/i)
-    ]);
-    var restart = document.createElement('button');
-    restart.className = 'link';
-    restart.style.cssText = 'background:none;border:0;font-size:14px';
-    restart.textContent = '実行';
-    restart.addEventListener('click', function () { location.href = '/'; });
-    var more = document.createElement('button');
-    more.className = 'link';
-    more.style.cssText = 'background:none;border:0;font-size:14px';
-    more.textContent = '開く';
-    more.addEventListener('click', function () { document.documentElement.classList.remove('m-settings'); });
-    section('アプリ', [
-      spotifySelect('言語', '変更後はプレーヤーを再起動', /言語を選択|language/i),
-      row('プレーヤーを再起動', '再生が止まったときに', restart),
-      row('Spotify の詳細設定', 'イコライザー・ライブラリ表示など', more)
-    ]);
+    rows.forEach(function (r) { box.appendChild(r); });
   }
+
+  function linkButton(label, fn) {
+    var b = document.createElement('button');
+    b.className = 'link';
+    b.style.cssText = 'background:none;border:0;font-size:14px';
+    b.textContent = label;
+    b.addEventListener('click', fn);
+    return b;
+  }
+
+  var SETTINGS_PAGES = [
+    ['account', 'アカウント', 'ログイン情報・ログアウト'],
+    ['display', 'コンテンツと表示', 'テーマ・アクセントカラー・Canvas・言語'],
+    ['playback', '再生', '音量の均一化・自動再生・バックグラウンド再生'],
+    ['privacy', 'プライバシーとソーシャル', '再生状況・フォロワーの公開'],
+    ['quality', 'メディアの品質', 'ストリーミングの音質'],
+    ['app', 'アプリとデバイス', 'イコライザー・プレーヤーの再起動'],
+    ['about', 'このアプリについて', 'バージョン情報']
+  ];
+
+  function renderSettingsHome() {
+    settingsPage = null;
+    var box = document.getElementById('m-settings');
+    settingsHeader(box, '設定とプライバシー', closeSettings);
+    var a = account();
+    var me = document.createElement('button');
+    me.className = 'row me';
+    me.innerHTML = '<div class="pic"></div><div class="t"><b></b><small>プロフィールを表示</small></div>' + CHEVRON;
+    setPic(me.querySelector('.pic'), a);
+    me.querySelector('b').textContent = a.name;
+    me.addEventListener('click', function () {
+      closeSettings();
+      setTimeout(function () { userMenu(function (e) { return /^\/user\//.test(e.getAttribute('href') || ''); }); }, 300);
+    });
+    box.appendChild(me);
+    SETTINGS_PAGES.forEach(function (pg) {
+      var r = document.createElement('button');
+      r.className = 'row nav';
+      r.innerHTML = '<div class="t"><b></b><small></small></div>' + CHEVRON;
+      r.querySelector('b').textContent = pg[1];
+      r.querySelector('small').textContent = pg[2];
+      r.addEventListener('click', function () { renderSettingsPage(pg[0], pg[1]); });
+      box.appendChild(r);
+    });
+  }
+
+  function renderSettingsPage(id, title) {
+    settingsPage = id;
+    var box = document.getElementById('m-settings');
+    settingsHeader(box, title, renderSettingsHome);
+    var sec = function (name, rows) { settingsSection(box, name, rows); };
+    if (id === 'account') {
+      var a = account();
+      sec(null, [
+        row('ユーザー名', a.name || '—', null),
+        row('ログアウト', 'このアプリからログアウトします', linkButton('ログアウト', function () {
+          closeSettings();
+          setTimeout(function () { userMenu(function (e) { return /ログアウト|Log out/.test(e.textContent); }); }, 300);
+        }))
+      ]);
+    } else if (id === 'display') {
+      var colors = document.createElement('div');
+      colors.className = 'colors';
+      Object.keys(ACCENTS).forEach(function (k) {
+        var b = document.createElement('button');
+        b.style.background = ACCENTS[k];
+        b.setAttribute('aria-label', k);
+        if (pref('accent', 'green') === k) b.className = 'on';
+        b.addEventListener('click', function () {
+          setPref('accent', k);
+          colors.querySelectorAll('button').forEach(function (x) { x.className = x === b ? 'on' : ''; });
+        });
+        colors.appendChild(b);
+      });
+      sec('テーマ', [
+        row('AMOLED ブラック', '背景を真っ黒にして電池を節約', switchEl(pref('amoled', '0') === '1', function (v) { setPref('amoled', v ? '1' : '0'); })),
+        row('アクセントカラー', null, colors),
+        row('画面の向き', null, selectEl([['portrait', '縦に固定'], ['auto', '自動回転']], nativeValue('orientation', 'portrait'), function (v) { nativeSetting('orientation', v); }))
+      ]);
+      sec('ビデオと Canvas', [
+        spotifySwitch('Canvas', '曲の再生中に短いループ動画を表示', /^Canvas$/),
+        spotifySwitch('ミュージックビデオ', 'オフにすると音声のみで再生', /ミュージックビデオ|Music videos/),
+        spotifySwitch('その他のビデオ', 'ビデオポッドキャストなど', /その他のビデオ|other videos/i)
+      ]);
+      sec('言語', [spotifySelect('アプリの言語', '変更後はプレーヤーを再起動', /言語を選択|language/i)]);
+    } else if (id === 'playback') {
+      sec(null, [
+        spotifySwitch('音量の均一化', 'すべての曲を同じ音量で再生する', /音量の均一|Normalize volume/),
+        spotifySwitch('自動再生', '曲が終わったら似た曲を再生する', /自動再生|Autoplay/),
+        row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
+      ]);
+    } else if (id === 'privacy') {
+      sec(null, [
+        spotifySwitch('再生状況を公開', 'フォロワーに聴いている曲を表示', /再生状況|listening activity/i),
+        spotifySwitch('フォロワーとフォロー中を公開', null, /フォロワー＆フォロー中|followers/i),
+        spotifySwitch('プロフィールにプレイリストを表示', null, /プロフィールに追加したプレイリスト|playlists on/i)
+      ]);
+    } else if (id === 'quality') {
+      var quality = spotifyControl(/ストリーミングの音質|Streaming quality/);
+      var lossless = quality && [].some.call(quality.options, function (o) { return /ロスレス|Lossless/i.test(o.text); });
+      sec('ストリーミング', [
+        spotifySelect('音質', lossless ? 'ロスレスを選べます' : 'ロスレスは Spotify Premium のみ（このアカウントでは選べません）', /ストリーミングの音質|Streaming quality/)
+      ]);
+    } else if (id === 'app') {
+      sec(null, [
+        row('イコライザー・詳細設定', 'Spotify の設定ページを開く', linkButton('開く', function () { document.documentElement.classList.remove('m-settings'); })),
+        row('プレーヤーを再起動', '再生が止まったときに', linkButton('実行', function () { location.href = '/'; }))
+      ]);
+    } else if (id === 'about') {
+      sec(null, [
+        row('Spotify Web', 'Spotify Web Player を使った非公式のアプリです', null),
+        row('データの保存', '曲は端末に保存しません。通信は Spotify と直接行います', null)
+      ]);
+    }
+  }
+
+  function renderSettings() { renderSettingsHome(); }
 
   function openSettings() {
     closeDrawer();
@@ -830,35 +932,46 @@
     window.__native.send(m);
   }
 
-  // 曲名・アーティスト名がはみ出すときだけ流す
-  function marquee() {
+  // ミニプレーヤーの文字（公式アプリと同じ 2 行構成）
+  function renderMiniText() {
     var w = q('[data-testid="now-playing-widget-v2"]');
     if (!w) return;
-    [w.querySelector('a[href*="/album/"], a[href*="/track/"], a[href*="/episode/"]'),
-     w.querySelector('[data-testid="now-playing-widget-v2-byline"]')].forEach(function (el) {
-      if (!el) return;
-      var box = el.parentElement;
-      while (box && box !== w && getComputedStyle(box).overflow !== 'hidden') box = box.parentElement;
-      if (!box || box === w) return;
-      var inner = box.firstElementChild;
-      if (!inner) return;
-      inner.classList.remove('m-marquee');
-      var dist = inner.scrollWidth - box.clientWidth;
+    var box = document.getElementById('m-mini-text');
+    if (!box || box.parentElement !== w) {
+      box = document.createElement('div');
+      box.id = 'm-mini-text';
+      box.innerHTML = '<div class="l1"><span></span></div><div class="l2"></div>';
+      w.appendChild(box);
+    }
+    var t = w.querySelector('a[href*="/album/"], a[href*="/track/"], a[href*="/episode/"]');
+    var by = w.querySelector('[data-testid="now-playing-widget-v2-byline"]');
+    var title = t ? t.textContent : '', artist = by ? by.textContent : '';
+    var remote = activeDeviceName();
+    var l1 = remote ? title + ' • ' + artist : title;
+    var span = box.querySelector('.l1 span');
+    var l2 = box.querySelector('.l2');
+    var key = l1 + '|' + remote;
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    span.textContent = l1;
+    l2.className = 'l2' + (remote ? ' dev' : '');
+    l2.innerHTML = remote ? P.device + '<span></span>' : '<span></span>';
+    l2.querySelector('span').textContent = remote || artist;
+    // はみ出すときだけ横に流す
+    span.classList.remove('m-marquee');
+    requestAnimationFrame(function () {
+      var dist = span.scrollWidth - box.querySelector('.l1').clientWidth;
       if (dist > 4) {
-        inner.style.setProperty('--m-dist', -dist + 'px');
-        inner.style.setProperty('--m-dur', Math.max(4, dist / 25) + 's');
-        inner.style.display = 'inline-block';
-        inner.classList.add('m-marquee');
+        span.style.setProperty('--m-dist', -dist + 'px');
+        span.style.setProperty('--m-dur', Math.max(4, dist / 25) + 's');
+        span.classList.add('m-marquee');
       }
     });
   }
 
-  var marqueeKey = '';
   function updateMini() {
     sendMeta();
-    var nw = q('[data-testid="now-playing-widget-v2"]');
-    var key = nw ? nw.getAttribute('aria-label') : '';
-    if (key !== marqueeKey) { marqueeKey = key; setTimeout(marquee, 300); }
+    renderMiniText();
     var pp = q('[data-testid="control-button-playpause"]');
     var btn = document.getElementById('m-mini-pp');
     if (btn && pp) {
@@ -1090,7 +1203,7 @@
     if (h.contains('m-drawer')) { closeDrawer(); return true; }
     if (h.contains('m-player') && h.contains('m-np')) { closePanel(); return true; }
     if (h.contains('m-player')) { closePlayer(); return true; }
-    if (h.contains('m-settings')) { closeSettings(); return true; }
+    if (h.contains('m-settings')) { if (settingsPage) renderSettingsHome(); else closeSettings(); return true; }
     if (h.contains('m-np') || h.contains('m-lib')) { setTab(currentTab()); return true; }
     return false;
   };
