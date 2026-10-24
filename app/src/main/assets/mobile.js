@@ -815,7 +815,8 @@
     } else if (id === 'app') {
       sec(null, [
         row('イコライザー・詳細設定', 'Spotify の設定ページを開く', linkButton('開く', function () { document.documentElement.classList.remove('m-settings'); })),
-        row('プレーヤーを再起動', '再生が止まったときに', linkButton('実行', function () { location.href = '/'; }))
+        row('プレーヤーを再起動', '再生が止まったときに', linkButton('実行', function () { location.href = '/'; })),
+        row('開発者向けデバッグ', 'PC から画面の中身を調べられるようにする（アプリの再起動後に反映）', switchEl(nativeValue('webdebug', 'false') === 'true', function (v) { nativeSetting('webdebug', v); }))
       ]);
     } else if (id === 'about') {
       sec(null, [

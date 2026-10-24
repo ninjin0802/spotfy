@@ -50,7 +50,8 @@ class MainActivity : Activity() {
             addView(webView)
         }
         setContentView(root)
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+        // 設定の「開発者向けデバッグ」をオンにしたときだけ、PC から WebView を調べられるようにする
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG || settings.getString("webdebug", "false") == "true")
         // targetSdk 35+ は edge-to-edge 強制なので、ステータスバー/ナビバー分の余白を確保する
         root.setOnApplyWindowInsetsListener { v, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
@@ -239,12 +240,13 @@ class MainActivity : Activity() {
                 JSONObject().put("type", "settings").put(
                     "values",
                     JSONObject().put("orientation", settings.getString("orientation", "portrait"))
-                        .put("background", settings.getString("background", "true")),
+                        .put("background", settings.getString("background", "true"))
+                        .put("webdebug", settings.getString("webdebug", "false")),
                 ).toString()
             )
             "setting" -> {
                 val name = m.optString("name")
-                if (name !in setOf("orientation", "background")) return
+                if (name !in setOf("orientation", "background", "webdebug")) return
                 settings.edit().putString(name, m.optString("value")).apply()
                 if (name == "orientation") applyOrientation()
             }
