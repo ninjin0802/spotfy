@@ -182,6 +182,9 @@
     main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="tracklist-row"] [aria-colindex]:last-child { justify-content: flex-end !important; gap: 4px !important; }
     main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="tracklist-row"] [data-testid="more-button"] { opacity: 1 !important; visibility: visible !important; }
 
+    /* 表示切り替え（リスト／コンパクト）ボタンは公式アプリにないので消す */
+    main [data-testid="action-bar-row"] button[aria-haspopup="true"]:not([data-testid]) { display: none !important; }
+
     /* 詳細ページ左上の戻るボタン */
     #m-back {
       position: fixed; top: 12px; left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
