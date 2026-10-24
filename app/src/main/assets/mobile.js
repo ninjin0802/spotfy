@@ -2258,6 +2258,9 @@
 
   function click(sel) { var el = document.querySelector(sel); if (el) el.click(); return !!el; }
 
+  function markTab(name) {
+    document.querySelectorAll('#m-tabbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === name); });
+  }
   function setTab(name) {
     var h = document.documentElement.classList;
     h.toggle('m-lib', name === 'lib');
@@ -2485,7 +2488,19 @@
   document.addEventListener('click', function (e) {
     var a = e.target.closest && e.target.closest('#Desktop_LeftSidebar_Id a, #Desktop_LeftSidebar_Id [role="row"]');
     // ライブラリ内でリンクを開いたらオーバーレイを閉じる
-    if (a) setTimeout(function () { setTab('home'); }, 0);
+    // 行をタップしたら公式アプリと同じくその項目のページを開く（Web 版は1回のタップでは開かないため）
+    var folderRow = false;
+    if (a && a.getAttribute('role') === 'row' && !e.target.closest('button, a')) {
+      var lb = a.querySelector('[aria-labelledby^="listrow-title-"]');
+      var uri = lb ? lb.getAttribute('aria-labelledby').split(' ')[0].replace('listrow-title-', '') : '';
+      var m = uri.match(/^spotify:(artist|album|playlist|show|episode|audiobook|track):(\w+)$/);
+      if (m) spaGo('/' + m[1] + '/' + m[2]);
+      else if (/:collection(:tracks)?$/.test(uri)) spaGo('/collection/tracks');
+      else if (/:collection:your-episodes$/.test(uri)) spaGo('/collection/your-episodes');
+      else if (/:folder:/.test(uri)) folderRow = true;
+    }
+    // 開いた先のページでもタブは「ライブラリ」のまま（公式アプリと同じ）
+    if (a && !folderRow) setTimeout(function () { setTab('home'); markTab('lib'); }, 0);
     // ミニプレーヤーのボタン以外をタップしたら全画面プレーヤーを開く
     var bar = e.target.closest && e.target.closest('[data-testid="now-playing-bar"]');
     if (bar && !e.target.closest('button, a, [data-testid="playback-progressbar"]')) {
