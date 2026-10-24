@@ -18,6 +18,7 @@ import java.net.URL
 import java.util.concurrent.Executors
 import androidx.webkit.JavaScriptReplyProxy
 import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -120,6 +121,19 @@ class MainActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String?) = injectMobileUi(view)
         }
         webView.webChromeClient = object : WebChromeClient() {
+            // プロフィール写真の変更など、ページの <input type="file"> から端末の画像を選ぶ
+            override fun onShowFileChooser(
+                view: WebView,
+                callback: ValueCallback<Array<Uri>>,
+                params: FileChooserParams,
+            ): Boolean {
+                fileCallback?.onReceiveValue(null)
+                fileCallback = callback
+                val pick = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+                return runCatching { startActivityForResult(Intent.createChooser(pick, null), REQUEST_FILE); true }
+                    .getOrElse { fileCallback = null; false }
+            }
+
             // Web Player は Widevine (EME) を使うので保護メディア ID を許可する
             override fun onPermissionRequest(request: PermissionRequest) {
                 val allowed = request.resources.filter {
@@ -141,6 +155,16 @@ class MainActivity : Activity() {
         } else {
             webView.loadUrl(initialUrl(intent))
         }
+    }
+
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    @Deprecated("Activity の結果 API（ComponentActivity 不使用のため）")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_FILE) return
+        fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
+        fileCallback = null
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -322,6 +346,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val HOME_URL = "https://open.spotify.com/"
+        private const val REQUEST_FILE = 42
         private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
         private val RELAY_URL = Regex("^https://([a-z0-9-]+\\.)*spotify\\.com/(connect-state|track-playback)/v1/[^#]*$")
         private val RELAY_METHODS = setOf("GET", "POST", "PUT", "DELETE")

@@ -188,15 +188,17 @@
     /* プロフィール：公式アプリと同じく、左に大きな丸いアイコン、右に名前とフォロー情報 */
     main [data-testid="entity-header"]:has([data-testid="user-image"]) { height: auto !important; max-height: none !important; min-height: 0 !important; padding: 64px 16px 20px !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child { display: flex !important; flex-direction: row !important; align-items: center !important; height: auto !important; gap: 16px !important; padding: 0 !important; }
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > :first-child { width: 112px !important; height: 112px !important; min-width: 112px !important; margin: 0 !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > :not(:has(h1)):not(:has(img)) { display: none !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > :not(:has(h1)):has(img) { width: 112px !important; height: 112px !important; min-width: 112px !important; margin: 0 !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="user-image"], main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="edit-image-button"] { width: 112px !important; height: 112px !important; }
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child { flex: 1 1 auto !important; min-width: 0 !important; width: auto !important; align-items: flex-start !important; text-align: left !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child { flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; max-width: calc(100vw - 160px) !important; align-items: flex-start !important; text-align: left !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > div:last-child > span:first-child:not(:has(h1)) { display: none !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="entityTitle"] { width: auto !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) [data-testid="entityTitle"] h1 { font-size: 26px !important; font-weight: 800 !important; line-height: 1.15 !important; white-space: normal !important; word-break: normal !important; }
 
     /* プロフィールの下は公式アプリと同じく「プレイリスト」の一覧だけ */
     main .m-hide-shelf { display: none !important; }
+    html.m-busy #main-view { visibility: hidden !important; }
     main .m-pl-shelf [data-testid="grid-container"] { display: flex !important; flex-direction: column !important; margin: 0 !important; gap: 0 !important; }
     main .m-pl-shelf [data-encore-id="card"] {
       display: flex !important; flex-direction: row !important; align-items: center !important; gap: 14px !important;
@@ -211,6 +213,63 @@
       display: flex; align-items: center; justify-content: center; }
     .m-row-more svg { width: 22px; height: 22px; fill: currentColor; }
     #m-edit { height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid #878787; background: none; color: #fff; font-weight: 700; font-size: 13px; }
+
+    /* プロフィール編集：公式アプリと同じ全画面（× / タイトル / 保存、大きな写真と鉛筆、名前の行） */
+    :is([role="dialog"]:has([data-testid="user-edit-name-input"]), [aria-modal="true"]:has([data-testid="user-edit-name-input"])) {
+      position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important;
+      margin: 0 !important; border-radius: 0 !important; background: #121212 !important; z-index: 10050 !important; transform: none !important; box-shadow: none !important;
+      padding: 0 !important; overflow-y: auto !important;
+    }
+    .m-editbox { width: 100% !important; max-width: none !important; height: auto !important; min-height: 100% !important; margin: 0 !important; border-radius: 0 !important;
+      background: #121212 !important; box-shadow: none !important; padding: 0 !important; position: relative !important; top: 0 !important; left: 0 !important; transform: none !important; }
+    .m-editbox > div:first-child { display: flex !important; align-items: center !important; justify-content: center !important; height: 56px !important; padding: 0 56px !important; position: relative !important; }
+    .m-editbox > div:first-child h1 { font-size: 17px !important; font-weight: 700 !important; margin: 0 !important; }
+    .m-editbox > div:first-child button[aria-label] { position: absolute !important; left: 8px !important; top: 8px !important; width: 40px !important; height: 40px !important; }
+    .m-editbox > div:first-child button[aria-label] svg { width: 22px !important; height: 22px !important; }
+    .m-editbox form { display: flex !important; flex-direction: column !important; align-items: stretch !important; padding: 20px 16px !important; gap: 28px !important; position: static !important; }
+    .m-editbox form > div:has(img) { align-self: center !important; width: 176px !important; height: 176px !important; position: relative !important; margin: 0 !important; }
+    .m-editbox form > div:has(img) > div, .m-editbox form > div:has(img) > div > div:has(img), .m-editbox form > div:has(img) img { width: 176px !important; height: 176px !important; }
+    .m-editbox form > div:has(img) img { border-radius: 50% !important; object-fit: cover !important; }
+    .m-editbox form > div:has(img) button:not(#m-pencil), .m-editbox form > div:has(img) svg:not(#m-pencil svg),
+    .m-editbox form > div:has(img) > div > div:not(:has(img)) { display: none !important; }
+    #m-pencil { position: absolute; right: 4px; bottom: 4px; width: 42px; height: 42px; border-radius: 6px; background: #fff; border: 0; display: flex; align-items: center; justify-content: center; z-index: 3; }
+    #m-pencil svg { width: 22px !important; height: 22px !important; fill: #000 !important; display: block !important; }
+    .m-editbox form > div:has(input[data-testid="user-edit-name-input"]) {
+      display: flex !important; align-items: center !important; border-bottom: 1px solid #333 !important; padding: 0 0 6px !important; margin: 0 !important; width: auto !important; position: relative !important;
+    }
+    .m-editbox form > div:has(input[data-testid="user-edit-name-input"])::before { content: "名前"; width: 96px; flex: none; font-size: 15px; font-weight: 700; color: #fff; }
+    .m-editbox form label { display: none !important; }
+    .m-editbox form label.unused { position: static !important; width: 96px !important; flex: none !important; transform: none !important; background: none !important; padding: 0 !important; margin: 0 !important; }
+    .m-editbox form label span { font-size: 15px !important; font-weight: 700 !important; color: #fff !important; }
+    .m-editbox input[data-testid="user-edit-name-input"] { flex: 1 !important; width: auto !important; background: none !important; border: 0 !important; box-shadow: none !important; color: #fff !important; font-size: 16px !important; padding: 10px 0 !important; height: auto !important; }
+    .m-editbox .m-save-wrap { position: absolute !important; top: 8px !important; right: 8px !important; width: auto !important; margin: 0 !important; z-index: 2 !important; }
+    .m-editbox .m-save-wrap button { background: none !important; min-height: 40px !important; }
+    .m-editbox .m-save-wrap button > span { background: none !important; color: #b3b3b3 !important; font-size: 16px !important; padding: 0 8px !important; font-weight: 400 !important; }
+    .m-editbox form > p { display: none !important; }
+
+    /* プロフィールの歯車：「ほかのユーザーが閲覧できる内容」のボトムシート */
+    main [data-testid="action-bar-row"] button[aria-label="設定に移動"] { display: none !important; }
+    #m-gear { width: 40px; height: 40px; background: none; border: 0; color: #fff; display: flex; align-items: center; justify-content: center; }
+    #m-gear svg { width: 28px; height: 28px; }
+    #m-vis-bg { position: fixed; inset: 0; z-index: 10040; background: rgba(0,0,0,.6); display: none; }
+    #m-vis { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10041; background: #242424; border-radius: 14px 14px 0 0; color: #fff;
+      padding: 8px 0 24px; transform: translateY(100%); transition: transform .22s ease; font-family: inherit; }
+    html.m-vis #m-vis-bg { display: block; }
+    html.m-vis #m-vis { transform: none; }
+    #m-vis .grip { width: 36px; height: 4px; border-radius: 2px; background: #727272; margin: 4px auto 12px; }
+    #m-vis h3 { text-align: center; font-size: 17px; font-weight: 700; margin: 0; padding: 4px 16px 14px; border-bottom: 1px solid #3a3a3a; }
+    #m-vis .r { display: flex; align-items: center; gap: 16px; padding: 14px 16px; }
+    #m-vis .r .t { flex: 1; }
+    #m-vis .r b { display: block; font-size: 16px; font-weight: 500; }
+    #m-vis .r small { display: block; color: #a7a7a7; font-size: 13px; margin-top: 4px; line-height: 1.4; }
+    #m-vis .r.off { opacity: .45; }
+    #m-vis .all { display: block; width: 100%; text-align: left; background: none; border: 0; color: #fff; font-size: 16px; padding: 16px; font-family: inherit; }
+    #m-vis .sw { position: relative; width: 52px; height: 32px; flex: none; }
+    #m-vis .sw input { opacity: 0; width: 0; height: 0; position: absolute; }
+    #m-vis .sw span { position: absolute; inset: 0; border-radius: 16px; background: #3e3e3e; border: 2px solid #727272; box-sizing: border-box; transition: .2s; }
+    #m-vis .sw span::after { content: ""; position: absolute; left: 4px; top: 4px; width: 20px; height: 20px; border-radius: 50%; background: #727272; transition: .2s; }
+    #m-vis .sw input:checked + span { background: var(--m-accent, #1ed760); border-color: var(--m-accent, #1ed760); }
+    #m-vis .sw input:checked + span::after { transform: translateX(20px); background: #000; }
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
@@ -274,6 +333,7 @@
       color: #fff; font-size: 16px; text-align: left;
     }
     #m-drawer button.item svg { width: 24px; height: 24px; fill: currentColor; flex: none; }
+    #m-drawer button.item svg[fill="none"] { fill: none; }
 
     /* アクセントカラーと AMOLED ブラック */
     #m-tabbar button.on, #m-drawer .accent { color: var(--m-accent, #1ed760) !important; }
@@ -490,7 +550,7 @@
     report: '<svg viewBox="0 0 24 24"><path d="M3 3h1.8v16.2H21V21H3zm15.6 3.4 1.5 1-5 7.4-3.6-3-3.2 4.6-1.5-1 4.3-6.2 3.6 3z"/></svg>',
     history: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4zM11.1 6h1.8v5.6l4 2.3-.9 1.6-4.9-2.8z"/></svg>',
     friends: '<svg viewBox="0 0 24 24"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-4 0-7 2-7 4.5V20h14v-2.5C16 15 13 13 9 13zm7.5-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm1 2.1c1.9.7 3.5 2.1 3.5 4.4V20h2v-2.5c0-2.1-2.3-3.9-5.5-4.4z"/></svg>',
-    settings: '<svg viewBox="0 0 24 24"><path d="M10.6 2h2.8l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.4 2.4-2 1.8a7 7 0 0 1 0 2.4l2 1.8-1.4 2.4-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-2.8l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.4-2.4 2-1.8a7 7 0 0 1 0-2.4l-2-1.8 1.4-2.4 2.5.9c.5-.4 1.1-.7 1.7-.9zm1.4 1.8h-.1l-.4 2.2-.9.3c-.7.2-1.3.6-1.8 1l-.7.6-2.1-.8-.2.3 1.7 1.5-.2.9a5.3 5.3 0 0 0 0 2l.2.9-1.7 1.5.2.3 2.1-.8.7.6c.5.4 1.1.8 1.8 1l.9.3.4 2.2h.2l.4-2.2.9-.3c.7-.2 1.3-.6 1.8-1l.7-.6 2.1.8.2-.3-1.7-1.5.2-.9a5.3 5.3 0 0 0 0-2l-.2-.9 1.7-1.5-.2-.3-2.1.8-.7-.6c-.5-.4-1.1-.8-1.8-1l-.9-.3zM12 8.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" transform="translate(0 3)"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58z"/><circle cx="12" cy="12" r="3.3"/></svg>',
     logout: '<svg viewBox="0 0 24 24"><path d="M10 3H4v18h6v-2H6V5h4zm6.6 4.6-1.4 1.4 2 2H9v2h8.2l-2 2 1.4 1.4L21 12z"/></svg>'
   };
 
@@ -508,17 +568,16 @@
   // プロフィールページを公式アプリの構成に（プレイリストの一覧だけ、編集ボタン、行の「…」）
   function tidyProfile() {
     if (!/^\/user\/[^/]+\/?$/.test(location.pathname.replace(/^\/intl-[a-z-]+/i, ''))) return;
-    var shelves = document.querySelectorAll('main [data-testid="component-shelf"]');
+    var shelves = document.querySelectorAll('main .contentSpacing > section');
     for (var i = 0; i < shelves.length; i++) {
       var sh = shelves[i];
-      if (sh.dataset.mDone) continue;
       var h = sh.querySelector('h2');
       if (!h) continue;
-      sh.dataset.mDone = '1';
-      if (/公開プレイリスト|Public Playlists/i.test(h.textContent)) {
+      if (/公開プレイリスト|Public Playlists|^プレイリスト$/i.test(h.textContent.trim())) {
         sh.classList.add('m-pl-shelf');
+        sh.classList.remove('m-hide-shelf');
         var link = h.querySelector('a') || h;
-        link.textContent = 'プレイリスト';
+        if (link.textContent !== 'プレイリスト') link.textContent = 'プレイリスト';
       } else sh.classList.add('m-hide-shelf');
     }
     var pl = document.querySelector('main .m-pl-shelf');
@@ -547,8 +606,120 @@
       eb.textContent = '編集';
       eb.addEventListener('click', function () { edit.click(); });
       bar.insertBefore(eb, bar.firstChild);
+      var gb = document.createElement('button');
+      gb.id = 'm-gear';
+      gb.setAttribute('aria-label', 'ほかのユーザーが閲覧できる内容');
+      gb.innerHTML = DRAWER_ICONS.settings;
+      gb.addEventListener('click', openVisibility);
+      eb.after(gb);
     }
   }
+
+  // ---- プロフィール編集（Spotify の編集ダイアログを公式アプリ風に） ----
+  function tidyEditDialog() {
+    var input = document.querySelector('[data-testid="user-edit-name-input"]');
+    if (!input) return;
+    var dlg = input.closest('[role="dialog"], [aria-modal="true"]');
+    var form = input.closest('form');
+    if (!dlg || !form || dlg.dataset.mDone) return;
+    dlg.dataset.mDone = '1';
+    form.parentElement.classList.add('m-editbox');
+    var saveBtn = [].find.call(form.querySelectorAll('button'), function (b) { return /保存|Save/.test(b.textContent); });
+    if (saveBtn) saveBtn.parentElement.classList.add('m-save-wrap');
+    var h = dlg.querySelector('h1');
+    if (h) h.textContent = 'プロフィールを編集';
+    var lbl = dlg.querySelector('form label span');
+    if (lbl) lbl.textContent = '名前';
+    var photo = form.querySelector('img');
+    var box = photo && [].find.call(form.children, function (c) { return c.contains(photo); });
+    var picker = dlg.querySelector('[data-testid="image-file-picker"]');
+    if (box && picker) {
+      var pen = document.createElement('button');
+      pen.id = 'm-pencil';
+      pen.type = 'button';
+      pen.setAttribute('aria-label', '写真を変更');
+      pen.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16.6 3.4a2 2 0 0 1 2.8 0l1.2 1.2a2 2 0 0 1 0 2.8L8.3 19.7 3 21l1.3-5.3zm1.4 1.4L5.9 16.9l-.6 1.8 1.8-.6L19.2 6z"/></svg>';
+      var pick = function (ev) { ev.preventDefault(); ev.stopPropagation(); picker.click(); };
+      pen.addEventListener('click', pick);
+      box.addEventListener('click', pick);
+      box.appendChild(pen);
+    }
+  }
+
+  // ---- 歯車：ほかのユーザーが閲覧できる内容 ----
+  var VIS = [
+    ['desktop.settings.showFollows', 'フォロワー＆フォロー中', 'ほかのユーザーは、あなたのフォロー中のユーザーとフォロワーをあなたのプロフィールで閲覧できます。'],
+    ['desktop.settings.playlistsOnProfile', 'プレイリスト', 'ほかのユーザーは、あなたがプロフィールに追加したプレイリストを見ることができます。'],
+    [null, '最近聴いたアーティスト', 'ほかのユーザーは、あなたが最近聴いたアーティストをあなたのプロフィールで確認できます。（Web Player 版では変更できません）']
+  ];
+  // Spotify の設定ページを一瞬開いて、そのスイッチを読み書きする（終わったら元のページへ戻る）
+  function withPreferences(fn) {
+    var back = location.pathname !== '/preferences';
+    // 設定ページへの一時的な切り替えは見せない
+    document.documentElement.classList.add('m-busy');
+    var done = function () { setTimeout(function () { document.documentElement.classList.remove('m-busy'); }, 600); };
+    if (back) spaGo('/preferences');
+    var tries = 0;
+    (function wait() {
+      if (document.getElementById(VIS[0][0]) || ++tries > 40) {
+        Promise.resolve(fn()).then(function () { if (back) setTimeout(function () { history.back(); done(); }, 300); else done(); });
+        return;
+      }
+      setTimeout(wait, 100);
+    })();
+  }
+  function prefProps(id) {
+    var i = document.getElementById(id);
+    return i && i[Object.keys(i).find(function (k) { return k.indexOf('__reactProps$') === 0; })];
+  }
+  function openVisibility() {
+    var sheet = document.getElementById('m-vis');
+    if (!sheet) {
+      var bg = document.createElement('div');
+      bg.id = 'm-vis-bg';
+      bg.addEventListener('click', closeVisibility);
+      document.body.appendChild(bg);
+      sheet = document.createElement('section');
+      sheet.id = 'm-vis';
+      document.body.appendChild(sheet);
+    }
+    sheet.innerHTML = '<div class="grip"></div><h3>ほかのユーザーが閲覧できる内容</h3>';
+    var rows = {};
+    VIS.forEach(function (v) {
+      var r = document.createElement('div');
+      r.className = 'r' + (v[0] ? '' : ' off');
+      r.innerHTML = '<div class="t"><b></b><small></small></div><label class="sw"><input type="checkbox"><span></span></label>';
+      r.querySelector('b').textContent = v[1];
+      r.querySelector('small').textContent = v[2];
+      var cb = r.querySelector('input');
+      cb.disabled = true;
+      if (v[0]) rows[v[0]] = cb;
+      cb.addEventListener('change', function () {
+        var want = cb.checked;
+        withPreferences(function () {
+          var p = prefProps(v[0]);
+          if (p && p.checked !== want) p.onChange({ target: { checked: want } });
+          return new Promise(function (res) { setTimeout(res, 800); });
+        });
+      });
+      sheet.appendChild(r);
+    });
+    var all = document.createElement('button');
+    all.className = 'all';
+    all.textContent = 'プライバシーとソーシャルの設定をすべて確認';
+    all.addEventListener('click', function () { closeVisibility(); openSettings(); setTimeout(function () { renderSettingsPage('privacy', 'プライバシーとソーシャル'); }, 3200); });
+    sheet.appendChild(all);
+    document.documentElement.classList.add('m-vis');
+    // 今の状態を読んでスイッチに反映
+    withPreferences(function () {
+      Object.keys(rows).forEach(function (id) {
+        var p = prefProps(id);
+        rows[id].checked = !!(p && p.checked);
+        rows[id].disabled = !p;
+      });
+    });
+  }
+  function closeVisibility() { document.documentElement.classList.remove('m-vis'); }
 
   // 自分のプロフィールを開く（公式アプリの「プロフィールを表示」）
   var myId = null;
@@ -764,6 +935,22 @@
     applyLeveling(true).then(function (ok) { if (!ok) levelingApplied = false; });
   }
 
+  // ---- ギャップレス再生 ----
+  // Web Player には曲間をつなぐ設定がないため、次の曲を早めに先読みして曲間の無音を減らす
+  var gaplessKey = '';
+  function gaplessTick() {
+    if (pref('gapless', '0') !== '1') return;
+    var w = q('[data-testid="now-playing-widget-v2"]');
+    var key = w ? w.getAttribute('aria-label') : '';
+    if (!key || key === gaplessKey) return;
+    gaplessKey = key;
+    setTimeout(function () {
+      var st = streamer();
+      var lp = st && st._listPlayer;
+      if (lp && typeof lp._preloadUpcomingTrack === 'function') { try { lp._preloadUpcomingTrack(); } catch (e) {} }
+    }, 4000);
+  }
+
   var qualityApplied = false;
   function applySavedQuality() {
     if (qualityApplied) return;
@@ -808,7 +995,7 @@
   var SETTINGS_PAGES = [
     ['account', 'アカウント', 'ユーザー名・ログアウト'],
     ['display', 'コンテンツと表示', 'テーマ・アクセントカラー・Canvas・言語'],
-    ['playback', '再生', '音量の均一化・バックグラウンド再生'],
+    ['playback', '再生', '音量の均一化・ギャップレス再生・バックグラウンド再生'],
     ['privacy', 'プライバシーとソーシャル', 'フォロワー・プレイリストの公開'],
     ['quality', 'メディアの品質', 'ストリーミングの音質'],
     ['app', 'アプリとデバイス', 'イコライザー・プレーヤーの再起動'],
@@ -892,7 +1079,11 @@
           try { localStorage.setItem('m.normalize', v ? '1' : '0'); } catch (e) {}
           applyLeveling(v);
         })),
-        row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
+        row('ギャップレス再生', '次の曲を早めに読み込んで、曲と曲のあいだの無音を減らす', switchEl(pref('gapless', '0') === '1', function (v) {
+          try { localStorage.setItem('m.gapless', v ? '1' : '0'); } catch (e) {}
+          gaplessKey = '';
+        })),
+                row('バックグラウンド再生', 'アプリを閉じても再生を続ける', switchEl(nativeValue('background', 'true') === 'true', function (v) { nativeSetting('background', v); }))
       ]);
     } else if (id === 'privacy') {
       sec(null, [
@@ -1564,7 +1755,9 @@
       document.body.appendChild(bb);
     }
     applySavedQuality();
+    gaplessTick();
     tidyProfile();
+    tidyEditDialog();
     applySavedLeveling();
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
     var h = document.documentElement.classList;
@@ -1646,6 +1839,7 @@
   window.__mobileBack = function () {
     var h = document.documentElement.classList;
     if (h.contains('m-devices')) { closeDevices(); return true; }
+    if (h.contains('m-vis')) { closeVisibility(); return true; }
     if (h.contains('m-searching')) { var si = document.querySelector('#global-nav-bar input'); if (si) si.blur(); h.remove('m-searching'); return true; }
     if (h.contains('m-drawer')) { closeDrawer(); return true; }
     if (h.contains('m-player') && h.contains('m-np')) { closePanel(); return true; }
