@@ -116,6 +116,24 @@
     html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] { flex-direction: row-reverse !important; gap: 6px !important; color: #fff !important; font-weight: 700 !important; }
     html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] > span:last-child svg { display: none !important; }
     html.m-lib #Desktop_LeftSidebar_Id [role="combobox"] > span:last-child::before { content: "⇅"; font-size: 16px; }
+    /* 検索中の「最近」画面（自前で描く通常のページ。Spotify のドロップダウンは裏に隠して中身だけ使う） */
+    #m-recentpage { position: fixed; left: 0; right: 0; top: calc(64px + var(--m-top, 0px)); bottom: 0; z-index: 10061; background: #121212;
+      overflow-y: auto; overscroll-behavior: contain; display: none; padding: 4px 0 24px; font-family: inherit; color: #fff; }
+    html.m-amoled #m-recentpage { background: #000; }
+    html.m-searching #m-recentpage { display: block; }
+    #m-recentpage::-webkit-scrollbar { display: none; }
+    html.m-searching .os-scrollbar { display: none !important; }
+    #m-recentpage h2 { font-size: 20px; font-weight: 700; margin: 12px 16px 8px; }
+    #m-recentpage .r { display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 16px; }
+    #m-recentpage .r img { width: 56px; height: 56px; object-fit: cover; flex: none; border-radius: 2px; }
+    #m-recentpage .r img.round { border-radius: 50%; }
+    #m-recentpage .r .t { flex: 1; min-width: 0; }
+    #m-recentpage .r .t b { display: block; font-size: 16px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-recentpage .r .t small { display: block; font-size: 13px; color: #b3b3b3; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-recentpage .r button { width: 44px; height: 44px; background: none; border: 0; color: #b3b3b3; display: flex; align-items: center; justify-content: center; flex: none; }
+    #m-recentpage .r button svg { width: 22px; height: 22px; fill: currentColor; }
+    #m-recentpage .r button.on { color: var(--m-accent, #1ed760); }
+    #m-recentpage .empty { color: #b3b3b3; padding: 24px 16px; font-size: 14px; }
     #m-sback { position: fixed; left: 8px; top: calc(var(--m-top, 0px) + 12px); width: 40px; height: 40px; border: 0; background: none; color: #fff; z-index: 8200; display: none; align-items: center; justify-content: center; }
     #m-sback svg { width: 24px; height: 24px; fill: currentColor; }
     html.m-search:is(.m-results, .m-searching) #m-sback { display: flex; }
@@ -170,7 +188,8 @@
     .m-recent p, .m-recent span, .m-recent a { font-weight: 400 !important; }
     .m-recent .m-recent-h { font-size: 20px !important; font-weight: 700 !important; margin: 12px 8px 8px !important; display: block; color: #fff !important; }
     .m-recent button { opacity: 1 !important; visibility: visible !important; }
-    html.m-searching .m-recent.m-recent { bottom: 0 !important; height: auto !important; max-height: none !important; }
+    html.m-searching .m-recent.m-recent { opacity: 0 !important; pointer-events: none !important; bottom: 0 !important; height: auto !important; max-height: none !important; overflow-y: auto !important; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y !important; }
+    html.m-searching .m-recent > *, html.m-searching .m-recent > * > * { overflow: visible !important; max-height: none !important; }
     .m-recent button[aria-label="削除"], .m-recent .m-radd { color: #b3b3b3 !important; width: 40px !important; height: 40px !important; background: none !important; border: 0; display: inline-flex !important; align-items: center; justify-content: center; }
     .m-recent button[aria-label="削除"] svg { width: 20px !important; height: 20px !important; fill: #b3b3b3 !important; }
     .m-recent .m-radd svg { width: 22px; height: 22px; }
@@ -2123,41 +2142,7 @@
       if (!hd) hd = document.evaluate('//*[not(ancestor-or-self::*[starts-with(@id,"m-")])][text()="最近の検索" or text()="Recent searches"]', document, null, 9, null).singleNodeValue;
       if (hd && hd.textContent !== '最近') hd.textContent = '最近';
       if (hd) hd.classList.add('m-recent-h');
-      // 公式アプリと同じく、各行の × の左に ⊕（ライブラリに追加）
-      var rlib = service('LibraryAPI');
-      document.querySelectorAll('.m-recent [role="row"]').forEach(function (row) {
-        var del = row.querySelector('button[aria-label="削除"]'), a = row.querySelector('a[href]');
-        if (del) { del.style.setProperty('color', '#b3b3b3', 'important'); del.querySelectorAll('svg, path').forEach(function (x) { x.style.setProperty('fill', '#b3b3b3', 'important'); }); }
-        if (row.querySelector('.m-radd')) return;
-        var m = a && a.getAttribute('href').match(/\/(track|album|playlist|artist|show|episode)\/([A-Za-z0-9]+)/);
-        if (!del || !m || !rlib) return;
-        var uri = 'spotify:' + m[1] + ':' + m[2];
-        var b = document.createElement('button');
-        b.className = 'm-radd';
-        b.style.cssText = 'color:#b3b3b3';
-        b.setAttribute('aria-label', 'ライブラリに追加');
-        var paint = function (on) { b.classList.toggle('on', !!on); b.style.setProperty('color', on ? 'var(--m-accent, #1ed760)' : '#b3b3b3', 'important'); b.innerHTML = on ? P.saved : P.add; b.querySelector('svg').style.cssText = 'width:22px;height:22px;fill:currentColor !important'; };
-        paint(false);
-        Promise.resolve(rlib.contains(uri)).then(function (r) { paint(r && r[0]); }, function () {});
-        b.addEventListener('click', function (ev) {
-          ev.stopPropagation(); ev.preventDefault();
-          var on = b.classList.contains('on');
-          Promise.resolve(on ? rlib.remove({ uris: [uri] }) : rlib.add({ uris: [uri] })).then(function () { paint(!on); });
-        });
-        b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
-        del.parentElement.insertBefore(b, del);
-      });
-      for (var pp = hd; pp && pp !== document.body; pp = pp.parentElement) {
-        if (pp.id && pp.id.indexOf('m-') === 0) break;
-        var pos = getComputedStyle(pp).position;
-        if (pos === 'absolute' || pos === 'fixed') { pp.classList.add('m-recent'); break; }
-      }
-    }
-    if (/^\/search\/.+/.test(location.pathname)) {
-      var cs0 = document.querySelector('main [data-testid="carousel-scroller"]');
-      for (var cp = cs0 && cs0.parentElement; cp && cp.tagName !== 'MAIN'; cp = cp.parentElement) {
-        if (getComputedStyle(cp).position === 'sticky') { cp.classList.add('m-schips'); break; }
-      }
+      renderRecentPage();
     }
     // 検索のトップ結果がアーティストなら「フォローする／フォロー中」ボタンを付ける
     if (/^\/search\/.+/.test(location.pathname)) {
@@ -2256,6 +2241,87 @@
       }
     }
   });
+  // ---- 検索中の「最近」画面 ----
+  var X_ICON = '<svg viewBox="0 0 24 24"><path d="M5.3 4 4 5.3 10.7 12 4 18.7 5.3 20 12 13.3 18.7 20 20 18.7 13.3 12 20 5.3 18.7 4 12 10.7z"/></svg>';
+  var recentKey = '';
+  function renderRecentPage() {
+    var page = document.getElementById('m-recentpage');
+    if (!page) {
+      page = document.createElement('section');
+      page.id = 'm-recentpage';
+      document.body.appendChild(page);
+      page.addEventListener('scroll', function () {
+        if (Date.now() - kbClosedAt < 800) return;
+        kbClosedAt = Date.now();
+        if (window.__native && __native.send) __native.send({ type: 'hideKeyboard' });
+      }, { passive: true });
+    }
+    var rows = [].filter.call(document.querySelectorAll('[data-encore-id="typeList"] [role="row"]'), function (r) {
+      return !r.closest('#main-view, #Desktop_LeftSidebar_Id, [id^="m-"]') && r.querySelector('button[aria-label="削除"]');
+    });
+    // 裏に隠す Spotify のドロップダウンにも目印
+    rows.forEach(function (r) {
+      for (var pp = r; pp && pp !== document.body; pp = pp.parentElement) {
+        var pos = getComputedStyle(pp).position;
+        if (pos === 'absolute' || pos === 'fixed') { pp.classList.add('m-recent'); break; }
+      }
+    });
+    var data = rows.map(function (row) {
+      var a = row.querySelector('a[href]'), img = row.querySelector('img');
+      var title = row.querySelector('[data-encore-id="listRowTitle"]'), sub = row.querySelector('[data-encore-id="listRowSubtitle"]');
+      return { row: row, href: a ? a.getAttribute('href') : '', img: img ? img.src : '', title: title ? title.textContent : (a ? a.textContent : ''), sub: sub ? sub.textContent : '' };
+    });
+    var key = data.map(function (d) { return d.href; }).join('|');
+    if (key === recentKey && page.childElementCount && data.length) return;
+    recentKey = data.length ? key : '';
+    page.innerHTML = '<h2>最近</h2>';
+    if (!data.length) return;
+    var lib = service('LibraryAPI');
+    data.forEach(function (d) {
+      var m = d.href.match(/\/(track|album|playlist|artist|show|episode|user)\/([A-Za-z0-9]+)/);
+      var r = document.createElement('div');
+      r.className = 'r';
+      r.innerHTML = '<img alt=""><div class="t"><b></b><small></small></div><button class="add" aria-label="ライブラリに追加">' + P.add + '</button><button class="del" aria-label="削除">' + X_ICON + '</button>';
+      r.querySelector('img').src = d.img;
+      if (m && (m[1] === 'artist' || m[1] === 'user')) r.querySelector('img').className = 'round';
+      r.querySelector('b').textContent = d.title;
+      r.querySelector('small').textContent = d.sub;
+      var add = r.querySelector('.add');
+      var uri = m ? 'spotify:' + m[1] + ':' + m[2] : '';
+      var paint = function (on) { add.classList.toggle('on', !!on); add.innerHTML = on ? P.saved : P.add; };
+      if (lib && uri && m[1] !== 'user') Promise.resolve(lib.contains(uri)).then(function (x) { paint(x && x[0]); }, function () {}); else add.style.visibility = 'hidden';
+      add.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var on = add.classList.contains('on');
+        Promise.resolve(on ? lib.remove({ uris: [uri] }) : lib.add({ uris: [uri] })).then(function () { paint(!on); });
+      });
+      r.querySelector('.del').addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var del = d.row.querySelector('button[aria-label="削除"]');
+        if (del) del.click();
+        r.remove();
+      });
+      r.addEventListener('click', function () {
+        var si = document.querySelector('#global-nav-bar input');
+        if (si) si.blur();
+        document.documentElement.classList.remove('m-searching');
+        if (d.href) spaGo(d.href.replace(/^\/intl-[a-z-]+/i, ''));
+      });
+      r.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      page.appendChild(r);
+    });
+  }
+
+  // 最近の一覧をスクロールし始めたら、公式アプリと同じくキーボードだけ閉じる（入力欄のフォーカスは残す）
+  var kbClosedAt = 0;
+  document.addEventListener('touchmove', function (e) {
+    if (!document.documentElement.classList.contains('m-searching')) return;
+    if (!e.target.closest || !e.target.closest('.m-recent')) return;
+    if (Date.now() - kbClosedAt < 800) return;
+    kbClosedAt = Date.now();
+    if (window.__native && __native.send) __native.send({ type: 'hideKeyboard' });
+  }, { passive: true, capture: true });
+
   document.addEventListener('focusout', function (e) {
     if (e.target.matches && e.target.matches('#global-nav-bar input')) {
       setTimeout(function () {

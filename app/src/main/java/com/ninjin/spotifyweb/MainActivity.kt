@@ -289,6 +289,8 @@ class MainActivity : Activity() {
                 if (name == "orientation") applyOrientation()
             }
             "playing" -> setPlaying(m.optBoolean("value"))
+            "hideKeyboard" -> getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                .hideSoftInputFromWindow(webView.windowToken, 0)
             "share" -> {
                 // Spotify のリンクだけ Android の共有シートで送る
                 val url = m.optString("url")
