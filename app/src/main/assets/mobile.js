@@ -242,7 +242,7 @@
     }
     /* 公式アプリと同じく、ジャケットの色をそのまま背景に。下の方だけ暗くする */
     #m-player .page {
-      min-height: 100%; display: flex; flex-direction: column; padding: 4px 24px 20px; box-sizing: border-box; flex: none;
+      min-height: calc(100% - 64px); display: flex; flex-direction: column; padding: 4px 24px 20px; box-sizing: border-box; flex: none;
       background: linear-gradient(to bottom, var(--m-tint2, #535353) 0%, var(--m-tint2, #535353) 35%, var(--m-tint, #404040) 100%);
     }
     #m-player .extras { padding: 8px 16px 32px; display: flex; flex-direction: column; gap: 16px; background: var(--m-tint, #404040); }
@@ -275,7 +275,8 @@
     #m-player.paused .art img { transform: scale(.88); }
     #m-player .meta { display: flex; align-items: center; gap: 12px; flex: none; }
     #m-player .meta .t { flex: 1; min-width: 0; }
-    #m-player .meta b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #m-player .meta b { display: block; font-size: 22px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+    #m-player .meta b span { display: inline-block; }
     #m-player .meta span { display: block; color: rgba(255,255,255,.7); font-size: 16px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #m-player .like svg { width: 28px; height: 28px; }
     #m-player .like.on { color: var(--m-accent, #1ed760); }
@@ -496,6 +497,63 @@
     return row(title, detail, selectEl(opts, c.value, function (v) { setSelect(c, v); }));
   }
 
+  // ---- 音質（Web Player の再生エンジンに直接指定する） ----
+  var QUALITIES = [
+    ['auto', '自動', '通信状況に合わせて調整'],
+    ['low', '低音質', '約 24 kbps'],
+    ['normal', '標準', '約 96 kbps'],
+    ['high', '高音質', '約 160 kbps'],
+    ['very_high', '最高音質', '約 320 kbps（Spotify Premium のみ）']
+  ];
+  var sdkCache = null;
+  function playerSdk() {
+    if (sdkCache) return sdkCache;
+    var host = document.getElementById('main');
+    if (!host) return null;
+    var els = [host].concat([].slice.call(host.querySelectorAll('*')));
+    for (var i = 0; i < els.length; i++) {
+      var k = Object.keys(els[i]).find(function (x) { return x.indexOf('__reactContainer$') === 0; });
+      if (!k) continue;
+      var stack = [els[i][k]];
+      while (stack.length) {
+        var f = stack.pop();
+        var v = f.memoizedProps && f.memoizedProps.value;
+        if (v && typeof v === 'object' && typeof v.getRegistry === 'function') {
+          var reg = v.getRegistry(), key = null;
+          reg._map.forEach(function (_, rk) { if (rk && rk.description === 'PlayerSDK') key = rk; });
+          sdkCache = key ? reg.resolve(key) : null;
+          return sdkCache;
+        }
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+    }
+    return null;
+  }
+  function streamer() {
+    var sdk = playerSdk();
+    return sdk && sdk.harmony && sdk.harmony._streamer;
+  }
+  function setQuality(level) {
+    var st = streamer();
+    if (!st || typeof st.setMediaPlaybackQuality !== 'function') return Promise.resolve(false);
+    return Promise.resolve(st.setMediaPlaybackQuality({ audio: level })).then(function (ok) { return ok !== false; }, function () { return false; });
+  }
+  function currentBitrate() {
+    var st = streamer();
+    if (!st || !st._playerPromise) return Promise.resolve(0);
+    return st._playerPromise.then(function (p) { return p && p._currentContent && p._currentContent._bitrate || 0; }, function () { return 0; });
+  }
+  var qualityApplied = false;
+  function applySavedQuality() {
+    if (qualityApplied) return;
+    var lv = pref('quality', 'auto');
+    if (lv === 'auto') { qualityApplied = true; return; }
+    if (!streamer()) return;
+    qualityApplied = true;
+    setQuality(lv);
+  }
+
   // 設定は公式アプリと同じく「カテゴリ一覧 → 各ページ」の 2 階層
   var settingsPage = null;
   var CHEVRON = '<svg viewBox="0 0 24 24"><path d="M8.6 5.4 10 4l8 8-8 8-1.4-1.4 6.6-6.6z"/></svg>';
@@ -615,11 +673,24 @@
         spotifySwitch('プロフィールにプレイリストを表示', null, /プロフィールに追加したプレイリスト|playlists on/i)
       ]);
     } else if (id === 'quality') {
-      var quality = spotifyControl(/ストリーミングの音質|Streaming quality/);
-      var lossless = quality && [].some.call(quality.options, function (o) { return /ロスレス|Lossless/i.test(o.text); });
-      sec('ストリーミング', [
-        spotifySelect('音質', lossless ? 'ロスレスを選べます' : 'ロスレスは Spotify Premium のみ（このアカウントでは選べません）', /ストリーミングの音質|Streaming quality/)
-      ]);
+      var info = row('いま再生中の音質', '確認中…', null);
+      var sel = selectEl(QUALITIES.map(function (x) { return [x[0], x[1]]; }), pref('quality', 'auto'), function (v) {
+        try { localStorage.setItem('m.quality', v); } catch (e) {}
+        detail.textContent = '切り替え中…';
+        setQuality(v).then(function (ok) {
+          var d = QUALITIES.filter(function (x) { return x[0] === v; })[0];
+          detail.textContent = ok ? d[2] + '。次の曲から反映されます' : 'この音質は選べませんでした（Premium 限定の可能性があります）';
+        });
+      });
+      var qrow = row('ストリーミングの音質', null, sel);
+      var detail = document.createElement('small');
+      detail.textContent = (QUALITIES.filter(function (x) { return x[0] === pref('quality', 'auto'); })[0] || QUALITIES[0])[2];
+      qrow.querySelector('.t').appendChild(detail);
+      sec('ストリーミング', [qrow, info]);
+      sec('ロスレス', [row('ロスレス（FLAC）', 'Spotify Premium の機能です。Web Player では選べません', null)]);
+      currentBitrate().then(function (b) {
+        info.querySelector('small').textContent = b ? Math.round(b / 1000) + ' kbps' : '不明（再生中の曲がありません）';
+      });
     } else if (id === 'app') {
       sec(null, [
         row('イコライザー・詳細設定', 'Spotify の設定ページを開く', linkButton('開く', function () { document.documentElement.classList.remove('m-settings'); })),
@@ -819,7 +890,6 @@
       '<button class="ib m next" aria-label="次へ">' + P.next + '</button>' +
       '<button class="ib s repeat" aria-label="リピート">' + P.repeat + '</button></div>' +
       '<div class="bottom"><button class="dev">' + P.device + '<span>このデバイス</span></button>' +
-      '<button class="ib lyrics" aria-label="歌詞">' + P.lyrics + '</button>' +
       '<button class="ib share" aria-label="共有">' + P.share + '</button>' +
       '<button class="ib queue" aria-label="キュー">' + P.queue + '</button></div></div>' +
       '<div class="extras"><button class="card lyrics-card"><h3>歌詞</h3><p>タップして歌詞を表示</p></button>' +
@@ -845,7 +915,6 @@
     on('.queue', function () { openPanel(q('[data-testid="control-button-queue"]')); });
     on('.lyrics-card', function () { closePlayer(); var b = q('[data-testid="lyrics-button"]'); if (b) b.click(); });
     on('.extras .artist', function () { closePlayer(); var a = q('[data-testid="now-playing-widget-v2"] a[href*="/artist/"]'); if (a) a.click(); });
-    on('.lyrics', function () { closePlayer(); var b = q('[data-testid="lyrics-button"]'); if (b) b.click(); });
     on('.more', function () { closePlayer(); var a = q('[data-testid="now-playing-widget-v2"] a[href*="/album/"]'); if (a) a.click(); });
     on('.share', function () {
       var a = q('[data-testid="now-playing-widget-v2"] a[href*="/album/"]');
@@ -899,9 +968,31 @@
     if (src && pic.getAttribute('src') !== src) {
       pic.src = src;
     }
-    el.querySelector('.meta b').textContent = title ? title.textContent : '';
+    var tb = el.querySelector('.meta b');
+    var tt = title ? title.textContent : '';
+    if (tb.dataset.t !== tt) {
+      tb.dataset.t = tt;
+      tb.innerHTML = '<span></span>';
+      var ts = tb.firstChild;
+      ts.textContent = tt;
+      requestAnimationFrame(function () {
+        var dist = ts.scrollWidth - tb.clientWidth;
+        if (dist > 4) {
+          ts.style.setProperty('--m-dist', -dist + 'px');
+          ts.style.setProperty('--m-dur', Math.max(4, dist / 25) + 's');
+          ts.classList.add('m-marquee');
+        }
+      });
+    }
     el.querySelector('.meta span').textContent = by ? by.textContent : '';
-    el.querySelector('.ctx b').textContent = by ? by.textContent : '';
+    // 再生元（プレイリスト・アルバムなど）は Connect の状態から
+    var st = window.__mConnect && __mConnect.get();
+    var ps = st && st.cluster && st.cluster.player_state;
+    var cu = ps && ps.context_uri || '';
+    var cname = ps && ps.context_metadata && (ps.context_metadata.context_description || ps.context_metadata.title) || '';
+    var kind = /:playlist:/.test(cu) ? 'プレイリスト' : /:album:/.test(cu) ? 'アルバム' : /:artist:/.test(cu) ? 'アーティスト' : /:collection/.test(cu) ? 'お気に入りの曲' : '';
+    el.querySelector('.ctx small').textContent = kind ? kind + 'から再生中' : '再生中';
+    el.querySelector('.ctx b').textContent = cname || (kind === 'お気に入りの曲' ? 'お気に入りの曲' : (by ? by.textContent : ''));
     var pp = q('[data-testid="control-button-playpause"]');
     var playing = pp && /一時停止|Pause/.test(pp.getAttribute('aria-label') || '');
     el.querySelector('.pp').innerHTML = playing ? P.pause : P.play;
@@ -1188,6 +1279,7 @@
     if (mdv) mdv.classList.toggle('on', !!activeDeviceName());
     updatePlayer();
     tintMiniPlayer();
+    applySavedQuality();
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
     var h = document.documentElement.classList;
     h.toggle('m-home', /^\/(intl-[a-z-]+\/?)?$/i.test(location.pathname) && !h.contains('m-lib') && !h.contains('m-search'));
