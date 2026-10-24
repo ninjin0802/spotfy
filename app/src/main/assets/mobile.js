@@ -125,6 +125,7 @@
     /* ライブラリの並べ替え行：公式アプリと同じ「⇅ 再生履歴」表記 */
     html.m-lib #Desktop_LeftSidebar_Id div:has(> [role="combobox"]):has(> [role="search"]),
     html.m-lib #Desktop_LeftSidebar_Id div:has(> div > [role="combobox"]):has([role="search"]) { position: absolute !important; opacity: 0 !important; height: 0 !important; overflow: hidden !important; pointer-events: none !important; }
+    [data-tippy-root]:has(#sort-and-view-picker), html.m-libop [data-tippy-root] { opacity: 0 !important; pointer-events: none !important; }
     #m-libbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px 12px; width: 100%; box-sizing: border-box; border-top: 1px solid #2a2a2a; }
     #m-libbar button { background: none; border: 0; color: #fff; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; font-family: inherit; padding: 4px; }
     #m-libbar svg { width: 22px; height: 22px; }
@@ -3111,6 +3112,9 @@
   function libMenu(fn) {
     var cb = document.querySelector('#Desktop_LeftSidebar_Id [role="combobox"]');
     if (!cb) return;
+    // Spotify のメニューは見せずに裏で操作する
+    document.documentElement.classList.add('m-libop');
+    setTimeout(function () { document.documentElement.classList.remove('m-libop'); }, 2500);
     cb.click();
     var n = 0;
     (function wait() {
