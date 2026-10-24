@@ -782,6 +782,27 @@
     html.m-sp #m-player { z-index: 10010; }
     html.m-sp #main { z-index: auto !important; isolation: auto !important; }
 
+    /* 曲の「⋮」メニュー（公式アプリと同じボトムシート） */
+    #m-tm-bg { position: fixed; inset: 0; z-index: 10070; background: rgba(0,0,0,.6); display: none; }
+    #m-tm { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10071; background: #242424; color: #fff; border-radius: 12px 12px 0 0;
+      transform: translateY(100%); transition: transform .22s ease; max-height: 80vh; overflow-y: auto; padding: 6px 0 calc(var(--m-bottom, 0px) + 12px); font-family: inherit; }
+    html.m-tm #m-tm-bg { display: block; }
+    html.m-tm #m-tm { transform: none; }
+    #m-tm .grip { width: 36px; height: 4px; border-radius: 2px; background: #6a6a6a; margin: 6px auto 12px; }
+    #m-tm .hd { display: flex; align-items: center; gap: 14px; padding: 4px 16px 14px; border-bottom: 1px solid #3a3a3a; }
+    #m-tm .hd img { width: 52px; height: 52px; object-fit: cover; border-radius: 2px; flex: none; }
+    #m-tm .hd b { display: block; font-size: 16px; font-weight: 600; }
+    #m-tm .hd small { display: block; font-size: 14px; color: #a7a7a7; margin-top: 3px; }
+    #m-tm button.it { display: flex; align-items: center; gap: 18px; width: 100%; padding: 15px 18px; background: none; border: 0; color: #fff; font-size: 16px; text-align: left; font-family: inherit; }
+    #m-tm button.it svg { width: 26px; height: 26px; flex: none; }
+    #m-tm .liked { width: 26px; height: 26px; border-radius: 3px; background: linear-gradient(135deg, #450af5, #c4efd9); display: flex; align-items: center; justify-content: center; flex: none; }
+    #m-tm button.it .liked svg { width: 13px; height: 13px; fill: #fff; }
+    #m-tm .pl img { width: 44px; height: 44px; border-radius: 2px; object-fit: cover; flex: none; background: #333; }
+    #m-tm .toast { position: fixed; }
+    #m-toast { position: fixed; left: 16px; right: 16px; bottom: calc(${NAV_H}px + var(--m-bottom, 0px) + 76px); z-index: 10080; background: #fff; color: #000; border-radius: 8px;
+      padding: 12px 16px; font-size: 14px; font-weight: 600; display: none; font-family: inherit; }
+    html.m-toast #m-toast { display: block; }
+
     /* 下部タブバー（固定） */
     #m-tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; height: calc(${NAV_H}px + var(--m-bottom, 0px)); padding-bottom: var(--m-bottom, 0px); box-sizing: border-box; z-index: 9999;
@@ -1718,7 +1739,13 @@
     on('.queue', function () { openPanel(q('[data-testid="control-button-queue"]')); });
     on('.lyrics-card', function () { closePlayer(); var b = q('[data-testid="lyrics-button"]'); if (b) b.click(); });
     on('.extras .artist', function () { closePlayer(); var a = q('[data-testid="now-playing-widget-v2"] a[href*="/artist/"]'); if (a) a.click(); });
-    on('.more', function () { closePlayer(); var a = q('[data-testid="now-playing-widget-v2"] a[href*="/album/"]'); if (a) a.click(); });
+    on('.more', function () {
+      var w = q('[data-testid="now-playing-widget-v2"]');
+      var st = window.__mConnect && __mConnect.get(), ps = st && st.cluster && st.cluster.player_state, tr = ps && ps.track;
+      if (!w || !tr) return;
+      var md = tr.metadata || {};
+      openTrackMenu({ uri: tr.uri, title: md.title, img: bigArt(md.image_url || ''), artist: md.artist_name, album: md.album_uri, artistUri: md.artist_uri });
+    });
     on('.share', function () {
       var a = q('[data-testid="now-playing-widget-v2"] a[href*="/album/"]');
       var url = a ? 'https://open.spotify.com' + a.getAttribute('href').replace(/^\/intl-[a-z-]+/i, '') : location.href;
@@ -2445,6 +2472,7 @@
     recentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     saveRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     removeRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    getTrack: 'fe16b8083eec2305854db612ca75589bcb71e009dc7a4d014f29bd534a4c01f5',
     searchTopResultsList: 'dd78eaff943eba629ed70ee25517b9cea0dcaa41193e2592ae2727660b21892c'
   };
   var platformCache = null;
@@ -2488,7 +2516,7 @@
     if (!d || !d.uri && !d._uri) return null;
     switch (w.__typename) {
       case 'ArtistResponseWrapper': return { uri: d.uri, kind: 'artist', title: d.profile && d.profile.name, sub: 'アーティスト', img: pickImg(d.visuals || d.visualIdentity || d), round: true, verified: !!(d.profile && d.profile.verified || d.onPlatformReputationTrait && d.onPlatformReputationTrait.verification && d.onPlatformReputationTrait.verification.isVerified) };
-      case 'TrackResponseWrapper': return { uri: d.uri, kind: 'track', title: d.name, sub: '曲 • ' + names(d.artists), img: pickImg(d.albumOfTrack), album: d.albumOfTrack && d.albumOfTrack.uri };
+      case 'TrackResponseWrapper': return { uri: d.uri, kind: 'track', title: d.name, sub: '曲 • ' + names(d.artists), img: pickImg(d.albumOfTrack), album: d.albumOfTrack && d.albumOfTrack.uri, artistName: names(d.artists), artistUri: d.artists && d.artists.items && d.artists.items[0] && d.artists.items[0].uri };
       case 'AlbumResponseWrapper': return { uri: d.uri, kind: 'album', title: d.name, sub: (d.type === 'SINGLE' ? 'シングル' : d.type === 'EP' ? 'EP' : 'アルバム') + ' • ' + names(d.artists), img: pickImg(d.coverArt) };
       case 'PlaylistResponseWrapper': return { uri: d.uri, kind: 'playlist', title: d.name, sub: 'プレイリスト', img: pickImg(d.images) };
       case 'PodcastOrAudiobookResponseWrapper': return { uri: d.uri, kind: 'show', title: d.name, sub: 'ポッドキャスト', img: pickImg(d.coverArt) };
@@ -2564,7 +2592,7 @@
     if (opts.dots && e.kind === 'track') {
       var dt = document.createElement('button');
       dt.className = 'dots'; dt.innerHTML = DOTS; dt.setAttribute('aria-label', 'その他');
-      dt.addEventListener('click', function (ev) { ev.stopPropagation(); closeSearchPage(); if (e.album) spaGo(uriPath(e.album)); });
+      dt.addEventListener('click', function (ev) { ev.stopPropagation(); hideKb(); openTrackMenu({ uri: e.uri, title: e.title, img: e.img, artist: e.artistName, album: e.album, artistUri: e.artistUri }); });
       tr.appendChild(dt);
     }
     if (lib && (e.kind === 'track' || e.kind === 'album' || e.kind === 'playlist' || e.kind === 'show' || (e.kind === 'artist' && opts.recent))) {
@@ -2634,9 +2662,119 @@
     row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
   }, true);
 
+  // ==== 曲の「⋮」メニュー ====
+  var TI = function (d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; };
+  var TM_ICONS = {
+    share: TI('<circle cx="17.5" cy="5.5" r="2.6"/><circle cx="6.5" cy="12" r="2.6"/><circle cx="17.5" cy="18.5" r="2.6"/><path d="M8.8 10.7 15.2 6.8M8.8 13.3l6.4 3.9"/>'),
+    playlist: TI('<circle cx="12" cy="12" r="9.5"/><path d="M12 7.5v9M7.5 12h9"/>'),
+    next: TI('<path d="M3 6h9M3 11h9M3 16h6M17 7v9M12.5 11.5h9"/>'),
+    queue: TI('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+    album: TI('<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="3"/>'),
+    artist: TI('<circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"/>'),
+    removeLiked: TI('<circle cx="12" cy="12" r="9.5"/><path d="M7.5 12h9"/>')
+  };
+  function toast(msg) {
+    var t = document.getElementById('m-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'm-toast'; document.body.appendChild(t); }
+    t.textContent = msg;
+    document.documentElement.classList.add('m-toast');
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { document.documentElement.classList.remove('m-toast'); }, 2200);
+  }
+  function closeTrackMenu() { document.documentElement.classList.remove('m-tm'); }
+  function openTrackMenu(t) {
+    var sheet = document.getElementById('m-tm');
+    if (!sheet) {
+      var bg = document.createElement('div'); bg.id = 'm-tm-bg'; bg.addEventListener('click', closeTrackMenu); document.body.appendChild(bg);
+      sheet = document.createElement('section'); sheet.id = 'm-tm'; document.body.appendChild(sheet);
+    }
+    var lib = service('LibraryAPI'), player = service('PlayerAPI');
+    sheet.innerHTML = '<div class="grip"></div><div class="hd"><img alt=""><div><b></b><small></small></div></div>';
+    sheet.querySelector('.hd img').src = t.img || '';
+    sheet.querySelector('.hd b').textContent = t.title || '';
+    sheet.querySelector('.hd small').textContent = t.artist || '';
+    function item(icon, label, fn) {
+      var b = document.createElement('button'); b.className = 'it';
+      b.innerHTML = icon + '<span class="lbl"></span>'; b.querySelector('.lbl').textContent = label;
+      b.addEventListener('click', fn); sheet.appendChild(b); return b;
+    }
+    item(TM_ICONS.share, 'シェア', function () { closeTrackMenu(); shareUrl('https://open.spotify.com/track/' + t.uri.split(':')[2], t.title); });
+    var likeBtn = item('<span class="liked">' + P.heart + '</span>', 'お気に入りの曲に追加', function () {
+      var on = likeBtn.dataset.on === '1';
+      closeTrackMenu();
+      if (!lib) return;
+      Promise.resolve(on ? lib.remove({ uris: [t.uri] }) : lib.add({ uris: [t.uri] })).then(function () { toast(on ? 'お気に入りの曲から削除しました' : 'お気に入りの曲に追加しました'); });
+    });
+    if (lib) Promise.resolve(lib.contains(t.uri)).then(function (x) {
+      if (x && x[0]) { likeBtn.dataset.on = '1'; likeBtn.querySelector('.lbl').textContent = 'お気に入りの曲から削除'; }
+    }, function () {});
+    item(TM_ICONS.playlist, 'プレイリストに追加', function () { openPlaylistPicker(t); });
+    item(TM_ICONS.next, '[次に再生] に追加', function () {
+      closeTrackMenu();
+      if (player && player.addToQueue) Promise.resolve(player.addToQueue([{ uri: t.uri }])).then(function () { toast('[次に再生] に追加しました'); });
+    });
+    item(TM_ICONS.queue, '再生リストに移動', function () { closeTrackMenu(); openPlayer(); openPanel(q('[data-testid="control-button-queue"]')); });
+    var albumBtn = item(TM_ICONS.album, 'アルバムに移動', function () { closeTrackMenu(); closePlayer(); if (window.__mSearchOpen && __mSearchOpen()) closeSearchPage(); if (t.album) spaGo(uriPath(t.album)); });
+    // アルバムが分からない行（アーティストの人気曲など）は曲の情報から取る
+    if (!t.album) gql('getTrack', { uri: t.uri }).then(function (r) {
+      var tu = r && r.data && r.data.trackUnion;
+      if (tu && tu.albumOfTrack) t.album = tu.albumOfTrack.uri;
+      var fa = tu && (tu.firstArtist || tu.artists);
+      if (!t.artistUri && fa && fa.items && fa.items[0]) t.artistUri = fa.items[0].uri;
+    }, function () {});
+    if (t.artistUri) item(TM_ICONS.artist, 'アーティストに移動', function () { closeTrackMenu(); closePlayer(); if (window.__mSearchOpen && __mSearchOpen()) closeSearchPage(); spaGo(uriPath(t.artistUri)); });
+    sheet.scrollTop = 0;
+    document.documentElement.classList.add('m-tm');
+  }
+  function openPlaylistPicker(t) {
+    var sheet = document.getElementById('m-tm');
+    var root = service('RootlistAPI'), pl = service('PlaylistAPI');
+    sheet.innerHTML = '<div class="grip"></div><div class="hd"><div><b>プレイリストに追加</b></div></div>';
+    if (!root || !pl) return;
+    Promise.resolve(root.getContents({})).then(function (c) {
+      var out = [];
+      (function walk(items) { (items || []).forEach(function (x) { if (x.type === 'folder') walk(x.items); else if (x.type === 'playlist' && (x.isOwnedBySelf || x.canAdd)) out.push(x); }); })(c.items);
+      out.forEach(function (x) {
+        var b = document.createElement('button'); b.className = 'it pl';
+        var img = x.images && x.images[0] && x.images[0].url || '';
+        b.innerHTML = '<img alt=""><span class="lbl"></span>';
+        b.querySelector('img').src = img; b.querySelector('.lbl').textContent = x.name;
+        b.addEventListener('click', function () {
+          closeTrackMenu();
+          Promise.resolve(pl.add(x.uri, [t.uri], { after: 'end' })).then(function () { toast('「' + x.name + '」に追加しました'); }, function () { toast('追加できませんでした'); });
+        });
+        sheet.appendChild(b);
+      });
+    });
+  }
+  // 曲の行の情報（Web 版の行・自前の検索結果から）
+  function trackFromRow(row) {
+    var a = row.querySelector('a[href*="/track/"]');
+    if (!a) return null;
+    var id = a.getAttribute('href').split('/track/')[1].split(/[/?#]/)[0];
+    var al = row.querySelector('a[href*="/album/"]'), ar = row.querySelectorAll('a[href*="/artist/"]');
+    var img = [].find.call(row.querySelectorAll('img'), function (i) { return /scdn\.co|spotifycdn/.test(i.src); });
+    return {
+      uri: 'spotify:track:' + id, title: a.textContent, img: img ? img.src : '',
+      artist: [].map.call(ar, function (x) { return x.textContent; }).join(', '),
+      album: al ? 'spotify:album:' + al.getAttribute('href').split('/album/')[1].split(/[/?#]/)[0] : null,
+      artistUri: ar[0] ? 'spotify:artist:' + ar[0].getAttribute('href').split('/artist/')[1].split(/[/?#]/)[0] : null
+    };
+  }
+  // Web 版の曲の「⋮」を押したら、Spotify の右クリックメニューの代わりにボトムシート
+  document.addEventListener('click', function (e) {
+    var mb = e.target.closest && e.target.closest('main [data-testid="tracklist-row"] [data-testid="more-button"]');
+    if (!mb) return;
+    var t = trackFromRow(mb.closest('[data-testid="tracklist-row"]'));
+    if (!t) return;
+    e.preventDefault(); e.stopPropagation();
+    openTrackMenu(t);
+  }, true);
+
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
   window.__mobileBack = function () {
     var h = document.documentElement.classList;
+    if (h.contains('m-tm')) { closeTrackMenu(); return true; }
     if (h.contains('m-devices')) { closeDevices(); return true; }
     if (h.contains('m-sp')) { closeSearchPage(); return true; }
     if (h.contains('m-vis')) { closeVisibility(); return true; }
