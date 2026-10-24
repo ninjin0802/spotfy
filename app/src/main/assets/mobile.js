@@ -762,6 +762,11 @@
     #m-tm .hd small { display: block; font-size: 14px; color: #a7a7a7; margin-top: 3px; }
     #m-tm button.it { display: flex; align-items: center; gap: 18px; width: 100%; padding: 15px 18px; background: none; border: 0; color: #fff; font-size: 16px; text-align: left; font-family: inherit; }
     #m-tm button.it svg { width: 26px; height: 26px; flex: none; }
+    #m-tm button.cr { padding: 10px 18px; }
+    #m-tm .cr .ic { width: 56px; height: 56px; border-radius: 50%; background: #2a2a2a; display: flex; align-items: center; justify-content: center; flex: none; color: #b3b3b3; }
+    #m-tm .cr .ic svg { width: 26px; height: 26px; }
+    #m-tm .cr b { display: block; font-size: 16px; font-weight: 600; }
+    #m-tm .cr small { display: block; font-size: 13px; color: #a7a7a7; margin-top: 3px; }
     #m-tm .liked { width: 26px; height: 26px; border-radius: 3px; background: linear-gradient(135deg, #450af5, #c4efd9); display: flex; align-items: center; justify-content: center; flex: none; }
     #m-tm button.it .liked svg { width: 13px; height: 13px; fill: #fff; }
     #m-tm .pl img { width: 44px; height: 44px; border-radius: 2px; object-fit: cover; flex: none; background: #333; }
@@ -3107,6 +3112,57 @@
     }
     document.documentElement.classList.add('m-tm');
   }
+
+  // ==== ライブラリの「＋」（作成）を公式アプリと同じボトムシートで開く ====
+  function createMenu(fn) {
+    var cr = document.querySelector('#Desktop_LeftSidebar_Id header button[aria-label="作成"]');
+    if (!cr) return;
+    document.documentElement.classList.add('m-libop');
+    setTimeout(function () { document.documentElement.classList.remove('m-libop'); }, 2500);
+    cr.dataset.mPass = '1'; cr.click(); delete cr.dataset.mPass;
+    var n = 0;
+    (function wait() {
+      var items = document.querySelectorAll('[data-tippy-root] [role="menuitem"]');
+      if (items.length) { fn(items); return; }
+      if (++n < 20) setTimeout(wait, 80);
+    })();
+  }
+  function closeHiddenMenu() {
+    var cr = document.querySelector('#Desktop_LeftSidebar_Id header button[aria-label="作成"]');
+    if (cr && document.querySelector('[data-tippy-root] [role="menuitem"]')) { cr.dataset.mPass = '1'; cr.click(); delete cr.dataset.mPass; }
+  }
+  function openCreateSheet() {
+    createMenu(function (items) {
+      var sheet = document.getElementById('m-tm');
+      if (!sheet) {
+        var bg = document.createElement('div'); bg.id = 'm-tm-bg'; bg.addEventListener('click', closeTrackMenu); document.body.appendChild(bg);
+        sheet = document.createElement('section'); sheet.id = 'm-tm'; document.body.appendChild(sheet);
+      }
+      sheet.innerHTML = '<div class="grip"></div>';
+      [].forEach.call(items, function (mi, i) {
+        var svg = mi.querySelector('svg');
+        var texts = [].filter.call(mi.querySelectorAll('span,p,div'), function (e) { return !e.children.length && e.textContent.trim(); }).map(function (e) { return e.textContent.trim(); });
+        var b = document.createElement('button'); b.className = 'it cr';
+        b.innerHTML = '<span class="ic"></span><span><b></b><small></small></span>';
+        if (svg) b.querySelector('.ic').appendChild(svg.cloneNode(true));
+        b.querySelector('b').textContent = texts[0] || '';
+        b.querySelector('small').textContent = texts[1] || '';
+        b.onclick = function () {
+          closeTrackMenu();
+          createMenu(function (now) { if (now[i]) now[i].click(); });
+        };
+        sheet.appendChild(b);
+      });
+      closeHiddenMenu();
+      document.documentElement.classList.add('m-tm');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var cr = e.target.closest && e.target.closest('#Desktop_LeftSidebar_Id header button[aria-label="作成"]');
+    if (!cr || cr.dataset.mPass) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    openCreateSheet();
+  }, true);
 
   // ==== ライブラリの並べ替え・表示形式（公式アプリと同じ「⇅ 再生履歴」と表示切替） ====
   var SORTS = [['最近', '再生履歴'], ['最近追加した順', '最近追加した順'], ['アルファベット順', 'アルファベット順'], ['クリエーター', 'クリエーター']];
