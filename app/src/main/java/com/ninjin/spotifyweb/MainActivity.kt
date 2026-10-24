@@ -275,9 +275,12 @@ class MainActivity : Activity() {
         runCatching { startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)) }
     }
 
-    private fun pushAudioOutput() = webView.evaluateJavascript(
-        "window.__mSetOutput && __mSetOutput(${JSONObject.quote(currentOutputName())})", null,
-    )
+    // 機器名は open.spotify.com のページにだけ渡す（ログイン画面など別のページには送らない）
+    private fun pushAudioOutput() {
+        val url = webView.url ?: return
+        if (!isSpotifyUrl(Uri.parse(url))) return
+        webView.evaluateJavascript("window.__mSetOutput && __mSetOutput(${JSONObject.quote(currentOutputName())})", null)
+    }
 
     private val audioDeviceCallback = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(added: Array<out AudioDeviceInfo>) = pushAudioOutput()
