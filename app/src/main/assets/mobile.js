@@ -2230,6 +2230,8 @@
     if (sortb && sortb.textContent === '最近') sortb.textContent = '再生履歴';
     // 検索結果ページ（/search/〜）かどうか。タブバーも「検索」を選択状態にする
     var h0 = document.documentElement.classList;
+    // 検索から開いたアーティストなどのページでは、検索の見出しを外して通常のページとして表示
+    if (h0.contains('m-search') && !/^\/search/.test(location.pathname.replace(/^\/intl-[a-z-]+/i, ''))) h0.remove('m-search', 'm-results', 'm-searching');
     var inResults = /^\/search\/.+/.test(location.pathname);
     h0.toggle('m-results', inResults);
     if (/^\/search/.test(location.pathname) && !h0.contains('m-search') && !h0.contains('m-lib')) setTab('search');
