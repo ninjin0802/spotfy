@@ -13,6 +13,12 @@
     html, body { overscroll-behavior: none !important; }
     /* 公式アプリと同じく、画面の一番上（ステータスバーの裏）まで描く。--m-top はステータスバーの高さ */
     main { padding-top: var(--m-top, 0px) !important; }
+    html.m-search main { padding-top: 0 !important; }
+    /* 検索ボックスの上に重なる飾り（ショートカットキーの案内など）がタップを奪わないように */
+    #global-nav-bar form input ~ div, #global-nav-bar form input ~ span,
+    #global-nav-bar form > div[class*="form-input-icon__icon"] { pointer-events: none !important; }
+    #global-nav-bar form > div[class*="form-input-icon__icon"] button { pointer-events: auto !important; }
+    #global-nav-bar form kbd, #global-nav-bar form input ~ div span:has(kbd) { display: none !important; }
     html, body, .Root, #main-view, .main-view-container { background-color: #121212 !important; }
     /* スクロールで上に貼りつくフィルター欄などは、ステータスバーの下で止め、その上も背景色で覆う */
     .m-sticky { top: var(--m-top, 0px) !important; background-color: var(--m-bg, #121212) !important; box-shadow: 0 calc(-1 * var(--m-top, 0px)) 0 0 var(--m-bg, #121212) !important; z-index: 5 !important; }
@@ -66,6 +72,7 @@
       border-radius: 6px !important; box-shadow: none !important; font-weight: 600 !important; font-size: 16px !important;
     }
     html.m-search #global-nav-bar input::placeholder { color: #535353 !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar input::placeholder { color: #b3b3b3 !important; }
     html.m-search #global-nav-bar form button, html.m-search #global-nav-bar form svg { color: #121212 !important; fill: #121212 !important; }
     html.m-search #m-avatar { display: block; top: calc(var(--m-top, 0px) + 16px); }
     /* 検索ボックスの × は右端に（虫めがねと重ならないように） */
@@ -76,15 +83,15 @@
     html.m-search #global-nav-bar input { padding-right: 48px !important; }
 
     /* 検索結果：公式アプリと同じく、見出しを出さず「← 検索ボックス」だけの細いヘッダー */
-    html.m-search.m-results .Root > div:first-child { grid-template-rows: 0 calc(64px + var(--m-top, 0px)) minmax(0, 1fr) 0 !important; }
-    html.m-search.m-results #global-nav-bar { height: calc(64px + var(--m-top, 0px)) !important; padding: calc(var(--m-top, 0px) + 8px) 12px 8px 56px !important; }
-    html.m-search.m-results #global-nav-bar::before, html.m-search.m-results #m-avatar { display: none !important; }
-    html.m-search.m-results #global-nav-bar input { background: #2a2a2a !important; color: #fff !important; padding-left: 16px !important; }
-    html.m-search.m-results #global-nav-bar form [data-testid="search-icon"] { display: none !important; }
-    html.m-search.m-results #global-nav-bar form [data-testid="clear-button"] svg { fill: #fff !important; color: #fff !important; }
+    html.m-search:is(.m-results, .m-searching) .Root > div:first-child { grid-template-rows: 0 calc(64px + var(--m-top, 0px)) minmax(0, 1fr) 0 !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar { height: calc(64px + var(--m-top, 0px)) !important; padding: calc(var(--m-top, 0px) + 8px) 12px 8px 56px !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar::before, html.m-search:is(.m-results, .m-searching) #m-avatar { display: none !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar input { background: #2a2a2a !important; color: #fff !important; padding-left: 16px !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="search-icon"] { display: none !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] svg { fill: #fff !important; color: #fff !important; }
     #m-sback { position: fixed; left: 8px; top: calc(var(--m-top, 0px) + 12px); width: 40px; height: 40px; border: 0; background: none; color: #fff; z-index: 8200; display: none; align-items: center; justify-content: center; }
     #m-sback svg { width: 24px; height: 24px; fill: currentColor; }
-    html.m-search.m-results #m-sback { display: flex; }
+    html.m-search:is(.m-results, .m-searching) #m-sback { display: flex; }
     /* 一番上の結果も、公式アプリと同じく普通の行として表示（大きなカード・再生ボタンなし） */
     html.m-results main [role="grid"] [role="row"]:first-child [role="group"] { background: none !important; padding: 8px 0 !important; height: auto !important; }
     html.m-results main [role="grid"] [role="row"]:first-child [data-testid="trailing"] [data-testid="play-button"] { display: none !important; }
@@ -107,13 +114,26 @@
 
     /* 検索ボックスを触ったら、最近の検索を全画面で出す（公式アプリの検索画面と同じ） */
     html.m-searching .m-recent, html.m-searching [data-testid="search-dropdown"] {
-      position: fixed !important; left: 0 !important; right: 0 !important; top: calc(120px + var(--m-top, 0px)) !important; bottom: calc(${NAV_H}px + var(--m-bottom, 0px)) !important;
+      position: fixed !important; left: 0 !important; right: 0 !important; top: calc(64px + var(--m-top, 0px)) !important; bottom: 0 !important; z-index: 10060 !important;
       width: 100vw !important; max-width: none !important; max-height: none !important; transform: none !important;
       border-radius: 0 !important; background: #121212 !important; box-shadow: none !important; z-index: 9400 !important; overflow-y: auto !important;
     }
     html.m-searching.m-amoled #floating-ui-popover-layer > * { background: #000 !important; }
+    /* 最近の検索の各行：公式アプリと同じく右に ⊕ と × を常に表示 */
+    .m-recent { padding: 0 !important; }
+    .m-recent, .m-recent * { border-radius: 0 !important; box-shadow: none !important; }
+    .m-recent > *, .m-recent > * > * { background: #121212 !important; margin: 0 !important; width: 100% !important; max-width: none !important; max-height: none !important; height: auto !important; padding-left: 8px !important; padding-right: 8px !important; box-sizing: border-box !important; }
+    html.m-amoled .m-recent > *, html.m-amoled .m-recent > * > * { background: #000 !important; }
+    .m-recent img { border-radius: 2px !important; }
+    .m-recent p, .m-recent span, .m-recent a { font-weight: 400 !important; }
+    .m-recent .m-recent-h { font-size: 20px !important; font-weight: 700 !important; margin: 12px 8px 8px !important; display: block; color: #fff !important; }
+    .m-recent button { opacity: 1 !important; visibility: visible !important; }
+    html.m-searching main { visibility: hidden !important; }
+    
+    html.m-searching #m-tabbar, html.m-searching [data-testid="now-playing-bar"] { visibility: hidden !important; }
     #m-cancel { display: none; position: absolute; right: 16px; top: calc(var(--m-top, 0px) + 16px); background: none; border: 0; color: #fff; font-size: 15px; font-weight: 600; height: 32px; z-index: 2; }
-    html.m-search.m-searching #m-cancel { display: block; }
+    html.m-search.m-searching #m-cancel { display: none; }
+    html.m-searching .m-recent { background: #121212 !important; }
 
     /* ライブラリ（左サイドバー）と再生中ビュー（右サイドバー）は全画面オーバーレイ */
     #Desktop_LeftSidebar_Id, .m-right { display: none !important; }
@@ -1938,10 +1958,17 @@
       }
     });
     applySavedLeveling();
+    var sInput = document.querySelector('#global-nav-bar input');
+    if (sInput && sInput.placeholder !== '何を聴きたいですか？') sInput.placeholder = '何を聴きたいですか？';
     // 検索ボックスの「最近の検索」ドロップダウンに目印を付ける（全画面で表示するため）
     if (document.documentElement.classList.contains('m-searching')) {
-      var hd = document.evaluate('//*[text()="最近の検索" or text()="Recent searches"]', document, null, 9, null).singleNodeValue;
+      // 自前の画面（サイドメニューの「最近」など）は対象外。Spotify 側の要素だけから探す
+      var hd = document.evaluate('//*[@id="main" or contains(@class,"Root")]//*[not(ancestor-or-self::*[starts-with(@id,"m-")])][text()="最近の検索" or text()="最近" or text()="Recent searches"]', document, null, 9, null).singleNodeValue;
+      if (!hd) hd = document.evaluate('//*[not(ancestor-or-self::*[starts-with(@id,"m-")])][text()="最近の検索" or text()="Recent searches"]', document, null, 9, null).singleNodeValue;
+      if (hd && hd.textContent !== '最近') hd.textContent = '最近';
+      if (hd) hd.classList.add('m-recent-h');
       for (var pp = hd; pp && pp !== document.body; pp = pp.parentElement) {
+        if (pp.id && pp.id.indexOf('m-') === 0) break;
         var pos = getComputedStyle(pp).position;
         if (pos === 'absolute' || pos === 'fixed') { pp.classList.add('m-recent'); break; }
       }
@@ -1956,7 +1983,13 @@
       sb.id = 'm-sback';
       sb.setAttribute('aria-label', '戻る');
       sb.innerHTML = BACK;
-      sb.addEventListener('click', function () { spaGo('/search'); });
+      sb.addEventListener('click', function () {
+        var si = document.querySelector('#global-nav-bar input');
+        if (document.documentElement.classList.contains('m-searching')) {
+          if (si) si.blur();
+          document.documentElement.classList.remove('m-searching');
+        } else spaGo('/search');
+      });
       document.body.appendChild(sb);
     }
     // アカウントアイコンは公式アプリと同じくホーム画面にだけ出す
