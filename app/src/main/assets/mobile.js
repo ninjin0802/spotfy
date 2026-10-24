@@ -11,6 +11,16 @@
     #onetrust-consent-sdk { display: none !important; }
     /* 画面全体が横にずれないようにする（棚のカルーセルは従来どおり横スクロール可） */
     html, body { overscroll-behavior: none !important; }
+    /* 公式アプリと同じく、画面の一番上（ステータスバーの裏）まで描く。--m-top はステータスバーの高さ */
+    main { padding-top: var(--m-top, 0px) !important; }
+    #main-view > header { padding-top: var(--m-top, 0px) !important; height: calc(64px + var(--m-top, 0px)) !important; box-sizing: border-box !important; }
+    #m-settings header, #m-player .page, :is(.m-editbox) > div:first-child { padding-top: var(--m-top, 0px) !important; }
+    #m-player .page { padding-top: calc(var(--m-top, 0px) + 4px) !important; }
+    :is(.m-editbox) > div:first-child { height: calc(56px + var(--m-top, 0px)) !important; }
+    .m-editbox > div:first-child button[aria-label] { top: calc(var(--m-top, 0px) + 8px) !important; }
+    .m-editbox .m-save-wrap { top: calc(var(--m-top, 0px) + 8px) !important; }
+    html.m-lib #Desktop_LeftSidebar_Id { padding-top: var(--m-top, 0px) !important; }
+    #m-settings { padding-top: 0 !important; }
     [data-overlayscrollbars-viewport] { overflow-x: hidden !important; overscroll-behavior-x: none !important; }
     .os-scrollbar-horizontal { display: none !important; }
 
@@ -21,7 +31,7 @@
       column-gap: 0 !important; row-gap: 0 !important; padding: 0 !important;
       width: 100vw !important; height: 100% !important; overflow: hidden !important;
     }
-    html.m-search .Root > div:first-child { grid-template-rows: 0 120px minmax(0, 1fr) 0 !important; }
+    html.m-search .Root > div:first-child { grid-template-rows: 0 calc(120px + var(--m-top, 0px)) minmax(0, 1fr) 0 !important; }
     #main-view { margin: 0 !important; border-radius: 0 !important; }
     [data-testid="LayoutResizer__resize-bar"] { display: none !important; }
 
@@ -30,7 +40,7 @@
     /* 検索タブ：大きな見出し＋白い検索ボックス */
     html.m-search #global-nav-bar {
       display: flex !important; flex-direction: column !important; align-items: stretch !important;
-      inset: 0 !important; width: 100vw !important; height: 120px !important; padding: 16px 16px 8px !important;
+      inset: 0 !important; width: 100vw !important; height: calc(120px + var(--m-top, 0px)) !important; padding: calc(var(--m-top, 0px) + 16px) 16px 8px !important;
       box-sizing: border-box !important; gap: 12px !important; background: #121212 !important;
     }
     html.m-search #global-nav-bar { position: relative !important; }
@@ -49,7 +59,7 @@
     }
     html.m-search #global-nav-bar input::placeholder { color: #535353 !important; }
     html.m-search #global-nav-bar form button, html.m-search #global-nav-bar form svg { color: #121212 !important; fill: #121212 !important; }
-    html.m-search #m-avatar { display: block; top: 16px; }
+    html.m-search #m-avatar { display: block; top: calc(var(--m-top, 0px) + 16px); }
     /* ジャンルのカード：2 列、角丸、公式アプリと同じく画像は右下に傾けて置く */
     html.m-search main [data-testid="grid-container"] {
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important; margin: 0 !important; width: 100% !important;
@@ -64,16 +74,16 @@
     }
     html.m-search main [data-testid="grid-container"] a span { font-size: 16px !important; font-weight: 700 !important; }
     html.m-search main section h2 { font-size: 16px !important; font-weight: 700 !important; }
-    html.m-search #m-avatar { top: 16px !important; }
+    html.m-search #m-avatar { top: calc(var(--m-top, 0px) + 16px) !important; }
 
     /* 検索ボックスを触ったら、最近の検索を全画面で出す（公式アプリの検索画面と同じ） */
     html.m-searching #floating-ui-popover-layer > *, html.m-searching [data-testid="search-dropdown"] {
-      position: fixed !important; left: 0 !important; right: 0 !important; top: 120px !important; bottom: ${NAV_H}px !important;
+      position: fixed !important; left: 0 !important; right: 0 !important; top: calc(120px + var(--m-top, 0px)) !important; bottom: ${NAV_H}px !important;
       width: 100vw !important; max-width: none !important; max-height: none !important; transform: none !important;
       border-radius: 0 !important; background: #121212 !important; box-shadow: none !important; z-index: 9400 !important; overflow-y: auto !important;
     }
     html.m-searching.m-amoled #floating-ui-popover-layer > * { background: #000 !important; }
-    #m-cancel { display: none; position: absolute; right: 16px; top: 16px; background: none; border: 0; color: #fff; font-size: 15px; font-weight: 600; height: 32px; z-index: 2; }
+    #m-cancel { display: none; position: absolute; right: 16px; top: calc(var(--m-top, 0px) + 16px); background: none; border: 0; color: #fff; font-size: 15px; font-weight: 600; height: 32px; z-index: 2; }
     html.m-search.m-searching #m-cancel { display: block; }
 
     /* ライブラリ（左サイドバー）と再生中ビュー（右サイドバー）は全画面オーバーレイ */
@@ -159,7 +169,7 @@
     main [data-testid="artist-page"] h2 { font-size: 20px !important; font-weight: 800 !important; }
     main [data-testid="artist-page"] [data-testid="tracklist-row"] { padding: 0 !important; }
     /* アルバム・プレイリスト：ジャケットを中央に大きく、その下に左寄せでタイトルと情報 */
-    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] { height: auto !important; min-height: 0 !important; max-height: none !important; padding-top: 56px !important; padding-bottom: 8px !important; }
+    main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] { height: auto !important; min-height: 0 !important; max-height: none !important; padding-top: calc(var(--m-top, 0px) + 56px) !important; padding-bottom: 8px !important; margin-top: calc(-1 * var(--m-top, 0px)) !important; }
     main :is([data-testid="album-page"], [data-testid="playlist-page"]) [data-testid="entity-header"] > div:last-child {
       display: flex !important; flex-direction: column !important; align-items: stretch !important; height: auto !important; padding: 0 16px !important; gap: 12px !important;
     }
@@ -186,7 +196,7 @@
     main [data-testid="action-bar-row"] button[aria-haspopup="true"]:not([data-testid]) { display: none !important; }
 
     /* プロフィール：公式アプリと同じく、左に大きな丸いアイコン、右に名前とフォロー情報 */
-    main [data-testid="entity-header"]:has([data-testid="user-image"]) { height: auto !important; max-height: none !important; min-height: 0 !important; padding: 64px 16px 20px !important; }
+    main [data-testid="entity-header"]:has([data-testid="user-image"]) { height: auto !important; max-height: none !important; min-height: 0 !important; padding: calc(var(--m-top, 0px) + 64px) 16px 20px !important; margin-top: calc(-1 * var(--m-top, 0px)) !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child { display: flex !important; flex-direction: row !important; align-items: center !important; height: auto !important; gap: 16px !important; padding: 0 !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > :not(:has(h1)):not(:has(img)) { display: none !important; }
     main [data-testid="entity-header"]:has([data-testid="user-image"]) > div:last-child > :not(:has(h1)):has(img) { width: 112px !important; height: 112px !important; min-width: 112px !important; margin: 0 !important; }
@@ -273,7 +283,7 @@
 
     /* 詳細ページ左上の戻るボタン */
     #m-back {
-      position: fixed; top: 12px; left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
+      position: fixed; top: calc(var(--m-top, 0px) + 12px); left: 12px; z-index: 8100; width: 36px; height: 36px; border-radius: 50%; border: 0;
       background: rgba(0,0,0,.55); color: #fff; display: none; align-items: center; justify-content: center;
     }
     #m-back svg { width: 22px; height: 22px; fill: currentColor; }
@@ -292,7 +302,7 @@
 
     /* アカウント（左上のアイコンと左ドロワー） */
     #m-avatar {
-      position: fixed; top: 20px; left: 16px; width: 32px; height: 32px; border-radius: 50%; z-index: 8000;
+      position: fixed; top: calc(var(--m-top, 0px) + 20px); left: 16px; width: 32px; height: 32px; border-radius: 50%; z-index: 8000;
       border: 0; padding: 0; background: #535353 center/cover no-repeat; color: #000; font-weight: 700; font-size: 14px;
       display: none;
     }
@@ -306,7 +316,7 @@
     }
     html.m-drawer #m-drawer-bg { display: block; }
     html.m-drawer #m-drawer { transform: none; }
-    #m-drawer { background: #1f1f1f !important; padding-top: 8px; }
+    #m-drawer { background: #1f1f1f !important; padding-top: calc(var(--m-top, 0px) + 8px); }
     #m-drawer .me { display: flex; align-items: center; gap: 12px; padding: 16px 16px 20px !important; border-bottom: 1px solid rgba(255,255,255,.1); }
     #m-drawer .me .pic { width: 40px; height: 40px; border-radius: 50%; background: #535353 center/cover no-repeat; flex: none;
       display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; }
@@ -1921,6 +1931,9 @@
     }
     setTimeout(check, 1000);
   }, 2500);
+
+  // アプリからステータスバーの高さを受け取る
+  window.__mSetTop = function (px) { document.documentElement.style.setProperty('--m-top', px + 'px'); };
 
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
   window.__mobileBack = function () {

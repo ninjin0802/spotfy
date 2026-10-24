@@ -54,9 +54,12 @@ class MainActivity : Activity() {
         // 設定の「開発者向けデバッグ」をオンにしたときだけ、PC から WebView を調べられるようにする
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG || settings.getString("webdebug", "false") == "true")
         // targetSdk 35+ は edge-to-edge 強制なので、ステータスバー/ナビバー分の余白を確保する
+        // 上はステータスバーの裏までページを描き（公式アプリと同じ）、その高さをページに伝える
         root.setOnApplyWindowInsetsListener { v, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            v.setPadding(bars.left, 0, bars.right, bars.bottom)
+            statusBarCss = bars.top / resources.displayMetrics.density
+            pushStatusBar()
             insets
         }
 
@@ -224,7 +227,14 @@ class MainActivity : Activity() {
 
     private val mobileUiJs by lazy { assets.open("mobile.js").bufferedReader().use { it.readText() } }
 
-    private fun injectMobileUi(view: WebView) = view.evaluateJavascript(mobileUiJs, null)
+    private var statusBarCss = 0f
+
+    private fun pushStatusBar() = webView.evaluateJavascript("window.__mSetTop && __mSetTop($statusBarCss)", null)
+
+    private fun injectMobileUi(view: WebView) {
+        view.evaluateJavascript(mobileUiJs, null)
+        pushStatusBar()
+    }
 
     private fun handleBack() {
         webView.evaluateJavascript("window.__mobileBack && window.__mobileBack()") { closed ->
