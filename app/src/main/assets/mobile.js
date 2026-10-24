@@ -73,7 +73,7 @@
     }
     html.m-search #global-nav-bar input::placeholder { color: #535353 !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar input::placeholder { color: #b3b3b3 !important; }
-    html.m-search #global-nav-bar form button, html.m-search #global-nav-bar form svg { color: #121212 !important; fill: #121212 !important; }
+    html.m-search #global-nav-bar form > div > button, html.m-search #global-nav-bar form > div > button svg { color: #121212 !important; fill: #121212 !important; }
     html.m-search #m-avatar { display: block; top: calc(var(--m-top, 0px) + 16px); }
     /* 検索ボックスの × は右端に（虫めがねと重ならないように） */
     html.m-search #global-nav-bar form > div:has([data-testid="clear-button"]) {
@@ -155,6 +155,12 @@
     .m-recent p, .m-recent span, .m-recent a { font-weight: 400 !important; }
     .m-recent .m-recent-h { font-size: 20px !important; font-weight: 700 !important; margin: 12px 8px 8px !important; display: block; color: #fff !important; }
     .m-recent button { opacity: 1 !important; visibility: visible !important; }
+    html.m-searching .m-recent.m-recent { bottom: 0 !important; height: auto !important; max-height: none !important; }
+    .m-recent button[aria-label="削除"], .m-recent .m-radd { color: #b3b3b3 !important; width: 40px !important; height: 40px !important; background: none !important; border: 0; display: inline-flex !important; align-items: center; justify-content: center; }
+    .m-recent button[aria-label="削除"] svg { width: 20px !important; height: 20px !important; fill: #b3b3b3 !important; }
+    .m-recent .m-radd svg { width: 22px; height: 22px; }
+    .m-recent .m-radd.on { color: var(--m-accent, #1ed760) !important; }
+    .m-recent [role="row"] button[aria-label$="を再生"] { display: none !important; }
     html.m-searching main { visibility: hidden !important; }
     
     html.m-searching #m-tabbar, html.m-searching [data-testid="now-playing-bar"] { visibility: hidden !important; }
@@ -1998,7 +2004,6 @@
           click('[data-testid="home-button"]') || (location.href = '/');
         } else if (t[0] === 'search') {
           if (location.pathname.indexOf('/search') !== 0) spaGo('/search');
-          setTimeout(function () { var i = document.querySelector('[data-testid="search-input"] input, input[data-testid="search-input"]'); if (i) i.focus(); }, 300);
         } else if (document.documentElement.classList.contains('m-lib')) {
           return setTab(currentTab());
         }
@@ -2103,6 +2108,30 @@
       if (!hd) hd = document.evaluate('//*[not(ancestor-or-self::*[starts-with(@id,"m-")])][text()="最近の検索" or text()="Recent searches"]', document, null, 9, null).singleNodeValue;
       if (hd && hd.textContent !== '最近') hd.textContent = '最近';
       if (hd) hd.classList.add('m-recent-h');
+      // 公式アプリと同じく、各行の × の左に ⊕（ライブラリに追加）
+      var rlib = service('LibraryAPI');
+      document.querySelectorAll('.m-recent [role="row"]').forEach(function (row) {
+        var del = row.querySelector('button[aria-label="削除"]'), a = row.querySelector('a[href]');
+        if (del) { del.style.setProperty('color', '#b3b3b3', 'important'); del.querySelectorAll('svg, path').forEach(function (x) { x.style.setProperty('fill', '#b3b3b3', 'important'); }); }
+        if (row.querySelector('.m-radd')) return;
+        var m = a && a.getAttribute('href').match(/\/(track|album|playlist|artist|show|episode)\/([A-Za-z0-9]+)/);
+        if (!del || !m || !rlib) return;
+        var uri = 'spotify:' + m[1] + ':' + m[2];
+        var b = document.createElement('button');
+        b.className = 'm-radd';
+        b.style.cssText = 'color:#b3b3b3';
+        b.setAttribute('aria-label', 'ライブラリに追加');
+        var paint = function (on) { b.classList.toggle('on', !!on); b.style.setProperty('color', on ? 'var(--m-accent, #1ed760)' : '#b3b3b3', 'important'); b.innerHTML = on ? P.saved : P.add; b.querySelector('svg').style.cssText = 'width:22px;height:22px;fill:currentColor !important'; };
+        paint(false);
+        Promise.resolve(rlib.contains(uri)).then(function (r) { paint(r && r[0]); }, function () {});
+        b.addEventListener('click', function (ev) {
+          ev.stopPropagation(); ev.preventDefault();
+          var on = b.classList.contains('on');
+          Promise.resolve(on ? rlib.remove({ uris: [uri] }) : rlib.add({ uris: [uri] })).then(function () { paint(!on); });
+        });
+        b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+        del.parentElement.insertBefore(b, del);
+      });
       for (var pp = hd; pp && pp !== document.body; pp = pp.parentElement) {
         if (pp.id && pp.id.indexOf('m-') === 0) break;
         var pos = getComputedStyle(pp).position;
