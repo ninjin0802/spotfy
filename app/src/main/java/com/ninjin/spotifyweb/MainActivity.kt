@@ -275,6 +275,14 @@ class MainActivity : Activity() {
                 if (name == "orientation") applyOrientation()
             }
             "playing" -> setPlaying(m.optBoolean("value"))
+            "share" -> {
+                // Spotify のリンクだけ Android の共有シートで送る
+                val url = m.optString("url")
+                if (url.startsWith("https://open.spotify.com/")) {
+                    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
+                    runCatching { startActivity(Intent.createChooser(send, m.optString("title").ifEmpty { null })) }
+                }
+            }
             "meta" -> media.update(
                 m.optString("title"), m.optString("artist"), m.optString("album"), m.optString("art"),
                 m.optBoolean("playing"), m.optLong("pos"), m.optLong("dur"),

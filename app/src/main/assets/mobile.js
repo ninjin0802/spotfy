@@ -523,6 +523,19 @@
     #m-mini-add svg { width: 24px; height: 24px; fill: currentColor; }
     #m-mini-add.on { color: var(--m-accent, #1ed760); }
 
+    /* 友達を招待のシート */
+    #m-invite-bg { position: fixed; inset: 0; z-index: 10040; background: rgba(0,0,0,.6); display: none; }
+    #m-invite { position: fixed; left: 0; right: 0; bottom: 0; height: 66vh; z-index: 10041; background: #242424; border-radius: 14px 14px 0 0;
+      color: #fff; padding: 8px 0 24px; transform: translateY(100%); transition: transform .22s ease; font-family: inherit; box-sizing: border-box; }
+    html.m-invite #m-invite-bg { display: block; }
+    html.m-invite #m-invite { transform: none; }
+    #m-invite .grip { width: 36px; height: 4px; border-radius: 2px; background: #727272; margin: 4px auto 18px; }
+    #m-invite h3 { text-align: center; font-size: 20px; font-weight: 700; margin: 0 16px 8px; }
+    #m-invite p { text-align: center; font-size: 13px; color: #b3b3b3; margin: 0 16px 16px; }
+    #m-invite .send { display: flex; align-items: center; gap: 16px; width: 100%; padding: 8px 16px; background: none; border: 0; color: #fff; font-size: 16px; font-family: inherit; }
+    #m-invite .send .ic { width: 52px; height: 52px; border-radius: 50%; background: #3e3e3e; display: flex; align-items: center; justify-content: center; }
+    #m-invite .send svg { width: 24px; height: 24px; fill: #fff; }
+
     /* 下部タブバー（固定） */
     #m-tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; height: ${NAV_H}px; z-index: 9999;
@@ -1391,8 +1404,7 @@
     on('.share', function () {
       var a = q('[data-testid="now-playing-widget-v2"] a[href*="/album/"]');
       var url = a ? 'https://open.spotify.com' + a.getAttribute('href').replace(/^\/intl-[a-z-]+/i, '') : location.href;
-      if (navigator.share) navigator.share({ url: url }).catch(function () {});
-      else if (navigator.clipboard) navigator.clipboard.writeText(url);
+      shareUrl(url);
     });
     // 下にスワイプして閉じる
     var startY = null, dy = 0;
@@ -1622,6 +1634,33 @@
     clearInterval(playerTimer);
   }
 
+  // 共有はアプリ側の Android 共有シートで（WebView は Web Share API に対応していない）
+  function shareUrl(url, title) {
+    if (window.__native && __native.send) __native.send({ type: 'share', url: url, title: title || '' });
+  }
+
+  // 「友達を招待」：公式アプリと同じボトムシート
+  function openInvite() {
+    var sheet = document.getElementById('m-invite');
+    if (!sheet) {
+      var bg = document.createElement('div');
+      bg.id = 'm-invite-bg';
+      bg.addEventListener('click', closeInvite);
+      document.body.appendChild(bg);
+      sheet = document.createElement('section');
+      sheet.id = 'm-invite';
+      sheet.innerHTML = '<div class="grip"></div><h3>友達をメッセージに招待しよう</h3>' +
+        '<p>友達を招待して、チャットしたり、再生状況をシェアしたりしよう。</p>' +
+        '<button class="send"><span class="ic">' + P.share + '</span><span>招待リンクを送信</span></button>';
+      sheet.querySelector('.send').addEventListener('click', function () {
+        withMyId(function (id) { shareUrl('https://open.spotify.com/user/' + id, 'Spotify'); });
+      });
+      document.body.appendChild(sheet);
+    }
+    document.documentElement.classList.add('m-invite');
+  }
+  function closeInvite() { document.documentElement.classList.remove('m-invite'); }
+
   function closeDrawer() { document.documentElement.classList.remove('m-drawer'); }
 
   function openDrawer() {
@@ -1692,13 +1731,7 @@
     social.innerHTML = '<button class="act"><span class="ring"><span class="pic"></span><img class="np" alt=""></span><span class="lbl">アクティビティ</span></button>' +
       '<button class="invite"><span class="ring plus">' + ICONS.create + '</span><span class="lbl">友達を招待</span></button>';
     social.querySelector('.act').addEventListener('click', function () { closeDrawer(); setTab('home'); openProfile(); });
-    social.querySelector('.invite').addEventListener('click', function () {
-      withMyId(function (id) {
-        var url = 'https://open.spotify.com/user/' + id;
-        if (navigator.share) navigator.share({ title: 'Spotify', url: url }).catch(function () {});
-        else if (navigator.clipboard) navigator.clipboard.writeText(url);
-      });
-    });
+    social.querySelector('.invite').addEventListener('click', openInvite);
     d.appendChild(social);
     document.body.appendChild(d);
 
@@ -1893,6 +1926,7 @@
     var h = document.documentElement.classList;
     if (h.contains('m-devices')) { closeDevices(); return true; }
     if (h.contains('m-vis')) { closeVisibility(); return true; }
+    if (h.contains('m-invite')) { closeInvite(); return true; }
     if (h.contains('m-searching')) { var si = document.querySelector('#global-nav-bar input'); if (si) si.blur(); h.remove('m-searching'); return true; }
     if (h.contains('m-drawer')) { closeDrawer(); return true; }
     if (h.contains('m-player') && h.contains('m-np')) { closePanel(); return true; }
