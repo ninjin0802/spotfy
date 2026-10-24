@@ -2297,6 +2297,14 @@
     var h = document.documentElement.classList;
     h.toggle('m-home', /^\/(intl-[a-z-]+\/?)?(home\/?)?$/i.test(location.pathname) && !h.contains('m-lib') && !h.contains('m-search'));
     var av = document.getElementById('m-avatar');
+    // ホームのアイコンは「すべて／音楽…」の丸ボタンと同じ高さにそろえる
+    if (av && document.documentElement.classList.contains('m-home')) {
+      var chip = document.querySelector('main [data-encore-id="chip"]');
+      if (chip) {
+        var cr = chip.getBoundingClientRect();
+        if (cr.height) av.style.top = Math.round(cr.top + cr.height / 2 - 16) + 'px';
+      }
+    } else if (av) av.style.top = '';
     if (av && !av.dataset.ready) {
       var a = account();
       if (a.name) { setPic(av, a); av.dataset.ready = '1'; }
