@@ -33,6 +33,7 @@
       inset: 0 !important; width: 100vw !important; height: 120px !important; padding: 16px 16px 8px !important;
       box-sizing: border-box !important; gap: 12px !important; background: #121212 !important;
     }
+    html.m-search #global-nav-bar { position: relative !important; }
     html.m-search #global-nav-bar::before {
       content: "検索"; font-size: 24px; font-weight: 700; color: #fff; line-height: 32px; padding-left: 44px;
     }
@@ -49,8 +50,31 @@
     html.m-search #global-nav-bar input::placeholder { color: #535353 !important; }
     html.m-search #global-nav-bar form button, html.m-search #global-nav-bar form svg { color: #121212 !important; fill: #121212 !important; }
     html.m-search #m-avatar { display: block; top: 16px; }
-    /* ジャンルのカードは 2 列 */
-    html.m-search main [role="grid"], html.m-search main .contentSpacing > div > div[style*="grid"] { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+    /* ジャンルのカード：2 列、角丸、公式アプリと同じく画像は右下に傾けて置く */
+    html.m-search main [data-testid="grid-container"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important; margin: 0 !important; width: 100% !important;
+      gap: 12px !important; column-gap: 12px !important; row-gap: 12px !important;
+    }
+    html.m-search main [data-testid="grid-container"] > [role="listitem"] { padding: 0 !important; width: auto !important; }
+    html.m-search main [data-testid="grid-container"] a { display: block !important; width: 100% !important; height: 100px !important; border-radius: 6px !important; overflow: hidden !important; }
+    html.m-search main [data-testid="grid-container"] a > div { width: 100% !important; height: 100% !important; }
+    html.m-search main [data-testid="grid-container"] img {
+      width: 64px !important; height: 64px !important; right: -12px !important; bottom: -4px !important; left: auto !important; top: auto !important;
+      transform: rotate(25deg) !important; position: absolute !important; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    }
+    html.m-search main [data-testid="grid-container"] a span { font-size: 16px !important; font-weight: 700 !important; }
+    html.m-search main section h2 { font-size: 16px !important; font-weight: 700 !important; }
+    html.m-search #m-avatar { top: 16px !important; }
+
+    /* 検索ボックスを触ったら、最近の検索を全画面で出す（公式アプリの検索画面と同じ） */
+    html.m-searching #floating-ui-popover-layer > *, html.m-searching [data-testid="search-dropdown"] {
+      position: fixed !important; left: 0 !important; right: 0 !important; top: 120px !important; bottom: ${NAV_H}px !important;
+      width: 100vw !important; max-width: none !important; max-height: none !important; transform: none !important;
+      border-radius: 0 !important; background: #121212 !important; box-shadow: none !important; z-index: 9400 !important; overflow-y: auto !important;
+    }
+    html.m-searching.m-amoled #floating-ui-popover-layer > * { background: #000 !important; }
+    #m-cancel { display: none; position: absolute; right: 16px; top: 16px; background: none; border: 0; color: #fff; font-size: 15px; font-weight: 600; height: 32px; z-index: 2; }
+    html.m-search.m-searching #m-cancel { display: block; }
 
     /* ライブラリ（左サイドバー）と再生中ビュー（右サイドバー）は全画面オーバーレイ */
     #Desktop_LeftSidebar_Id, .m-right { display: none !important; }
@@ -1029,10 +1053,40 @@
     }
   }, true);
 
+  // 検索ボックスにフォーカスがある間は「検索中」表示にする
+  document.addEventListener('focusin', function (e) {
+    if (e.target.matches && e.target.matches('#global-nav-bar input')) {
+      document.documentElement.classList.add('m-searching');
+      var bar = document.getElementById('global-nav-bar');
+      if (bar && !document.getElementById('m-cancel')) {
+        var c = document.createElement('button');
+        c.id = 'm-cancel';
+        c.textContent = 'キャンセル';
+        c.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+        c.addEventListener('click', function () {
+          var i = document.querySelector('#global-nav-bar input');
+          if (i) i.blur();
+          document.documentElement.classList.remove('m-searching');
+        });
+        bar.appendChild(c);
+      }
+    }
+  });
+  document.addEventListener('focusout', function (e) {
+    if (e.target.matches && e.target.matches('#global-nav-bar input')) {
+      setTimeout(function () {
+        if (!document.activeElement || !document.activeElement.matches('#global-nav-bar input')) {
+          document.documentElement.classList.remove('m-searching');
+        }
+      }, 200);
+    }
+  });
+
   // Android の戻るボタン用：オーバーレイが開いていれば閉じて true を返す
   window.__mobileBack = function () {
     var h = document.documentElement.classList;
     if (h.contains('m-devices')) { closeDevices(); return true; }
+    if (h.contains('m-searching')) { var si = document.querySelector('#global-nav-bar input'); if (si) si.blur(); h.remove('m-searching'); return true; }
     if (h.contains('m-drawer')) { closeDrawer(); return true; }
     if (h.contains('m-player') && h.contains('m-np')) { closePanel(); return true; }
     if (h.contains('m-player')) { closePlayer(); return true; }
