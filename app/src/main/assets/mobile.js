@@ -91,13 +91,21 @@
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] svg { fill: #fff !important; color: #fff !important; }
     /* 公式アプリと同じ、丸い灰色の検索ボックスと小さな ⓧ */
     html.m-search:is(.m-results, .m-searching) #global-nav-bar > :has(form), html.m-search:is(.m-results, .m-searching) #global-nav-bar form,
-    html.m-search:is(.m-results, .m-searching) #global-nav-bar form *:has(> input), html.m-search:is(.m-results, .m-searching) #global-nav-bar > :has(form) div:has(form) { height: 40px !important; min-height: 0 !important; }
-    html.m-search:is(.m-results, .m-searching) #global-nav-bar input { height: 40px !important; border-radius: 20px !important; font-size: 15px !important; font-weight: 400 !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form *:has(> input), html.m-search:is(.m-results, .m-searching) #global-nav-bar > :has(form) div:has(form) { height: 36px !important; min-height: 0 !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar { align-items: center !important; flex-direction: row !important; height: calc(56px + var(--m-top, 0px)) !important; padding-top: var(--m-top, 0px) !important; padding-bottom: 0 !important; }
+    html.m-search:is(.m-results, .m-searching) .Root > div:first-child { grid-template-rows: 0 calc(56px + var(--m-top, 0px)) minmax(0, 1fr) 0 !important; }
+    html.m-search:is(.m-results, .m-searching) #m-sback { top: calc(var(--m-top, 0px) + 8px) !important; }
+    #m-recentpage { top: calc(56px + var(--m-top, 0px)) !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"], html.m-search:is(.m-results, .m-searching) #global-nav-bar form > div:has([data-testid="clear-button"]) { top: 0 !important; bottom: 0 !important; transform: none !important; height: 36px !important; margin: 0 !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar input { height: 36px !important; border-radius: 18px !important; padding-top: 0 !important; padding-bottom: 0 !important; font-size: 15px !important; font-weight: 400 !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar { padding-top: calc(var(--m-top, 0px) + 12px) !important; }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] { width: 32px !important; }
-    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] span { width: 20px !important; height: 20px !important; border-radius: 50%; background: #b3b3b3; display: flex !important; align-items: center; justify-content: center; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] > * { display: none !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] { background: none !important; padding: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; width: 36px !important; height: 36px !important; }
+    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"]::after {
+      content: ""; width: 18px; height: 18px; border-radius: 50%; background: #b3b3b3 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M6 6l6 6M12 6l-6 6' stroke='%232a2a2a' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center/18px 18px no-repeat;
+    }
     html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] svg { display: none !important; }
-    html.m-search:is(.m-results, .m-searching) #global-nav-bar form [data-testid="clear-button"] span::after { content: "✕"; font-size: 11px; font-weight: 700; color: #2a2a2a; line-height: 1; }
     /* 結果の絞り込み（曲・アーティスト…）は上に貼りつけず普通に並べ、「すべて」は出さない */
     .m-schips { position: relative !important; top: auto !important; background: none !important; box-shadow: none !important; margin: 4px 0 8px !important; padding: 0 !important; height: auto !important; }
     .m-schips [role="presentation"] > [role="presentation"]:first-child { display: none !important; }
@@ -120,7 +128,21 @@
     #m-recentpage { position: fixed; left: 0; right: 0; top: calc(64px + var(--m-top, 0px)); bottom: 0; z-index: 10061; background: #121212;
       overflow-y: auto; overscroll-behavior: contain; display: none; padding: 4px 0 24px; font-family: inherit; color: #fff; }
     html.m-amoled #m-recentpage { background: #000; }
-    html.m-searching #m-recentpage { display: block; }
+    html.m-searching:not(.m-typing) #m-recentpage { display: block; }
+    html.m-searching.m-typing main { visibility: visible !important; }
+    /* 入力中の候補：公式アプリと同じく、ヘッダーの下いっぱいに通常のリストとして出す */
+    html.m-typing .m-suggest {
+      position: fixed !important; left: 0 !important; right: 0 !important; top: calc(56px + var(--m-top, 0px)) !important; bottom: 0 !important;
+      width: 100vw !important; max-width: none !important; max-height: none !important; height: auto !important; transform: none !important;
+      margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #121212 !important; z-index: 10062 !important;
+      overflow-y: auto !important; overscroll-behavior: contain; padding: 4px 0 24px !important;
+    }
+    html.m-amoled.m-typing .m-suggest { background: #000 !important; }
+    html.m-typing .m-suggest * { background-color: transparent !important; max-height: none !important; }
+    html.m-typing .m-suggest > *, html.m-typing .m-suggest > * > * { width: 100% !important; max-width: none !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important; }
+    html.m-typing .m-suggest :has(> kbd), html.m-typing .m-suggest div:has(> span > kbd) { display: none !important; }
+    html.m-typing .m-suggest::-webkit-scrollbar { display: none; }
+    html.m-searching.m-typing #m-tabbar, html.m-searching.m-typing [data-testid="now-playing-bar"] { visibility: visible !important; }
     #m-recentpage::-webkit-scrollbar { display: none; }
     html.m-searching .os-scrollbar { display: none !important; }
     #m-recentpage h2 { font-size: 20px; font-weight: 700; margin: 12px 16px 8px; }
@@ -2312,11 +2334,26 @@
     });
   }
 
+  // 文字を入力している間は「最近」ではなく検索結果を出す（公式アプリと同じ）
+  document.addEventListener('input', function (e) {
+    if (e.target.matches && e.target.matches('#global-nav-bar input')) {
+      document.documentElement.classList.toggle('m-typing', !!e.target.value);
+    }
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target.matches && e.target.matches('#global-nav-bar input') && e.target.value) {
+      var q = e.target.value;
+      document.documentElement.classList.add('m-typing');
+      if (location.pathname !== '/search/' + encodeURIComponent(q)) spaGo('/search/' + encodeURIComponent(q));
+      if (window.__native && __native.send) __native.send({ type: 'hideKeyboard' });
+    }
+  }, true);
+
   // 最近の一覧をスクロールし始めたら、公式アプリと同じくキーボードだけ閉じる（入力欄のフォーカスは残す）
   var kbClosedAt = 0;
   document.addEventListener('touchmove', function (e) {
     if (!document.documentElement.classList.contains('m-searching')) return;
-    if (!e.target.closest || !e.target.closest('.m-recent')) return;
+    if (!e.target.closest || !e.target.closest('.m-recent, .m-suggest, #m-recentpage')) return;
     if (Date.now() - kbClosedAt < 800) return;
     kbClosedAt = Date.now();
     if (window.__native && __native.send) __native.send({ type: 'hideKeyboard' });
