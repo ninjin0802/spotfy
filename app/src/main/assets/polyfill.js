@@ -65,10 +65,58 @@
     if (!p) return;
     delete pending[id];
     if (status === 0) return p.reject(new TypeError('Failed to fetch'));
+    if (status >= 200 && status < 300) remember(p.url, p.headers, body);
     var empty = status === 204 || status === 205 || status === 304;
     var headers = contentType ? { 'content-type': contentType } : {};
     p.resolve(new Response(empty ? null : body, { status: status, headers: headers }));
   };
+
+  // Spotify Connect（キャスト先の切り替え）用に、デバイス一覧と認証ヘッダーを控えておく
+  var connect = { headers: null, base: null, self: null, cluster: null, listeners: [] };
+  function setCluster(c) {
+    if (!c || !c.devices) return;
+    connect.cluster = c;
+    connect.listeners.forEach(function (f) { try { f(c); } catch (e) {} });
+  }
+  function remember(url, headers, text) {
+    var m = url.match(/^(https:\/\/[^/]+)\/connect-state\/v1\/(devices\/hobs_([0-9a-f]+)|player\/command\/from\/([0-9a-f]+)|cluster)/);
+    if (!m) return;
+    connect.base = m[1];
+    if (m[3] || m[4]) connect.self = m[3] || m[4];
+    if (headers.authorization) connect.headers = headers;
+    if (text && (m[3] || /cluster$/.test(m[2]))) { try { setCluster(JSON.parse(text)); } catch (e) {} }
+  }
+  window.__mConnect = {
+    get: function () { return { self: connect.self, cluster: connect.cluster }; },
+    onChange: function (f) { connect.listeners.push(f); },
+    transfer: function (target) {
+      if (!connect.base || !connect.self || !connect.headers) return Promise.reject(new Error('not ready'));
+      var h = {};
+      ['authorization', 'client-token', 'spotify-app-version', 'app-platform', 'accept-language'].forEach(function (k) {
+        if (connect.headers[k]) h[k] = connect.headers[k];
+      });
+      h['content-type'] = 'application/json';
+      return window.fetch(connect.base + '/connect-state/v1/connect/transfer/from/' + connect.self + '/to/' + target, {
+        method: 'POST', headers: h, body: JSON.stringify({ transfer_options: { restore_paused: 'resume' } })
+      });
+    }
+  };
+  // dealer の WebSocket から届くデバイス一覧の更新も拾う
+  var NativeWS = window.WebSocket;
+  window.WebSocket = function (url, protocols) {
+    var ws = protocols === undefined ? new NativeWS(url) : new NativeWS(url, protocols);
+    if (/dealer/.test(String(url))) ws.addEventListener('message', function (e) {
+      if (typeof e.data !== 'string' || e.data.indexOf('connect-state/v1/cluster') < 0) return;
+      try {
+        var m = JSON.parse(e.data), p = m.payloads && m.payloads[0];
+        if (typeof p === 'string') p = JSON.parse(p);
+        if (p && p.cluster) setCluster(p.cluster);
+      } catch (err) {}
+    });
+    return ws;
+  };
+  window.WebSocket.prototype = NativeWS.prototype;
+  ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function (k) { window.WebSocket[k] = NativeWS[k]; });
 
   window.fetch = function (input, init) {
     var req = input instanceof Request ? input : null;
@@ -85,6 +133,8 @@
         pending[id] = { resolve: resolve, reject: reject };
         var h = {};
         headers.forEach(function (v, k) { h[k] = v; });
+        pending[id].url = url;
+        pending[id].headers = h;
         window.__native.relay(id, url, method, h, b == null ? null : b);
       });
     });
