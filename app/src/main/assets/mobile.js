@@ -560,6 +560,11 @@
     #m-settings .row .t { flex: 1; min-width: 0; }
     #m-settings .row .t b { display: block; font-weight: 500; font-size: 16px; }
     #m-settings .row .t small { display: block; color: #a7a7a7; font-size: 13px; margin-top: 2px; }
+    #m-settings .row.radio { cursor: pointer; }
+    #m-settings .row.radio .rd { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #7c7c7c; box-sizing: border-box; flex: none; }
+    #m-settings .row.radio.on .rd { border: 6px solid var(--m-accent, #1ed760); }
+    #m-settings .row.radio.on .t b { color: var(--m-accent, #1ed760); }
+    #m-settings .row.radio.off { opacity: .45; }
     #m-settings select {
       background: #2a2a2a; color: #fff; border: 0; border-radius: 4px; padding: 8px; font-size: 14px; max-width: 40vw !important; flex: none;
     }
@@ -1463,14 +1468,26 @@
   }
 
   var qualityApplied = false;
-  function applySavedQuality() {
-    if (qualityApplied) return;
-    var lv = pref('quality', 'auto');
-    if (lv === 'auto') { qualityApplied = true; return; }
+  // いまの通信（アプリから届く。モバイルデータ通信なら true）に合わせた音質
+  var metered = false;
+  function qualityFor(cell) {
+    var wifi = pref('quality', 'auto');
+    return cell ? pref('quality.cell', wifi) : wifi;
+  }
+  function applySavedQuality(force) {
+    if (qualityApplied && !force) return;
     if (!streamer()) return;
     qualityApplied = true;
-    setQuality(lv);
+    setQuality(qualityFor(metered));
   }
+  // Wi-Fi ⇔ モバイルデータ通信が切り替わったら、その通信用の音質に変える
+  window.__mSetMetered = function (m) {
+    m = !!m;
+    if (m === metered && qualityApplied) return;
+    metered = m;
+    qualityApplied = false;
+    applySavedQuality();
+  };
 
   // 設定は公式アプリと同じく「カテゴリ一覧 → 各ページ」の 2 階層
   var settingsPage = null;
@@ -1619,20 +1636,31 @@
         spotifySwitch('プロフィールにプレイリストを表示', null, /プロフィールに追加したプレイリスト|playlists on/i)
       ]);
     } else if (id === 'quality') {
+      // 公式アプリ・myspoti と同じく、Wi-Fi とモバイルデータ通信で別々に選ぶ（モバイルは未設定なら Wi-Fi と同じ）
       var info = row('いま再生中の音質', '確認中…', null);
-      var sel = selectEl(QUALITIES.map(function (x) { return [x[0], x[1]]; }), pref('quality', 'auto'), function (v) {
-        try { localStorage.setItem('m.quality', v); } catch (e) {}
-        detail.textContent = '切り替え中…';
-        setQuality(v).then(function (ok) {
-          var d = QUALITIES.filter(function (x) { return x[0] === v; })[0];
-          detail.textContent = ok ? d[2] + '。次の曲から反映されます' : 'この音質は選べませんでした（Premium 限定の可能性があります）';
+      function radios(key) {
+        return QUALITIES.map(function (x) {
+          var premium = x[0] === 'very_high';
+          var r = row(x[1], x[2], null);
+          r.classList.add('radio');
+          if (premium) r.classList.add('off');
+          var dot = document.createElement('span'); dot.className = 'rd'; r.appendChild(dot);
+          var paint = function () { r.classList.toggle('on', qualityFor(key === 'quality.cell') === x[0]); };
+          paint();
+          r.addEventListener('click', function () {
+            if (premium) return toast('最高音質は Spotify Premium の機能です。Web Player では選べません');
+            setPref(key, x[0]);
+            [].forEach.call(r.parentElement.querySelectorAll('.row.radio'), function (o) { o.classList.remove('on'); });
+            r.classList.add('on');
+            qualityApplied = false; applySavedQuality(true);
+            toast(x[1] + 'にしました。次の曲から反映されます');
+          });
+          return r;
         });
-      });
-      var qrow = row('ストリーミングの音質', null, sel);
-      var detail = document.createElement('small');
-      detail.textContent = (QUALITIES.filter(function (x) { return x[0] === pref('quality', 'auto'); })[0] || QUALITIES[0])[2];
-      qrow.querySelector('.t').appendChild(detail);
-      sec('ストリーミング', [qrow, info]);
+      }
+      sec('Wi-Fi でのストリーミング', radios('quality'));
+      sec('モバイルデータ通信でのストリーミング', radios('quality.cell'));
+      sec('いまの状態', [row('接続', metered ? 'モバイルデータ通信' : 'Wi-Fi', null), info]);
       sec('ロスレス', [row('ロスレス（FLAC）', 'Spotify Premium の機能です。Web Player では選べません', null)]);
       currentBitrate().then(function (b) {
         info.querySelector('small').textContent = b ? Math.round(b / 1000) + ' kbps' : '不明（再生中の曲がありません）';

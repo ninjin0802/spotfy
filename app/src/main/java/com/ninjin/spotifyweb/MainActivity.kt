@@ -59,6 +59,7 @@ class MainActivity : Activity() {
         setContentView(root)
         audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
         registerReceiver(noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
+        runCatching { connectivity.registerDefaultNetworkCallback(networkCallback) }
         // 設定の「開発者向けデバッグ」をオンにしたときだけ、PC から WebView を調べられるようにする
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG || settings.getString("webdebug", "false") == "true")
         // targetSdk 35+ は edge-to-edge 強制なので、ステータスバー/ナビバー分の余白を確保する
@@ -247,6 +248,7 @@ class MainActivity : Activity() {
         view.evaluateJavascript(mobileUiJs, null)
         pushStatusBar()
         pushAudioOutput()
+        pushMetered()
     }
 
     // ---- Bluetooth イヤホンなどの出力先（公式アプリと同じく、ミニプレーヤーに機器名を出す） ----
@@ -262,6 +264,23 @@ class MainActivity : Activity() {
         outs.firstOrNull { it.type in wireless }?.let { return it.productName?.toString().orEmpty().ifBlank { "Bluetooth" } }
         outs.firstOrNull { it.type in wired }?.let { return it.productName?.toString().orEmpty().ifBlank { "ヘッドホン" } }
         return ""
+    }
+
+    // ---- いまの通信がモバイルデータ（従量制）か。音質を Wi-Fi 用／モバイル用で切り替えるのに使う ----
+    private val connectivity by lazy { getSystemService(android.net.ConnectivityManager::class.java) }
+    private fun isMetered() = connectivity.isActiveNetworkMetered
+
+    private fun pushMetered() {
+        val url = webView.url ?: return
+        if (!isSpotifyUrl(Uri.parse(url))) return
+        webView.evaluateJavascript("window.__mSetMetered && __mSetMetered(${isMetered()})", null)
+    }
+
+    private val networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onCapabilitiesChanged(network: android.net.Network, caps: android.net.NetworkCapabilities) {
+            webView.post { pushMetered() }
+        }
+        override fun onLost(network: android.net.Network) { webView.post { pushMetered() } }
     }
 
     // スピーカー／イヤホンの切り替え（Android の出力切り替え画面を開く。公式アプリと同じく端末の一覧から選ぶ）
@@ -429,6 +448,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
         unregisterReceiver(noisyReceiver)
+        runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
         PlaybackService.stop(this)
         media.release()
         CookieManager.getInstance().flush()
