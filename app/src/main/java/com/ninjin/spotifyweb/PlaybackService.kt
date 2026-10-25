@@ -20,7 +20,7 @@ class PlaybackService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(MediaControls.CHANNEL_ID, "再生", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(MediaControls.CHANNEL_ID, tr("再生", "Playback"), NotificationManager.IMPORTANCE_LOW)
         )
         // 曲情報つきのメディア通知を、そのままフォアグラウンド通知として使う
         val notification = MediaControls.instance?.buildNotification() ?: Notification.Builder(this, MediaControls.CHANNEL_ID)

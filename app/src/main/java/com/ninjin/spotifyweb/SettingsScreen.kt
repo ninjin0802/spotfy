@@ -41,12 +41,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
-internal val QUALITIES = listOf(
-    Triple("auto", "自動", "通信状況に合わせて調整"),
-    Triple("low", "低音質", "通信量を抑える"),
-    Triple("normal", "標準", "通信量を少し抑える"),
-    Triple("high", "高音質", "AAC 128 kbps（無料プランの Web Player の上限）"),
-    Triple("very_high", "最高音質", "AAC 256 kbps（Spotify Premium のみ）"),
+// 端末の言語が変わったときに読み直すよう、毎回作る
+internal val QUALITIES get() = listOf(
+    Triple("auto", tr("自動", "Automatic"), tr("通信状況に合わせて調整", "Adjusts to your connection")),
+    Triple("low", tr("低音質", "Low"), tr("通信量を抑える", "Uses less data")),
+    Triple("normal", tr("標準", "Normal"), tr("通信量を少し抑える", "Uses a little less data")),
+    Triple("high", tr("高音質", "High"), tr("AAC 128 kbps（無料プランの Web Player の上限）", "AAC 128 kbps (the Web Player's limit on the free plan)")),
+    Triple("very_high", tr("最高音質", "Very high"), tr("AAC 256 kbps（Spotify Premium のみ）", "AAC 256 kbps (Spotify Premium only)")),
 )
 
 @Composable
@@ -57,7 +58,7 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 24) { if (page != null) page = null else onBack() }
             Text(
-                when (page) { "quality" -> "メディアの音質"; "playback" -> "再生"; "account" -> "アカウント"; "look" -> "コンテンツと表示"; else -> "設定" },
+                when (page) { "quality" -> tr("メディアの音質", "Media quality"); "playback" -> tr("再生", "Playback"); "account" -> tr("アカウント", "Account"); "look" -> tr("コンテンツと表示", "Content and display"); else -> tr("設定", "Settings") },
                 color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp),
             )
         }
@@ -67,22 +68,22 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     val missing by bridge.missing.collectAsState()
                     // Spotify の更新で使えなくなった機能があれば、いちばん上で知らせる（押すとログを送れる）
                     if (missing.isNotEmpty()) SettingRow(
-                        "⚠ 一部の機能が使えません",
-                        missing.joinToString("・") + "\nSpotify 側の更新が原因かもしれません。押すとデバッグログを共有できます",
+                        tr("⚠ 一部の機能が使えません", "⚠ Some features aren't working"),
+                        missing.joinToString(tr("・", ", ")) + tr("\nSpotify 側の更新が原因かもしれません。押すとデバッグログを共有できます", "\nA Spotify update may be the cause. Tap to share the debug log"),
                     ) { host.shareDebugLog() }
-                    SettingRow("アカウント", user?.name ?: "") { page = "account" }
-                    SettingRow("コンテンツと表示", "テーマカラー・背景") { page = "look" }
-                    SettingRow("再生", "バックグラウンド再生・広告抑制・クロスフェード") { page = "playback" }
-                    SettingRow("メディアの音質", "Wi-Fi・モバイルデータ通信でのストリーミング") { page = "quality" }
-                    SettingRow("デバッグログを共有", "直近の広告の検出・ミュート・早送りなどの記録") { host.shareDebugLog() }
-                    SettingRow("このアプリについて", "Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません") {}
+                    SettingRow(tr("アカウント", "Account"), user?.name ?: "") { page = "account" }
+                    SettingRow(tr("コンテンツと表示", "Content and display"), tr("テーマカラー・背景", "Theme color, background")) { page = "look" }
+                    SettingRow(tr("再生", "Playback"), tr("バックグラウンド再生・広告抑制・クロスフェード", "Background playback, ad handling, crossfade")) { page = "playback" }
+                    SettingRow(tr("メディアの音質", "Media quality"), tr("Wi-Fi・モバイルデータ通信でのストリーミング", "Streaming on Wi-Fi and mobile data")) { page = "quality" }
+                    SettingRow(tr("デバッグログを共有", "Share debug log"), tr("直近の広告の検出・ミュート・早送りなどの記録", "Recent ad detection, muting and fast-forward events")) { host.shareDebugLog() }
+                    SettingRow(tr("このアプリについて", "About this app"), tr("Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません", "An unofficial app built on the Spotify Web Player. Nothing is saved to your device")) {}
                 }
                 "account" -> {
-                    SettingRow("ユーザー名", user?.name ?: "") {}
-                    SettingRow("ログアウト", "このアプリからログアウトします") { host.logout() }
+                    SettingRow(tr("ユーザー名", "Username"), user?.name ?: "") {}
+                    SettingRow(tr("ログアウト", "Log out"), tr("このアプリからログアウトします", "Log out of this app")) { host.logout() }
                 }
                 "look" -> {
-                    Section("テーマカラー")
+                    Section(tr("テーマカラー", "Theme color"))
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Theme.accents.forEach { (key, color) ->
                             Box(
@@ -91,23 +92,23 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                             )
                         }
                     }
-                    SwitchRow("AMOLED ブラック", "背景を真っ黒にして電池を節約", Theme.amoled) { Theme.amoled = it; host.setSetting("amoled", it.toString()) }
+                    SwitchRow(tr("AMOLED ブラック", "AMOLED black"), tr("背景を真っ黒にして電池を節約", "Pure black background to save battery"), Theme.amoled) { Theme.amoled = it; host.setSetting("amoled", it.toString()) }
                 }
                 "playback" -> {
                     var bg by remember { mutableStateOf(host.setting("background", "true") == "true") }
-                    SwitchRow("バックグラウンド再生", "アプリを閉じても再生を続ける", bg) { bg = it; host.setSetting("background", it.toString()) }
+                    SwitchRow(tr("バックグラウンド再生", "Background playback"), tr("アプリを閉じても再生を続ける", "Keep playing after closing the app"), bg) { bg = it; host.setSetting("background", it.toString()) }
                     var ads by remember { mutableStateOf(host.setting("adblock", "true") == "true") }
-                    SwitchRow("広告をブロック", "広告マネージャーを停止し、広告再生をミュート・スキップする", ads) { ads = it; host.setSetting("adblock", it.toString()) }
+                    SwitchRow(tr("広告をブロック", "Handle ads"), tr("広告マネージャーを停止し、広告をミュートして早送りする", "Stops the ad managers, and mutes and fast-forwards ads"), ads) { ads = it; host.setSetting("adblock", it.toString()) }
                     var gl by remember { mutableStateOf(host.setting("gapless", "true") == "true") }
-                    SwitchRow("ギャップレス再生", "曲と曲のあいだの無音をなくして、続けて再生する", gl) { gl = it; host.setSetting("gapless", it.toString()) }
+                    SwitchRow(tr("ギャップレス再生", "Gapless playback"), tr("曲と曲のあいだの無音をなくして、続けて再生する", "Removes the silence between songs"), gl) { gl = it; host.setSetting("gapless", it.toString()) }
                     // クロスフェード：公式アプリと同じく、オンにするとスライダーで 1〜12 秒を選ぶ
                     var xf by remember { mutableStateOf(host.setting("crossfade", "0").toIntOrNull() ?: 0) }
                     var xfLast by remember { mutableStateOf(if (xf > 0) xf else 5) }
-                    SwitchRow("クロスフェード", "曲と曲のあいだを指定した秒数でフェードさせる", xf > 0) { on ->
+                    SwitchRow(tr("クロスフェード", "Crossfade"), tr("曲と曲のあいだを指定した秒数でフェードさせる", "Fades between songs over the seconds you choose"), xf > 0) { on ->
                         xf = if (on) xfLast else 0; host.setSetting("crossfade", xf.toString())
                     }
                     if (xf > 0) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${xf} 秒", color = Color.White, fontSize = 14.sp, modifier = Modifier.width(48.dp))
+                        Text(tr("${xf} 秒", "${xf} s"), color = Color.White, fontSize = 14.sp, modifier = Modifier.width(48.dp))
                         Slider(
                             value = xf.toFloat(), valueRange = 1f..12f, steps = 10,
                             onValueChange = { xf = it.toInt().coerceIn(1, 12); xfLast = xf },
@@ -122,13 +123,13 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     var cell by remember { mutableStateOf(host.quality(true)) }
                     var rate by remember { mutableStateOf<Int?>(null) }
                     LaunchedEffect(wifi, cell) { delay(300); rate = runCatching { bridge.bitrate() }.getOrNull() }
-                    Section("Wi-Fi でのストリーミング")
+                    Section(tr("Wi-Fi でのストリーミング", "Streaming on Wi-Fi"))
                     QUALITIES.forEach { q -> RadioRow(q, wifi == q.first) { wifi = q.first; host.setSetting("quality", q.first) } }
-                    Section("モバイルデータ通信でのストリーミング")
+                    Section(tr("モバイルデータ通信でのストリーミング", "Streaming on mobile data"))
                     QUALITIES.forEach { q -> RadioRow(q, cell == q.first) { cell = q.first; host.setSetting("quality.cell", q.first) } }
-                    Section("いまの状態")
-                    SettingRow("接続", if (host.metered) "モバイルデータ通信" else "Wi-Fi") {}
-                    SettingRow("いま再生中の音質", rate?.let { if (it > 0) "AAC ${it / 1000} kbps" else "不明（このスマホで再生中の曲がありません）" } ?: "確認中…") {}
+                    Section(tr("いまの状態", "Current status"))
+                    SettingRow(tr("接続", "Connection"), if (host.metered) tr("モバイルデータ通信", "Mobile data") else "Wi-Fi") {}
+                    SettingRow(tr("いま再生中の音質", "Current playback quality"), rate?.let { if (it > 0) "AAC ${it / 1000} kbps" else tr("不明（このスマホで再生中の曲がありません）", "Unknown (nothing is playing on this phone)") } ?: tr("確認中…", "Checking…")) {}
                 }
             }
         }

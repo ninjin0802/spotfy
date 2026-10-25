@@ -48,7 +48,7 @@ class MediaControls(private val context: Context, private val onAction: (String,
     private var hasTrack = false
 
     init {
-        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "再生", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, tr("再生", "Playback"), NotificationManager.IMPORTANCE_LOW))
         instance = this
     }
 
@@ -122,12 +122,12 @@ class MediaControls(private val context: Context, private val onAction: (String,
             .setContentIntent(open)
             .setOngoing(playing)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .addAction(action(android.R.drawable.ic_media_previous, "前へ", "prev"))
+            .addAction(action(android.R.drawable.ic_media_previous, tr("前へ", "Previous"), "prev"))
             .addAction(
-                if (playing) action(android.R.drawable.ic_media_pause, "一時停止", "pause")
-                else action(android.R.drawable.ic_media_play, "再生", "play")
+                if (playing) action(android.R.drawable.ic_media_pause, tr("一時停止", "Pause"), "pause")
+                else action(android.R.drawable.ic_media_play, tr("再生", "Play"), "play")
             )
-            .addAction(action(android.R.drawable.ic_media_next, "次へ", "next"))
+            .addAction(action(android.R.drawable.ic_media_next, tr("次へ", "Next"), "next"))
             .setStyle(Notification.MediaStyle().setMediaSession(session.sessionToken).setShowActionsInCompactView(0, 1, 2))
             .build()
     }

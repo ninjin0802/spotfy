@@ -5,6 +5,10 @@
   if (window.__mb) return;
   var send = function (m) { if (window.__native && __native.send) __native.send(m); };
   var pageDebug = function (event, detail) { send({ type: 'debug', event: event, detail: detail || '' }); };
+  // 表示の言語（端末の言語が日本語なら日本語、それ以外は英語）。アプリ側の tr() と同じ決め方
+  var JA = /^ja\b/i.test(navigator.language || '');
+  function T(ja, en) { return JA ? ja : en; }
+  function count(n) { return JA ? n.toLocaleString() : n.toLocaleString('en-US'); }
 
   // ---- Web Player の Platform（サービスの登録簿と GraphQL ローダー）を React の木から探す ----
   var plat = null, reg = null;
@@ -251,9 +255,9 @@
     switch (d.__typename) {
       case 'Playlist': return { uri: d.uri, title: d.name, subtitle: strip(d.description) || (d.ownerV2 && d.ownerV2.data && d.ownerV2.data.name) || '', image: pickImg(d.images) };
       case 'Album': return { uri: d.uri, title: d.name, subtitle: names(d.artists), image: pickImg(d.coverArt), color: darkColor(d.coverArt), kind: (d.albumType || d.type || 'album').toLowerCase() };
-      case 'Artist': return { uri: d.uri, title: d.profile && d.profile.name, subtitle: 'アーティスト', image: pickImg(d.visuals || d), round: true };
-      case 'Podcast': return { uri: d.uri, title: d.name, subtitle: d.publisher && d.publisher.name || 'ポッドキャスト', image: pickImg(d.coverArt), kind: 'show' };
-      case 'Episode': return { uri: d.uri, title: d.name, subtitle: (d.podcastV2 && d.podcastV2.data && d.podcastV2.data.name || 'エピソード') + (d.releaseDate && d.releaseDate.isoString ? ' • ' + d.releaseDate.isoString.slice(0, 10).replace(/^(\d+)-0?(\d+)-0?(\d+)$/, '$1年$2月$3日') : ''), image: pickImg(d.coverArt), color: darkColor(d.coverArt), kind: 'episode' };
+      case 'Artist': return { uri: d.uri, title: d.profile && d.profile.name, subtitle: T('アーティスト', 'Artist'), image: pickImg(d.visuals || d), round: true };
+      case 'Podcast': return { uri: d.uri, title: d.name, subtitle: d.publisher && d.publisher.name || T('ポッドキャスト', 'Podcast'), image: pickImg(d.coverArt), kind: 'show' };
+      case 'Episode': return { uri: d.uri, title: d.name, subtitle: (d.podcastV2 && d.podcastV2.data && d.podcastV2.data.name || T('エピソード', 'Episode')) + (d.releaseDate && d.releaseDate.isoString ? ' • ' + d.releaseDate.isoString.slice(0, 10).replace(/^(\d+)-0?(\d+)-0?(\d+)$/, JA ? '$1年$2月$3日' : '$2/$3/$1') : ''), image: pickImg(d.coverArt), color: darkColor(d.coverArt), kind: 'episode' };
       case 'Track': return { uri: d.uri, title: d.name, subtitle: names(d.artists), image: pickImg(d.albumOfTrack) };
       case 'BrowseSectionContainer': {
         var cr = d.data && d.data.cardRepresentation;
@@ -313,13 +317,13 @@
       return gql('getAlbum', { uri: a.uri, locale: '', offset: 0, limit: 300 }).then(function (r) {
         var d = r.data.albumUnion;
         var year = d.date && d.date.isoString ? d.date.isoString.slice(0, 4) : '';
-        var kind = d.type === 'SINGLE' ? 'シングル' : d.type === 'EP' ? 'EP' : d.type === 'COMPILATION' ? 'コンピレーション' : 'アルバム';
+        var kind = d.type === 'SINGLE' ? T('シングル', 'Single') : d.type === 'EP' ? 'EP' : d.type === 'COMPILATION' ? T('コンピレーション', 'Compilation') : T('アルバム', 'Album');
         return {
           kind: 'album', uri: d.uri, title: d.name, image: pickImg(d.coverArt), artist: names(d.artists),
           artistUri: d.artists && d.artists.items[0] && d.artists.items[0].uri || '',
           subtitle: kind + (year ? ' • ' + year : ''), saved: !!d.saved, date: d.date && d.date.isoString || '',
           tracks: (d.tracksV2.items || []).map(function (x) { var t = x.track; return { uri: t.uri, title: t.name, artist: names(t.artists), image: '', dur: t.duration && t.duration.totalMilliseconds || 0 }; }),
-          shelves: d.moreAlbumsByArtist ? [{ title: names(d.artists) + 'のその他の作品', items: ((d.moreAlbumsByArtist.items[0] || {}).discography || { popularReleasesAlbums: { items: [] } }).popularReleasesAlbums.items.map(card).filter(Boolean) }] : []
+          shelves: d.moreAlbumsByArtist ? [{ title: T(names(d.artists) + 'のその他の作品', 'More by ' + names(d.artists)), items: ((d.moreAlbumsByArtist.items[0] || {}).discography || { popularReleasesAlbums: { items: [] } }).popularReleasesAlbums.items.map(card).filter(Boolean) }] : []
         };
       });
     },
@@ -329,7 +333,7 @@
         var owner = d.ownerV2 && d.ownerV2.data && d.ownerV2.data.name || '';
         return {
           kind: 'playlist', uri: d.uri, title: d.name, image: pickImg(d.images), description: strip(d.description),
-          artist: owner, subtitle: (d.followers ? d.followers.toLocaleString() + '件の保存 • ' : '') + (d.content.totalCount || 0) + '曲',
+          artist: owner, subtitle: (d.followers ? T(d.followers.toLocaleString() + '件の保存 • ', count(d.followers) + ' saves • ') : '') + T((d.content.totalCount || 0) + '曲', (d.content.totalCount || 0) + ((d.content.totalCount || 0) === 1 ? ' song' : ' songs')),
           tracks: (d.content.items || []).map(function (x) {
             var t = x.itemV2 && x.itemV2.data;
             if (!t || !t.uri) return null;
@@ -345,14 +349,14 @@
         var header = d.headerImage && d.headerImage.data ? pickImg(d.headerImage.data) : '';
         var shelves = [];
         function add(title, list) { var items = (list || []).map(function (x) { return card(x.releases ? x.releases.items[0] : x); }).filter(Boolean); if (items.length) shelves.push({ title: title, items: items }); }
-        add('人気リリース', disc.popularReleasesAlbums && disc.popularReleasesAlbums.items);
-        add('アルバム', disc.albums && disc.albums.items);
-        add('シングルと EP', disc.singles && disc.singles.items);
-        add('ファンの間で人気', d.relatedContent && d.relatedContent.relatedArtists && d.relatedContent.relatedArtists.items);
+        add(T('人気リリース', 'Popular releases'), disc.popularReleasesAlbums && disc.popularReleasesAlbums.items);
+        add(T('アルバム', 'Albums'), disc.albums && disc.albums.items);
+        add(T('シングルと EP', 'Singles and EPs'), disc.singles && disc.singles.items);
+        add(T('ファンの間で人気', 'Fans also like'), d.relatedContent && d.relatedContent.relatedArtists && d.relatedContent.relatedArtists.items);
         var ml = d.stats && d.stats.monthlyListeners || 0;
         return {
           kind: 'artist', uri: d.uri, title: d.profile && d.profile.name, image: header || pickImg(d.visuals), round: !header, header: !!header,
-          subtitle: ml ? (ml >= 10000 ? (Math.round(ml / 1000) / 10) + '万' : ml.toLocaleString()) + '人の月間リスナー' : '', saved: !!d.saved,
+          subtitle: ml ? (JA ? (ml >= 10000 ? (Math.round(ml / 1000) / 10) + '万' : ml.toLocaleString()) + '人の月間リスナー' : count(ml) + ' monthly listeners') : '', saved: !!d.saved,
           tracks: ((disc.topTracks && disc.topTracks.items) || []).slice(0, 10).map(function (x) { var t = x.track; return { uri: t.uri, title: t.name, artist: names(t.artists), image: pickImg(t.albumOfTrack && t.albumOfTrack.coverArt), dur: t.duration && t.duration.totalMilliseconds || 0 }; }),
           shelves: shelves
         };
@@ -367,9 +371,9 @@
           var c = card(w);
           if (!c) return null;
           c.kind = (d.__typename || '').toLowerCase();
-          if (d.__typename === 'Track') { c.subtitle = '曲 • ' + names(d.artists); }
-          else if (d.__typename === 'Album') { c.subtitle = (d.type === 'SINGLE' ? 'シングル' : 'アルバム') + ' • ' + names(d.artists); }
-          else if (d.__typename === 'Playlist') c.subtitle = 'プレイリスト';
+          if (d.__typename === 'Track') { c.subtitle = T('曲', 'Song') + ' • ' + names(d.artists); }
+          else if (d.__typename === 'Album') { c.subtitle = (d.type === 'SINGLE' ? T('シングル', 'Single') : T('アルバム', 'Album')) + ' • ' + names(d.artists); }
+          else if (d.__typename === 'Playlist') c.subtitle = T('プレイリスト', 'Playlist');
           return c;
         }).filter(Boolean);
       });
@@ -395,7 +399,7 @@
           var c = card(w); if (!c) return null;
           var t = w.data && w.data.__typename;
           c.kind = (t || '').toLowerCase();
-          c.subtitle = t === 'Track' ? '曲 • ' + names(w.data.artists) : t === 'Album' ? 'アルバム • ' + names(w.data.artists) : t === 'Playlist' ? 'プレイリスト' : t === 'Artist' ? 'アーティスト' : c.subtitle;
+          c.subtitle = t === 'Track' ? T('曲', 'Song') + ' • ' + names(w.data.artists) : t === 'Album' ? T('アルバム', 'Album') + ' • ' + names(w.data.artists) : t === 'Playlist' ? T('プレイリスト', 'Playlist') : t === 'Artist' ? T('アーティスト', 'Artist') : c.subtitle;
           return c;
         }).filter(Boolean);
       });
@@ -469,8 +473,8 @@
             id: id, mine: mine, following: x[1],
             name: j.name || (mine ? me.displayName : '') || '', image: j.image_url || (mine && me.images && me.images[0] && me.images[0].url) || '',
             followers: j.followers_count || 0, followingCount: j.following_count || 0,
-            playlists: (j.public_playlists || []).map(function (p) { return { uri: p.uri, title: p.name, subtitle: (p.followers_count ? p.followers_count + '人のフォロワー' : 'プレイリスト'), image: p.image_url || '' }; }),
-            artists: (j.recently_played_artists || []).map(function (x) { return { uri: x.uri, title: x.name, subtitle: 'アーティスト', image: x.image_url || '', round: true }; })
+            playlists: (j.public_playlists || []).map(function (p) { return { uri: p.uri, title: p.name, subtitle: (p.followers_count ? T(p.followers_count + '人のフォロワー', count(p.followers_count) + ' followers') : T('プレイリスト', 'Playlist')), image: p.image_url || '' }; }),
+            artists: (j.recently_played_artists || []).map(function (x) { return { uri: x.uri, title: x.name, subtitle: T('アーティスト', 'Artist'), image: x.image_url || '', round: true }; })
           };
         });
       });
@@ -482,7 +486,7 @@
         .then(function (j) {
           return (j.profiles || []).map(function (p) {
             var artist = /:artist:/.test(p.uri);
-            return { uri: p.uri, title: p.name, subtitle: (artist ? 'アーティスト' : 'プロフィール') + (p.followers_count ? ' • ' + p.followers_count.toLocaleString() + '人のフォロワー' : ''), image: p.image_url || '', round: true, pinned: !!p.is_following, kind: artist ? 'artist' : 'user' };
+            return { uri: p.uri, title: p.name, subtitle: (artist ? T('アーティスト', 'Artist') : T('プロフィール', 'Profile')) + (p.followers_count ? ' • ' + T(p.followers_count.toLocaleString() + '人のフォロワー', count(p.followers_count) + ' followers') : ''), image: p.image_url || '', round: true, pinned: !!p.is_following, kind: artist ? 'artist' : 'user' };
           });
         });
     },
@@ -571,9 +575,9 @@
       return Promise.resolve(lib.getContents({ limit: 300, offset: 0 })).then(function (c) {
         return (c.items || []).map(function (x) {
           var img = x.images && x.images.slice().sort(function (p, q) { return (p.width || 300) - (q.width || 300); }).find(function (i) { return (i.width || 300) >= 150; });
-          var kind = x.type === 'artist' ? 'アーティスト' : x.type === 'album' ? 'アルバム' : x.type === 'show' ? 'ポッドキャスト' : x.type === 'folder' ? 'フォルダ' : 'プレイリスト';
+          var kind = x.type === 'artist' ? T('アーティスト', 'Artist') : x.type === 'album' ? T('アルバム', 'Album') : x.type === 'show' ? T('ポッドキャスト', 'Podcast') : x.type === 'folder' ? T('フォルダ', 'Folder') : T('プレイリスト', 'Playlist');
           var by = x.owner && x.owner.name || (x.artists && x.artists.map(function (z) { return z.name; }).join(', ')) || '';
-          if (x.type === 'liked-songs' || /:collection$/.test(x.uri)) { kind = 'プレイリスト'; }
+          if (x.type === 'liked-songs' || /:collection$/.test(x.uri)) { kind = T('プレイリスト', 'Playlist'); }
           return { uri: x.uri, title: x.name, subtitle: kind + (by ? ' • ' + by : ''), image: img && img.url || (x.images && x.images[0] && x.images[0].url) || '', round: x.type === 'artist', pinned: !!x.pinned, kind: x.type || '' };
         });
       });
@@ -794,13 +798,13 @@
     var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
     var player = service('PlayerAPI'), managers = service('AdManagers');
     var checks = [
-      ['データの取得（ホーム・検索・ライブラリ）', function () { return typeof platform().getGraphQLLoader === 'function'; }],
-      ['再生の操作', function () { return ['getState', 'skipToNext', 'seekTo'].every(function (k) { return typeof player[k] === 'function'; }); }],
-      ['音量・広告の早送り・クロスフェード', function () { return !!st._playerPromise; }],
-      ['音質の切り替え', function () { return typeof st.setMediaPlaybackQuality === 'function'; }],
-      ['ギャップレス再生', function () { return typeof st._listPlayer._preloadUpcomingTrack === 'function'; }],
-      ['広告の停止', function () { return !!managers.audio; }],
-      ['ログイン情報', function () { return typeof service('AuthorizationAPI').getState === 'function'; }]
+      [T('データの取得（ホーム・検索・ライブラリ）', 'Loading data (Home, Search, Library)'), function () { return typeof platform().getGraphQLLoader === 'function'; }],
+      [T('再生の操作', 'Playback controls'), function () { return ['getState', 'skipToNext', 'seekTo'].every(function (k) { return typeof player[k] === 'function'; }); }],
+      [T('音量・広告の早送り・クロスフェード', 'Volume, ad fast-forward, crossfade'), function () { return !!st._playerPromise; }],
+      [T('音質の切り替え', 'Audio quality'), function () { return typeof st.setMediaPlaybackQuality === 'function'; }],
+      [T('ギャップレス再生', 'Gapless playback'), function () { return typeof st._listPlayer._preloadUpcomingTrack === 'function'; }],
+      [T('広告の停止', 'Ad blocking'), function () { return !!managers.audio; }],
+      [T('ログイン情報', 'Login info'), function () { return typeof service('AuthorizationAPI').getState === 'function'; }]
     ];
     var missing = checks.filter(function (c) { try { return !c[1](); } catch (e) { return true; } }).map(function (c) { return c[0]; });
     send({ type: 'bhealth', missing: missing });

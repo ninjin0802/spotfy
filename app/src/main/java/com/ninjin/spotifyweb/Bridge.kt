@@ -52,12 +52,12 @@ data class PlayerState(
 ) {
     /** 「プレイリストから再生中」などの見出し */
     val contextLabel: String get() = when {
-        contextUri.startsWith("spotify:album:") -> "アルバムから再生中"
-        contextUri.startsWith("spotify:artist:") -> "アーティストから再生中"
-        contextUri.contains(":collection") -> "お気に入りの曲から再生中"
-        contextUri.startsWith("spotify:show:") -> "ポッドキャストから再生中"
-        contextUri.isNotEmpty() -> "プレイリストから再生中"
-        else -> "再生中"
+        contextUri.startsWith("spotify:album:") -> tr("アルバムから再生中", "Playing from album")
+        contextUri.startsWith("spotify:artist:") -> tr("アーティストから再生中", "Playing from artist")
+        contextUri.contains(":collection") -> tr("お気に入りの曲から再生中", "Playing from Liked Songs")
+        contextUri.startsWith("spotify:show:") -> tr("ポッドキャストから再生中", "Playing from podcast")
+        contextUri.isNotEmpty() -> tr("プレイリストから再生中", "Playing from playlist")
+        else -> tr("再生中", "Now playing")
     }
 
     fun positionNow(): Long =
@@ -199,7 +199,7 @@ class Bridge(
     private suspend fun loadPage(uri: String): Page {
         if (uri.contains(":collection")) {
             val a = call("liked") as JSONArray
-            return Page("playlist", uri, "お気に入りの曲", "${a.length()}曲", "", false, false, "", "", "", true, tracks(a), emptyList())
+            return Page("playlist", uri, tr("お気に入りの曲", "Liked Songs"), songs(a.length()), "", false, false, "", "", "", true, tracks(a), emptyList())
         }
         val method = when (uri.split(':').getOrNull(1)) { "album" -> "album"; "artist" -> "artist"; "page", "genre" -> "genre"; else -> "playlist" }
         val o = call(method, JSONObject().put("uri", uri)) as JSONObject

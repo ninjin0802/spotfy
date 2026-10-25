@@ -88,19 +88,19 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
                         info.complete(i2)
                     }
                     Header(t.image, t.title, t.artist, false)
-                    Item(MenuIcons.share, "シェア") { close { host.share("https://open.spotify.com/track/" + t.uri.substringAfterLast(':'), t.title) } }
-                    LikedItem(if (liked == true) "お気に入りの曲から削除" else "お気に入りの曲に追加") {
+                    Item(MenuIcons.share, tr("シェア", "Share")) { close { host.share("https://open.spotify.com/track/" + t.uri.substringAfterLast(':'), t.title) } }
+                    LikedItem(if (liked == true) tr("お気に入りの曲から削除", "Remove from Liked Songs") else tr("お気に入りの曲に追加", "Add to Liked Songs")) {
                         val was = liked == true
-                        close { scope.launch { runCatching { bridge.like(t.uri, !was) }.onSuccess { toast(if (was) "お気に入りの曲から削除しました" else "お気に入りの曲に追加しました") } } }
+                        close { scope.launch { runCatching { bridge.like(t.uri, !was) }.onSuccess { toast(if (was) tr("お気に入りの曲から削除しました", "Removed from Liked Songs") else tr("お気に入りの曲に追加しました", "Added to Liked Songs")) } } }
                     }
-                    Item(MenuIcons.queue, "[次に再生] に追加") {
-                        close { scope.launch { runCatching { bridge.addToQueue(t.uri) }.onSuccess { toast("[次に再生] に追加しました") } } }
+                    Item(MenuIcons.queue, tr("[次に再生] に追加", "Add to queue")) {
+                        close { scope.launch { runCatching { bridge.addToQueue(t.uri) }.onSuccess { toast(tr("[次に再生] に追加しました", "Added to queue")) } } }
                     }
-                    Item(MenuIcons.album, "アルバムに移動") {
-                        scope.launch { info.await()?.takeIf { it.album.isNotEmpty() }?.let { i2 -> close { onOpen(Card(i2.album, i2.albumName, "", "", false)) } } ?: toast("アルバムが見つかりませんでした") }
+                    Item(MenuIcons.album, tr("アルバムに移動", "Go to album")) {
+                        scope.launch { info.await()?.takeIf { it.album.isNotEmpty() }?.let { i2 -> close { onOpen(Card(i2.album, i2.albumName, "", "", false)) } } ?: toast(tr("アルバムが見つかりませんでした", "Couldn't find the album")) }
                     }
-                    Item(MenuIcons.artist, "アーティストに移動") {
-                        scope.launch { info.await()?.takeIf { it.artist.isNotEmpty() }?.let { i2 -> close { onOpen(Card(i2.artist, i2.artistName, "", "", true)) } } ?: toast("アーティストが見つかりませんでした") }
+                    Item(MenuIcons.artist, tr("アーティストに移動", "Go to artist")) {
+                        scope.launch { info.await()?.takeIf { it.artist.isNotEmpty() }?.let { i2 -> close { onOpen(Card(i2.artist, i2.artistName, "", "", true)) } } ?: toast(tr("アーティストが見つかりませんでした", "Couldn't find the artist")) }
                     }
                 }
                 is MenuTarget.OfPage -> {
@@ -108,18 +108,18 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
                     LaunchedEffect(target.uri) { inLib = runCatching { bridge.inLibrary(target.uri) }.getOrNull() }
                     val kind = target.uri.split(':').getOrNull(1)
                     Header(target.image, target.title, target.subtitle, kind == "artist")
-                    Item(MenuIcons.share, "シェア") { close { host.share("https://open.spotify.com/$kind/" + target.uri.substringAfterLast(':'), target.title) } }
+                    Item(MenuIcons.share, tr("シェア", "Share")) { close { host.share("https://open.spotify.com/$kind/" + target.uri.substringAfterLast(':'), target.title) } }
                     if (inLib != null) {
                         val on = inLib == true
-                        val label = if (kind == "artist") (if (on) "フォローをやめる" else "フォローする") else (if (on) "マイライブラリから削除" else "マイライブラリに追加")
+                        val label = if (kind == "artist") (if (on) tr("フォローをやめる", "Unfollow") else tr("フォローする", "Follow")) else (if (on) tr("マイライブラリから削除", "Remove from Your Library") else tr("マイライブラリに追加", "Add to Your Library"))
                         Item(MenuIcons.addLib, label) {
-                            close { scope.launch { runCatching { bridge.follow(target.uri, !on) }.onSuccess { toast(if (on) "マイライブラリから削除しました" else "マイライブラリに追加しました") } } }
+                            close { scope.launch { runCatching { bridge.follow(target.uri, !on) }.onSuccess { toast(if (on) tr("マイライブラリから削除しました", "Removed from Your Library") else tr("マイライブラリに追加しました", "Added to Your Library")) } } }
                         }
                     }
-                    Item(MenuIcons.queue, "[次に再生] に追加") {
-                        close { scope.launch { runCatching { bridge.addToQueue(target.uri) }.onSuccess { toast("[次に再生] に追加しました") } } }
+                    Item(MenuIcons.queue, tr("[次に再生] に追加", "Add to queue")) {
+                        close { scope.launch { runCatching { bridge.addToQueue(target.uri) }.onSuccess { toast(tr("[次に再生] に追加しました", "Added to queue")) } } }
                     }
-                    if (target.artistUri.isNotEmpty()) Item(MenuIcons.artist, "アーティストに移動") { close { onOpen(Card(target.artistUri, target.artist, "", "", true)) } }
+                    if (target.artistUri.isNotEmpty()) Item(MenuIcons.artist, tr("アーティストに移動", "Go to artist")) { close { onOpen(Card(target.artistUri, target.artist, "", "", true)) } }
                 }
             }
         }
@@ -187,35 +187,35 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
         dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Color(0xFF6A6A6A))) },
     ) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 16.dp)) {
-            Text("デバイスに接続", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Text(tr("デバイスに接続", "Connect to a device"), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             val d = devs
             if (d == null) {
-                Text("デバイスを探しています…", color = Sub, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
+                Text(tr("デバイスを探しています…", "Looking for devices…"), color = Sub, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
             } else {
                 val out = host.outputName()
                 // このスマホ（いま出している先：スピーカー／イヤホン）
                 DeviceRow(
-                    if (out.isNotEmpty()) DevIcons.headphones else DevIcons.phone, "このスマホ",
-                    when { busy == d.self -> "接続中…"; d.active == d.self -> "再生中" + (if (out.isNotEmpty()) " • $out" else ""); else -> "このスマホで再生" },
+                    if (out.isNotEmpty()) DevIcons.headphones else DevIcons.phone, tr("このスマホ", "This phone"),
+                    when { busy == d.self -> tr("接続中…", "Connecting…"); d.active == d.self -> tr("再生中", "Now playing") + (if (out.isNotEmpty()) " • $out" else ""); else -> tr("このスマホで再生", "Play on this phone") },
                     d.active == d.self,
                 ) {
                     if (d.active == d.self) close() else { busy = d.self; scope.launch { val ok = runCatching { bridge.transfer(d.self) }.getOrDefault(false); busy = null; if (ok) close() else failed = d.self } }
                 }
-                DeviceRow(if (out.isNotEmpty()) DevIcons.headphones else DevIcons.speaker, out.ifEmpty { "スマホのスピーカー" }, "タップしてスピーカー／イヤホンを切り替え", false) { close(); host.outputSwitch() }
+                DeviceRow(if (out.isNotEmpty()) DevIcons.headphones else DevIcons.speaker, out.ifEmpty { tr("スマホのスピーカー", "Phone speaker") }, tr("タップしてスピーカー／イヤホンを切り替え", "Tap to switch between speaker and earphones"), false) { close(); host.outputSwitch() }
                 Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
                 val others = d.list.filter { it.id != d.self }
-                if (others.isEmpty()) Text("ほかのデバイスは見つかりませんでした", color = Sub, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                if (others.isEmpty()) Text(tr("ほかのデバイスは見つかりませんでした", "No other devices found"), color = Sub, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 others.forEach { dev ->
                     DeviceRow(
                         DevIcons.of(dev.type), dev.name,
-                        when { busy == dev.id -> "接続中…"; failed == dev.id -> "接続できませんでした"; dev.id == d.active -> "再生中"; else -> "Spotify Connect" },
+                        when { busy == dev.id -> tr("接続中…", "Connecting…"); failed == dev.id -> tr("接続できませんでした", "Couldn't connect"); dev.id == d.active -> tr("再生中", "Now playing"); else -> "Spotify Connect" },
                         dev.id == d.active,
                     ) {
                         if (dev.id == d.active) close() else { busy = dev.id; failed = null; scope.launch { val ok = runCatching { bridge.transfer(dev.id) }.getOrDefault(false); busy = null; if (ok) close() else failed = dev.id } }
                     }
                 }
                 Text(
-                    "同じ Spotify アカウントでログインしているスピーカー・テレビ・PC・ゲーム機などが表示されます。", color = Sub, fontSize = 13.sp,
+                    tr("同じ Spotify アカウントでログインしているスピーカー・テレビ・PC・ゲーム機などが表示されます。", "Speakers, TVs, computers and game consoles signed in to the same Spotify account appear here."), color = Sub, fontSize = 13.sp,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             }

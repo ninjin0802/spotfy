@@ -91,28 +91,28 @@ fun QueueSheet(bridge: Bridge, player: PlayerState, onDismiss: () -> Unit) {
         Column(Modifier.fillMaxHeight(0.92f).windowInsetsPadding(WindowInsets.navigationBars)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("次に再生", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    q?.context?.takeIf { it.isNotEmpty() }?.let { Text("$it を再生中", color = Sub, fontSize = 13.sp) }
+                    Text(tr("次に再生", "Next in queue"), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    q?.context?.takeIf { it.isNotEmpty() }?.let { Text(tr("$it を再生中", "Playing $it"), color = Sub, fontSize = 13.sp) }
                 }
-                Text(if (edit) "完了" else "編集", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(CircleShape).clickable { edit = !edit }.padding(10.dp))
+                Text(if (edit) tr("完了", "Done") else tr("編集", "Edit"), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(CircleShape).clickable { edit = !edit }.padding(10.dp))
             }
             LazyColumn(Modifier.weight(1f), userScrollEnabled = !dragging) {
                 q?.current?.let { c -> item { QRow(c, true, false, {}, {}) } }
                 fun refresh() { scope.launch { kotlinx.coroutines.delay(300); q = runCatching { bridge.queue() }.getOrNull() ?: q } }
                 q?.queued?.takeIf { it.isNotEmpty() }?.let { list ->
-                    item { Text("次に再生", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
+                    item { Text(tr("次に再生", "Next in queue"), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
                     item { DragList(list, edit, onDragging = { dragging = it }, onSkip = { scope.launch { runCatching { bridge.skipTo(it) }; refresh() } }, onRemove = { scope.launch { runCatching { bridge.unqueue(it) }; refresh() } }) { item, target, after -> scope.launch { runCatching { bridge.reorder(item, target, after) }; refresh() } } }
                 }
                 q?.next?.takeIf { it.isNotEmpty() }?.let { list ->
-                    item { Text("この後に再生" + (q?.context?.takeIf { it.isNotEmpty() }?.let { "：$it" } ?: ""), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
+                    item { Text(tr("この後に再生", "Next from") + (q?.context?.takeIf { it.isNotEmpty() }?.let { tr("：$it", ": $it") } ?: ""), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
                     item { DragList(list, edit, onDragging = { dragging = it }, onSkip = { scope.launch { runCatching { bridge.skipTo(it) }; refresh() } }, onRemove = { scope.launch { runCatching { bridge.unqueue(it) }; refresh() } }) { item, target, after -> scope.launch { runCatching { bridge.reorder(item, target, after) }; refresh() } } }
                 }
             }
             // 下：シャッフル・リピート・タイマー
             Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                BarButton(Icons.shuffle, "シャッフル", player.shuffle) { scope.launch { runCatching { bridge.shuffle(!player.shuffle) } } }
-                BarButton(Icons.repeat, if (player.repeat == 2) "1曲リピート" else "リピート", player.repeat > 0) { scope.launch { runCatching { bridge.repeat((player.repeat + 1) % 3) } } }
-                BarButton(QIcons.timer, if (SleepTimer.endsAt > 0) "あと${SleepTimer.minutesLeft()}分" else "タイマー", SleepTimer.endsAt > 0) { timerOpen = true }
+                BarButton(Icons.shuffle, tr("シャッフル", "Shuffle"), player.shuffle) { scope.launch { runCatching { bridge.shuffle(!player.shuffle) } } }
+                BarButton(Icons.repeat, if (player.repeat == 2) tr("1曲リピート", "Repeat one") else tr("リピート", "Repeat"), player.repeat > 0) { scope.launch { runCatching { bridge.repeat((player.repeat + 1) % 3) } } }
+                BarButton(QIcons.timer, if (SleepTimer.endsAt > 0) tr("あと${SleepTimer.minutesLeft()}分", "${SleepTimer.minutesLeft()} min left") else tr("タイマー", "Timer"), SleepTimer.endsAt > 0) { timerOpen = true }
             }
         }
     }
@@ -204,19 +204,19 @@ fun SleepTimerSheet(bridge: Bridge, onDismiss: () -> Unit) {
     val app = remember { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main) }
     fun set(min: Int) {
         SleepTimer.job?.cancel()
-        if (min == 0) { SleepTimer.endsAt = 0; Toast.makeText(ctx, "タイマーをオフにしました", Toast.LENGTH_SHORT).show(); return }
+        if (min == 0) { SleepTimer.endsAt = 0; Toast.makeText(ctx, tr("タイマーをオフにしました", "Sleep timer turned off"), Toast.LENGTH_SHORT).show(); return }
         SleepTimer.endsAt = System.currentTimeMillis() + min * 60_000L
         SleepTimer.job = app.launch { delay(min * 60_000L); runCatching { bridge.pause() }; SleepTimer.endsAt = 0 }
-        Toast.makeText(ctx, "${if (min >= 60) "${min / 60}時間" else "${min}分"}後に停止します", Toast.LENGTH_SHORT).show()
+        Toast.makeText(ctx, tr("${duration(min)}後に停止します", "Stopping in ${duration(min)}"), Toast.LENGTH_SHORT).show()
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424), dragHandle = { Grip() }) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 12.dp)) {
-            Text("おやすみタイマー", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-            if (SleepTimer.endsAt > 0) Text("あと ${SleepTimer.minutesLeft()} 分で停止", color = Accent, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 20.dp))
-            listOf(5 to "5分", 10 to "10分", 15 to "15分", 30 to "30分", 45 to "45分", 60 to "1時間").forEach { (m, label) ->
+            Text(tr("おやすみタイマー", "Sleep timer"), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            if (SleepTimer.endsAt > 0) Text(tr("あと ${SleepTimer.minutesLeft()} 分で停止", "Stopping in ${SleepTimer.minutesLeft()} min"), color = Accent, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 20.dp))
+            listOf(5 to tr("5分", "5 min"), 10 to tr("10分", "10 min"), 15 to tr("15分", "15 min"), 30 to tr("30分", "30 min"), 45 to tr("45分", "45 min"), 60 to tr("1時間", "1 hour")).forEach { (m, label) ->
                 Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.fillMaxWidth().clickable { set(m); scope.launch { state.hide() }.invokeOnCompletion { onDismiss() } }.padding(horizontal = 20.dp, vertical = 14.dp))
             }
-            if (SleepTimer.endsAt > 0) Text("タイマーをオフにする", color = Color.White, fontSize = 16.sp, modifier = Modifier.fillMaxWidth().clickable { set(0); scope.launch { state.hide() }.invokeOnCompletion { onDismiss() } }.padding(horizontal = 20.dp, vertical = 14.dp))
+            if (SleepTimer.endsAt > 0) Text(tr("タイマーをオフにする", "Turn off timer"), color = Color.White, fontSize = 16.sp, modifier = Modifier.fillMaxWidth().clickable { set(0); scope.launch { state.hide() }.invokeOnCompletion { onDismiss() } }.padding(horizontal = 20.dp, vertical = 14.dp))
         }
     }
 }
@@ -233,28 +233,28 @@ fun CreateSheet(bridge: Bridge, onCreated: (Card) -> Unit, onDismiss: () -> Unit
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424), dragHandle = { Grip() }) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 16.dp)) {
             if (naming == null) {
-                CreateRow(line("M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z", 1.6f), "プレイリスト", "楽曲やエピソードでプレイリストを作成します") { naming = "playlist"; name = "マイプレイリスト" }
-                CreateRow(line("M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2.5h7.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z", 1.6f), "フォルダ", "プレイリストを整理できます") { naming = "folder"; name = "新しいフォルダ" }
+                CreateRow(line("M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z", 1.6f), tr("プレイリスト", "Playlist"), tr("楽曲やエピソードでプレイリストを作成します", "Build a playlist with songs or episodes")) { naming = "playlist"; name = tr("マイプレイリスト", "My playlist") }
+                CreateRow(line("M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2.5h7.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z", 1.6f), tr("フォルダ", "Folder"), tr("プレイリストを整理できます", "Organize your playlists")) { naming = "folder"; name = tr("新しいフォルダ", "New folder") }
             } else {
                 val req = remember { FocusRequester() }
                 LaunchedEffect(Unit) { req.requestFocus() }
-                Text(if (naming == "playlist") "プレイリストに名前を付けよう" else "フォルダに名前を付けよう", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
+                Text(if (naming == "playlist") tr("プレイリストに名前を付けよう", "Give your playlist a name") else tr("フォルダに名前を付けよう", "Give your folder a name"), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
                 BasicTextField(
                     name, { name = it }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
                     cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp).focusRequester(req),
                 )
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
-                        "作成", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                        tr("作成", "Create"), color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.clip(CircleShape).background(Accent).clickable {
                             val n = name.trim().ifEmpty { return@clickable }
                             val kind = naming
                             scope.launch {
                                 if (kind == "playlist") runCatching { bridge.createPlaylist(n) }.onSuccess { uri ->
-                                    Toast.makeText(ctx, "「$n」を作成しました", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(ctx, tr("「$n」を作成しました", "Created \"$n\""), Toast.LENGTH_SHORT).show()
                                     if (uri.isNotEmpty()) onCreated(Card(uri, n, "", "", false))
-                                }.onFailure { Toast.makeText(ctx, "作成できませんでした", Toast.LENGTH_SHORT).show() }
-                                else runCatching { bridge.createFolder(n) }.onSuccess { Toast.makeText(ctx, "「$n」を作成しました", Toast.LENGTH_SHORT).show() }
+                                }.onFailure { Toast.makeText(ctx, tr("作成できませんでした", "Couldn't create it"), Toast.LENGTH_SHORT).show() }
+                                else runCatching { bridge.createFolder(n) }.onSuccess { Toast.makeText(ctx, tr("「$n」を作成しました", "Created \"$n\""), Toast.LENGTH_SHORT).show() }
                                 state.hide(); onDismiss()
                             }
                         }.padding(horizontal = 32.dp, vertical = 12.dp),
@@ -307,15 +307,15 @@ fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen
                         Text(name, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         p?.let { pr ->
                             Row(Modifier.padding(top = 6.dp)) {
-                                Text("${pr.followers}人のフォロワー", color = Sub, fontSize = 13.sp, modifier = Modifier.clickable { listOf = true })
+                                Text(tr("${pr.followers}人のフォロワー", "${pr.followers} followers"), color = Sub, fontSize = 13.sp, modifier = Modifier.clickable { listOf = true })
                                 Text(" • ", color = Sub, fontSize = 13.sp)
-                                Text("${pr.following}人をフォロー中", color = Sub, fontSize = 13.sp, modifier = Modifier.clickable { listOf = false })
+                                Text(tr("${pr.following}人をフォロー中", "${pr.following} following"), color = Sub, fontSize = 13.sp, modifier = Modifier.clickable { listOf = false })
                             }
                         }
                     }
                 }
                 if (mine) Text(
-                    "編集", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    tr("編集", "Edit"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp).clip(CircleShape).background(Color(0x33FFFFFF)).clickable { editing = true }.padding(horizontal = 16.dp, vertical = 7.dp),
                 ) else if (p != null) FollowButton(following, Modifier.padding(start = 16.dp, top = 8.dp)) {
                     following = !following
@@ -325,11 +325,11 @@ fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen
         }
         p?.let { pr ->
             if (pr.playlists.isNotEmpty()) {
-                item { Text("プレイリスト", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
+                item { Text(tr("プレイリスト", "Playlists"), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
                 items(pr.playlists, key = { "p" + it.uri }) { c -> ProfileRow(c) { onOpen(c) } }
             }
             if (pr.artists.isNotEmpty()) {
-                item { Text("最近聴いたアーティスト", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
+                item { Text(tr("最近聴いたアーティスト", "Recently played artists"), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
                 items(pr.artists, key = { "a" + it.uri }) { c -> ProfileRow(c) { onOpen(c) } }
             }
         } ?: item { Loading() }
@@ -341,7 +341,7 @@ fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen
 @Composable
 private fun FollowButton(on: Boolean, m: Modifier = Modifier, onClick: () -> Unit) {
     Text(
-        if (on) "フォロー中" else "フォローする", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+        if (on) tr("フォロー中", "Following") else tr("フォローする", "Follow"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
         modifier = m.clip(CircleShape).background(if (on) Color(0x33FFFFFF) else Color.Transparent)
             .then(if (on) Modifier else Modifier.background(Color(0x22FFFFFF))).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 7.dp),
     )
@@ -357,12 +357,12 @@ private fun FollowListScreen(bridge: Bridge, id: String, followers: Boolean, onB
     Column(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 22, onClick = onBack)
-            Text(if (followers) "フォロワー" else "フォロー中", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(if (followers) tr("フォロワー", "Followers") else tr("フォロー中", "Following"), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 170.dp)) {
             val l = list
             if (l == null) item { Loading() }
-            else if (l.isEmpty()) item { Text(if (followers) "まだフォロワーはいません" else "まだ誰もフォローしていません", color = Sub, fontSize = 14.sp, modifier = Modifier.padding(24.dp)) }
+            else if (l.isEmpty()) item { Text(if (followers) tr("まだフォロワーはいません", "No followers yet") else tr("まだ誰もフォローしていません", "Not following anyone yet"), color = Sub, fontSize = 14.sp, modifier = Modifier.padding(24.dp)) }
             else items(l, key = { it.uri }) { c ->
                 Row(Modifier.fillMaxWidth().clickable { onOpen(c) }.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     AsyncImage(c.image, null, Modifier.size(56.dp).clip(CircleShape).background(Card2), contentScale = ContentScale.Crop)
@@ -403,25 +403,25 @@ fun EditProfileSheet(bridge: Bridge, name0: String, image0: String, onDone: () -
     val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { u -> if (u != null) picked = u }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424), dragHandle = { Grip() }) {
         Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("プロフィールを編集", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(8.dp))
+            Text(tr("プロフィールを編集", "Edit profile"), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(8.dp))
             Box(Modifier.padding(16.dp).size(150.dp).clip(CircleShape).background(Card2).clickable { pick.launch("image/*") }, contentAlignment = Alignment.Center) {
                 AsyncImage(picked ?: image0, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
-            Text("写真を変更", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { pick.launch("image/*") }.padding(8.dp))
+            Text(tr("写真を変更", "Change photo"), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { pick.launch("image/*") }.padding(8.dp))
             Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("名前", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(72.dp))
+                Text(tr("名前", "Name"), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(72.dp))
                 BasicTextField(name, { name = it.take(30) }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 16.sp), cursorBrush = SolidColor(Accent),
                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).background(Color(0xFF3A3A3A)).padding(horizontal = 12.dp, vertical = 10.dp))
             }
             Text(
-                if (saving) "保存中…" else "保存", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                if (saving) tr("保存中…", "Saving…") else tr("保存", "Save"), color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.clip(CircleShape).background(Color.White).clickable(enabled = !saving && name.isNotBlank()) {
                     saving = true
                     scope.launch {
                         val jpeg = picked?.let { u -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { toJpeg(ctx, u) }.getOrNull() } }
                         val ok = runCatching { bridge.editProfile(name.trim().takeIf { it != name0 }, jpeg) }.getOrDefault(false)
                         saving = false
-                        Toast.makeText(ctx, if (ok) "プロフィールを更新しました" else "保存できませんでした", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, if (ok) tr("プロフィールを更新しました", "Profile updated") else tr("保存できませんでした", "Couldn't save"), Toast.LENGTH_SHORT).show()
                         if (ok) { onDone(); state.hide(); onDismiss() }
                     }
                 }.padding(horizontal = 36.dp, vertical = 12.dp),
