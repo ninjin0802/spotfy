@@ -568,7 +568,7 @@
       });
     },
     // クロスフェード（秒。0 でオフ）
-    crossfade: function (a) { xfSec = a.sec | 0; xfWatch(); return true; },
+    crossfade: function (a) { xfSec = a.sec | 0; xfWatch(); gapWatch(); return true; },
     gapless: function (a) { gapOn = !!a.on; gapWatch(); return true; },
     library: function () {
       var lib = service('LibraryAPI');
@@ -684,7 +684,9 @@
 
   // ---- クロスフェード ----
   // Web Player は再生要素を 1 つしか持たないため 2 曲を重ねて鳴らせない。
-  // 代わりに、曲の終わりを指定秒数かけて小さくし、次の曲の始まりを同じ秒数かけて大きくする
+  // 代わりに、曲の終わりと次の曲の始まりを、それぞれ指定秒数の半分ずつで小さく／大きくする。
+  // 小さくなりきる直前に次の曲へ進め（ギャップレスと同じ仕組み）、切り替えの無音を挟まない。
+  // 音量は耳に自然に聞こえるよう、直線ではなく正弦の曲線で変える
   var xfSec = 0, xfTimer = null, xfBase = null;
   function audioEl() {
     var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
@@ -704,8 +706,9 @@
           return;
         }
         if (xfBase == null) xfBase = el.volume > 0.01 ? el.volume : 1;
-        var t = el.currentTime, rest = el.duration - t;
-        el.volume = Math.max(0, Math.min(1, xfBase * Math.min(1, t / xfSec, rest / xfSec)));
+        var half = xfSec / 2, t = el.currentTime, rest = el.duration - t;
+        var x = Math.max(0, Math.min(1, t / half, rest / half));
+        el.volume = Math.max(0, Math.min(1, xfBase * Math.sin(x * Math.PI / 2)));
       });
     }, 100);
   }
@@ -718,7 +721,8 @@
   function gapWatch() {
     if (gapTimer) return;
     gapTimer = setInterval(function () {
-      if (!gapOn) return;
+      // クロスフェード中も、曲の切り替えの無音をなくすためにこの仕組みを使う
+      if (!gapOn && !xfSec) return;
       var p = service('PlayerAPI'), st = p && p.getState();
       if (!st || !st.item) return;
       if (st.item.uri !== gapUri) {
@@ -739,7 +743,7 @@
           } else if (waited > 5) gapSkippedAt = 0;
           return;
         }
-        if (el.paused || !isFinite(el.duration) || el.duration < 10 || st.repeat === 2 || xfSec) return;
+        if (el.paused || !isFinite(el.duration) || el.duration < 10 || st.repeat === 2 || adBreakActive) return;
         var rest = el.duration - el.currentTime;
         if (rest > 0 && rest <= gapLatency && !(st.restrictions && st.restrictions.canSkipNext === false)) {
           gapSkippedAt = performance.now();
