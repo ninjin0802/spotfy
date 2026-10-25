@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/icon.png" width="120" alt="spotfy icon">
+
 # spotfy
 
 **The Spotify Web Player, with the feel of the official app.**
@@ -78,8 +80,10 @@ Share a debug log with a single tap.
 | 🔀 **Playback** | Gapless playback, crossfade (1–12 s), background playback |
 | ⏩ **Ad handling** | Disables the Web Player's ad managers, then mutes ads and plays them at 16× |
 | 📡 **Cast** | Spotify Connect to PCs, speakers and TVs; switch between phone speaker and Bluetooth |
+| 🧭 **Menu** | Recents (grouped by day), What's new (releases and episodes from what you follow) |
 | 👥 **Social** | Edit your profile, followers / following, follow other users |
 | 🎨 **Theme** | 5 accent colors, AMOLED black |
+| 🌐 **Language** | English or Japanese, following your device (per-app language on Android 13+) |
 | 🎚 **Audio quality** | Separate settings for Wi-Fi and mobile data (free plan: up to AAC 128 kbps) |
 
 <br>
