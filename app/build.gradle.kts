@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -13,10 +14,10 @@ android {
         applicationId = "com.ninjin.spotifyweb"
         minSdk = 26
         targetSdk = 36
-        versionCode = 31
-        versionName = "1.0.30"
+        versionCode = 100
+        versionName = "2.0.0-alpha1"
     }
-    buildFeatures { buildConfig = true }
+    buildFeatures { buildConfig = true; compose = true }
     // 署名鍵の情報はリポジトリの外（~/.config/spotfy/keystore.properties）に置く
     val keystoreProps = Properties().apply {
         val f = file(System.getenv("SPOTFY_KEYSTORE_PROPERTIES") ?: "${System.getProperty("user.home")}/.config/spotfy/keystore.properties")
@@ -50,4 +51,11 @@ kotlin { jvmToolchain(17) }
 
 dependencies {
     implementation("androidx.webkit:webkit:1.14.0")
+    // 画面は Jetpack Compose で描く（データと再生は裏の Web Player から）
+    implementation(platform("androidx.compose:compose-bom:2025.08.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 }

@@ -8,7 +8,12 @@ import android.content.Context
 import android.content.IntentFilter
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.Activity
+import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
+import androidx.compose.ui.platform.ComposeView
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import android.view.View
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
@@ -30,13 +35,12 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.window.OnBackInvokedDispatcher
 import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
 
     private lateinit var webView: WebView
 
@@ -52,9 +56,23 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFF121212.toInt())
             setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         }
+        bridge = Bridge(webView)
+        // アプリの画面（Compose）は Web Player の上に重ねる。Web Player は裏で再生とデータ取得だけを受け持つ
+        composeView = ComposeView(this).apply {
+            visibility = View.GONE
+            setContent { NativeApp(bridge) }
+        }
         val root = FrameLayout(this).apply {
             setBackgroundColor(0xFF121212.toInt())
             addView(webView)
+            addView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        lifecycleScope.launch {
+            bridge.ready.collect { ready ->
+                // ログインが切れていたら、アプリの画面は出さずにログインページへ
+                if (ready && !isLoggedIn()) { bridge.reset(); webView.loadUrl(LOGIN_URL); return@collect }
+                composeView.visibility = if (ready) View.VISIBLE else View.GONE
+            }
         }
         setContentView(root)
         audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
@@ -158,15 +176,16 @@ class MainActivity : Activity() {
 
         if (Build.VERSION.SDK_INT >= 33) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(
-                OnBackInvokedDispatcher.PRIORITY_DEFAULT
-            ) { handleBack() }
         }
+
+        // アプリの画面で戻れないときは、Web のページを戻るか、アプリを裏に回す
+        onBackPressedDispatcher.addCallback(this) { handleBack() }
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
         } else {
-            webView.loadUrl(initialUrl(intent))
+            // ログインしていなければ、最初から Spotify のログインページを開く
+            webView.loadUrl(if (isLoggedIn()) initialUrl(intent) else LOGIN_URL)
         }
     }
 
@@ -235,7 +254,14 @@ class MainActivity : Activity() {
         )
     }
 
-    private val mobileUiJs by lazy { assets.open("mobile.js").bufferedReader().use { it.readText() } }
+    private val mobileUiJs by lazy { assets.open("bridge.js").bufferedReader().use { it.readText() } }
+
+    private lateinit var bridge: Bridge
+    private lateinit var composeView: ComposeView
+
+    /** Spotify のログイン Cookie（sp_dc）があるか */
+    private fun isLoggedIn(): Boolean =
+        CookieManager.getInstance().getCookie(HOME_URL)?.split(';')?.any { it.trim().startsWith("sp_dc=") } == true
 
     private var statusBarCss = 0f
     private var navBarCss = 0f
@@ -245,6 +271,8 @@ class MainActivity : Activity() {
     )
 
     private fun injectMobileUi(view: WebView) {
+        // 橋は open.spotify.com のページにだけ入れる（ログインページなどには入れない）
+        if (!isSpotifyUrl(Uri.parse(view.url ?: return))) { bridge.reset(); return }
         view.evaluateJavascript(mobileUiJs, null)
         pushStatusBar()
         pushAudioOutput()
@@ -320,14 +348,13 @@ class MainActivity : Activity() {
     )
 
     private fun handleBack() {
+        if (composeView.visibility == View.VISIBLE) { moveTaskToBack(true); return }
         webView.evaluateJavascript("window.__mobileBack && window.__mobileBack()") { closed ->
             if (closed == "true") return@evaluateJavascript
             if (webView.canGoBack()) webView.goBack() else moveTaskToBack(true)
         }
     }
 
-    @Deprecated("Android 12 以前向け")
-    override fun onBackPressed() = handleBack()
 
     // バックグラウンド再生を止めないよう webView.onPause() は呼ばず、再生中だけサービスで生存させる
     private var serviceRunning = false
@@ -352,6 +379,7 @@ class MainActivity : Activity() {
      */
     private fun onPageMessage(message: String, reply: JavaScriptReplyProxy) {
         val m = runCatching { JSONObject(message) }.getOrNull() ?: return
+        if (bridge.onMessage(m)) return
         when (m.optString("type")) {
             "hello" -> reply.postMessage(
                 JSONObject().put("type", "settings").put(
@@ -458,6 +486,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val HOME_URL = "https://open.spotify.com/"
+        private const val LOGIN_URL = "https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F"
         private const val REQUEST_FILE = 42
         private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
         private val RELAY_URL = Regex("^https://([a-z0-9-]+\\.)*spotify\\.com/(connect-state|track-playback)/v1/[^#]*$")
