@@ -340,6 +340,7 @@ class MainActivity : ComponentActivity() {
             runCatching { startActivity(Intent.createChooser(send, title.ifEmpty { null })) }
         }
         override fun outputSwitch() = showOutputSwitcher()
+        override fun outputName() = currentOutputName()
         override fun logout() {
             // Cookie を消して最初からログインページへ
             // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ）も消し、画面を作り直す

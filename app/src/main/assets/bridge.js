@@ -39,10 +39,15 @@
     getAlbum: '0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f',
     fetchPlaylist: '21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf',
     queryArtistOverview: '9f8134ef565e78621f1e1793555bd6633c5ac144ae0f89604ed3ae3f80b3c8e6',
+    browseAll: 'dbd8b55e09a58afc52eab438bc228ba28fd72ac2f2148c6c26354980e4579001',
+    recentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    saveRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    removeRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    getTrack: 'fe16b8083eec2305854db612ca75589bcb71e009dc7a4d014f29bd534a4c01f5',
     searchTopResultsList: 'dd78eaff943eba629ed70ee25517b9cea0dcaa41193e2592ae2727660b21892c'
   };
-  function gql(name, vars) {
-    return platform().getGraphQLLoader()({ name: name, operation: 'query', sha256Hash: GQL[name], value: null }, vars);
+  function gql(name, vars, op) {
+    return platform().getGraphQLLoader()({ name: name, operation: op || 'query', sha256Hash: GQL[name], value: null }, vars);
   }
   function cookie(name) {
     var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
@@ -177,11 +182,79 @@
           if (!d) return null;
           var c = card(w);
           if (!c) return null;
-          if (d.__typename === 'Track') { c.subtitle = '曲 • ' + names(d.artists); c.kind = 'track'; }
+          c.kind = (d.__typename || '').toLowerCase();
+          if (d.__typename === 'Track') { c.subtitle = '曲 • ' + names(d.artists); }
           else if (d.__typename === 'Album') { c.subtitle = (d.type === 'SINGLE' ? 'シングル' : 'アルバム') + ' • ' + names(d.artists); }
           else if (d.__typename === 'Playlist') c.subtitle = 'プレイリスト';
           return c;
         }).filter(Boolean);
+      });
+    },
+    // 検索ページの「すべてを見る」（ジャンルのタイル）
+    browse: function () {
+      return gql('browseAll', { browseEndUserIntegration: 'INTEGRATION_WEB_PLAYER', pagePagination: { offset: 0, limit: 10 }, sectionPagination: { offset: 0, limit: 99 } }).then(function (r) {
+        var out = [];
+        (r.data.browseStart.sections.items || []).forEach(function (sec) {
+          (sec.sectionItems.items || []).forEach(function (it) {
+            var cr = it.content && it.content.data && it.content.data.data && it.content.data.data.cardRepresentation;
+            if (!cr) return;
+            out.push({ uri: it.uri, title: cr.title && cr.title.transformedLabel || '', subtitle: cr.backgroundColor && cr.backgroundColor.hex || '#555555', image: pickImg(cr.artwork) });
+          });
+        });
+        return out;
+      });
+    },
+    recent: function () {
+      return gql('recentSearches', { limit: 50, includeAuthors: true, includeEpisodeContentRatingsV2: true }).then(function (r) {
+        var items = (((r.data || {}).recentSearches || {}).recentSearchesItems || {}).items || [];
+        return items.map(function (w) {
+          var c = card(w); if (!c) return null;
+          var t = w.data && w.data.__typename;
+          c.kind = (t || '').toLowerCase();
+          c.subtitle = t === 'Track' ? '曲 • ' + names(w.data.artists) : t === 'Album' ? 'アルバム • ' + names(w.data.artists) : t === 'Playlist' ? 'プレイリスト' : t === 'Artist' ? 'アーティスト' : c.subtitle;
+          return c;
+        }).filter(Boolean);
+      });
+    },
+    saveRecent: function (a) { return gql('saveRecentSearches', { uris: [a.uri] }, 'mutation').then(function () { return true; }); },
+    removeRecent: function (a) { return gql('removeRecentSearches', { uris: [a.uri] }, 'mutation').then(function () { return true; }); },
+    // 歌詞（Web Player と同じ color-lyrics。ログイン情報はページのものをそのまま使い、Spotify に直接聞く）
+    lyrics: function (a) {
+      var id = a.uri.split(':')[2];
+      var img = encodeURIComponent(a.image || '');
+      var h = { accept: 'application/json', 'app-platform': 'WebPlayer' };
+      if (window.__mConnect) { var au = __mConnect.auth(); if (au) h.authorization = au; var ct = __mConnect.clientToken(); if (ct) h['client-token'] = ct; }
+      return fetch('https://spclient.wg.spotify.com/color-lyrics/v2/track/' + id + '/image/' + img + '?format=json&vocalRemoval=false&market=from_token', { headers: h })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          var lines = (j && j.lyrics && j.lyrics.lines || []).filter(function (l) { return l.words && l.words !== '♪'; }).map(function (l) { return { t: +l.startTimeMs, w: l.words }; });
+          var bg = j && j.colors && j.colors.background;
+          return { synced: !!(j && j.lyrics && j.lyrics.syncType === 'LINE_SYNCED'), lines: lines, bg: bg == null ? 0 : bg | 0 };
+        });
+    },
+    // 全画面プレーヤーの「アーティストについて」
+    about: function (a) {
+      return gql('queryArtistOverview', { uri: a.uri, locale: '', includePrerelease: false }).then(function (r) {
+        var d = r.data.artistUnion;
+        var hi = d.headerImage && d.headerImage.data && d.headerImage.data.sources || [];
+        var av = d.visuals && d.visuals.avatarImage && d.visuals.avatarImage.sources || [];
+        var bio = d.profile && d.profile.biography && d.profile.biography.text || '';
+        return {
+          uri: d.uri, name: d.profile && d.profile.name || '', image: (hi[0] || av[0] || {}).url || '',
+          listeners: d.stats && d.stats.monthlyListeners || 0, saved: !!d.saved, bio: strip(bio),
+          verified: !!((d.profile && d.profile.verified) || (d.onPlatformReputationTrait && d.onPlatformReputationTrait.verification && d.onPlatformReputationTrait.verification.isVerified))
+        };
+      });
+    },
+    // 次に流れる曲
+    nextUp: function () {
+      var p = service('PlayerAPI');
+      return Promise.resolve(p.getQueue()).then(function (q) {
+        var list = [].concat(q.queued || [], q.nextUp || []);
+        var t = list[0] && (list[0].contextTrack || list[0]);
+        if (!t || !t.uri) return null;
+        var md = t.metadata || {};
+        return { uri: t.uri, title: t.name || md.title || '', artist: (t.artists || []).map(function (x) { return x.name; }).join(', ') || md.artist_name || '', image: (t.images && t.images[0] && t.images[0].url) || md.image_url || '', dur: 0 };
       });
     },
     library: function () {
@@ -192,7 +265,7 @@
           var kind = x.type === 'artist' ? 'アーティスト' : x.type === 'album' ? 'アルバム' : x.type === 'show' ? 'ポッドキャスト' : x.type === 'folder' ? 'フォルダ' : 'プレイリスト';
           var by = x.owner && x.owner.name || (x.artists && x.artists.map(function (z) { return z.name; }).join(', ')) || '';
           if (x.type === 'liked-songs' || /:collection$/.test(x.uri)) { kind = 'プレイリスト'; }
-          return { uri: x.uri, title: x.name, subtitle: kind + (by ? ' • ' + by : ''), image: img && img.url || (x.images && x.images[0] && x.images[0].url) || '', round: x.type === 'artist', pinned: !!x.pinned };
+          return { uri: x.uri, title: x.name, subtitle: kind + (by ? ' • ' + by : ''), image: img && img.url || (x.images && x.images[0] && x.images[0].url) || '', round: x.type === 'artist', pinned: !!x.pinned, kind: x.type || '' };
         });
       });
     },
@@ -203,6 +276,34 @@
           return { uri: t.uri, title: t.name, artist: (t.artists || []).map(function (z) { return z.name; }).join(', '), image: (t.album && t.album.images && (t.album.images[1] || t.album.images[0]) || {}).url || '', dur: t.duration && t.duration.milliseconds || 0 };
         });
       });
+    },
+    // 曲の「⋮」メニュー用：アルバム・アーティスト・お気に入りかどうか
+    trackInfo: function (a) {
+      var lib = service('LibraryAPI');
+      return Promise.all([
+        gql('getTrack', { uri: a.uri }).catch(function () { return null; }),
+        Promise.resolve(lib.contains(a.uri)).catch(function () { return [false]; })
+      ]).then(function (r) {
+        var t = r[0] && r[0].data && r[0].data.trackUnion || {};
+        var ar = (t.firstArtist && t.firstArtist.items && t.firstArtist.items[0]) || (t.artists && t.artists.items && t.artists.items[0]) || null;
+        return {
+          album: t.albumOfTrack && t.albumOfTrack.uri || '', albumName: t.albumOfTrack && t.albumOfTrack.name || '',
+          artist: ar && ar.uri || '', artistName: ar && ar.profile && ar.profile.name || '', liked: !!(r[1] && r[1][0])
+        };
+      });
+    },
+    inLibrary: function (a) { return Promise.resolve(service('LibraryAPI').contains(a.uri)).then(function (x) { return !!(x && x[0]); }); },
+    queue: function (a) { return Promise.resolve(service('PlayerAPI').addToQueue([{ uri: a.uri }])).then(function () { return true; }); },
+    // ---- Spotify Connect（キャスト）：同じアカウントのスピーカー・PC・テレビなど ----
+    devices: function () {
+      var st = window.__mConnect ? __mConnect.get() : {}, c = st.cluster || {};
+      var list = Object.keys(c.devices || {}).map(function (k) { var d = c.devices[k]; return { id: d.device_id || k, name: d.name || '', type: (d.device_type || '').toLowerCase(), hidden: !!(d.capabilities && d.capabilities.hidden) }; })
+        .filter(function (d) { return !d.hidden; });
+      return { self: st.self || '', active: c.active_device_id || st.self || '', list: list };
+    },
+    transfer: function (a) {
+      if (!window.__mConnect) throw new Error('not ready');
+      return __mConnect.transfer(a.id).then(function (r) { return !!(r && (r.ok || r.status < 300)); });
     },
     follow: function (a) {
       var lib = service('LibraryAPI');
@@ -255,8 +356,11 @@
     var img = md.image_xlarge_url || md.image_large_url || md.image_url || (it.images && it.images[0] && it.images[0].url) || '';
     if (it.uri !== likedFor) checkLiked(it.uri);
     var ctx = st.context || {};
+    // ほかの機器で再生中なら、その名前（このスマホなら空）
+    var cst = window.__mConnect ? __mConnect.get() : {}, cl = cst.cluster || {};
+    var act = cl.active_device_id && cl.active_device_id !== cst.self && cl.devices && cl.devices[cl.active_device_id];
     return {
-      has: true, uri: it.uri, liked: likedFor === it.uri ? liked : false,
+      has: true, artistUri: it.artists && it.artists[0] && it.artists[0].uri || '', device: act ? act.name || '' : '', deviceType: act ? (act.device_type || '').toLowerCase() : '', uri: it.uri, liked: likedFor === it.uri ? liked : false,
       contextName: ctx.metadata && ctx.metadata.context_description || '', contextUri: ctx.uri || '', title: it.name || md.title || '', artist: (it.artists || []).map(function (a) { return a.name; }).join(', ') || md.artist_name || '',
       album: it.album && it.album.name || md.album_title || '', image: img, playing: !st.isPaused, buffering: !!st.isBuffering,
       // 位置は「いま」の値にして渡す（Web Player は最後に変化した時点の値と時刻を持っている）
@@ -275,7 +379,7 @@
   var lastKey = '';
   function pushState() {
     var s = snapshot();
-    var key = JSON.stringify([s.uri, s.liked, s.playing, s.shuffle, s.repeat, s.buffering, Math.round(s.pos / 5000)]);
+    var key = JSON.stringify([s.uri, s.device, s.liked, s.playing, s.shuffle, s.repeat, s.buffering, Math.round(s.pos / 5000)]);
     if (key === lastKey) return;
     lastKey = key;
     send({ type: 'bstate', value: s });
@@ -312,6 +416,7 @@
     var p = service('PlayerAPI');
     if (!p) return setTimeout(function () { waitReady(n + 1); }, n < 50 ? 200 : 1000);
     try { p.getEvents().addListener('update', pushState); } catch (e) {}
+    if (window.__mConnect) __mConnect.onChange(function () { lastKey = ''; pushState(); });
     setInterval(pushState, 1000);
     var st = document.createElement('style');
     st.textContent = '.Root, #main > div { content-visibility: hidden !important; }';

@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -60,7 +63,7 @@ internal fun isPage(uri: String) = uri.split(':').getOrNull(1) in setOf("album",
 
 /** アルバム・プレイリスト・アーティスト・お気に入りの曲のページ */
 @Composable
-internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBack: () -> Unit, onOpen: (Card) -> Unit) {
+internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBack: () -> Unit, onOpen: (Card) -> Unit, onMenu: (MenuTarget) -> Unit) {
     var page by remember(uri) { mutableStateOf<Page?>(null) }
     var failed by remember(uri) { mutableStateOf(false) }
     var saved by remember(uri) { mutableStateOf(false) }
@@ -114,6 +117,9 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                         ) else if (!p.uri.contains(":collection")) Ico(if (saved) Icons.check else Icons.add, 28, if (saved) Accent else Sub, 44) {
                             saved = !saved; scope.launch { runCatching { bridge.follow(p.uri, saved) } }
                         }
+                        if (!p.uri.contains(":collection")) Ico(Icons.more, 22, Sub, 44) {
+                            onMenu(MenuTarget.OfPage(p.uri, p.title, p.artist.ifEmpty { p.subtitle }, p.image, p.artistUri, p.artist))
+                        }
                         Spacer(Modifier.weight(1f))
                         val isThis = playing.has && playing.playing && (playing.contextUri == p.uri)
                         Box(
@@ -129,7 +135,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                 }
             }
             itemsIndexed(p.tracks, key = { i, t -> "$i${t.uri}" }) { i, t ->
-                TrackRow(t, if (p.kind == "artist") (i + 1).toString() else null, playing.uri == t.uri) {
+                TrackRow(t, if (p.kind == "artist") (i + 1).toString() else null, playing.uri == t.uri, onMore = { onMenu(MenuTarget.OfTrack(t)) }) {
                     scope.launch { runCatching { if (p.kind == "artist") bridge.play(t.uri) else bridge.play(p.uri, t.uri) } }
                 }
             }
@@ -159,7 +165,7 @@ private fun Text(t: String, color: Color, fontSize: androidx.compose.ui.unit.Tex
     androidx.compose.material3.Text(t, color = color, fontSize = fontSize, modifier = modifier, fontWeight = fontWeight, maxLines = maxLines, overflow = overflow, lineHeight = lineHeight)
 
 @Composable
-internal fun TrackRow(t: Track, number: String?, current: Boolean, onClick: () -> Unit) {
+internal fun TrackRow(t: Track, number: String?, current: Boolean, onMore: () -> Unit, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         if (number != null) Text(number, color = Sub, fontSize = 15.sp, modifier = Modifier.width(28.dp))
         if (t.image.isNotEmpty()) {
@@ -170,7 +176,7 @@ internal fun TrackRow(t: Track, number: String?, current: Boolean, onClick: () -
             Text(t.title, color = if (current) Accent else Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(t.artist, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Ico(Icons.more, 18, Sub, 36) {}
+        Ico(Icons.more, 18, Sub, 36, onClick = onMore)
     }
 }
 
@@ -185,59 +191,200 @@ private fun ResultRow(c: Card, onClick: () -> Unit) {
     }
 }
 
-/** 検索：入力に合わせてその場で結果を出す */
+/** 検索：ジャンルのタイル、押すと検索画面（最近の検索・入力に合わせた結果・種類の絞り込み） */
 @Composable
-internal fun SearchScreen(bridge: Bridge, onOpen: (Card) -> Unit) {
+internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onOpen: (Card) -> Unit) {
+    var tiles by remember { mutableStateOf(bridge.cachedBrowse()) }
+    var typing by remember { mutableStateOf(false) }
+    LaunchedEffect(ready) { if (ready) runCatching { bridge.browse() }.onSuccess { tiles = it } }
+    androidx.activity.compose.BackHandler(enabled = typing) { typing = false }
+    LazyColumn(Modifier.fillMaxSize().background(Bg), contentPadding = PaddingValues(bottom = 170.dp)) {
+        item {
+            Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Avatar(user, 32, onAvatar)
+                Text2("検索", 24, FontWeight.Bold, Modifier.padding(start = 12.dp))
+            }
+        }
+        item {
+            Row(
+                Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(48.dp).clip(RoundedCornerShape(6.dp)).background(Color.White).clickable { typing = true }.padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(rememberVectorPainter(Icons.search), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color.Black))
+                Text("何を聴きたいですか？", color = Color(0xFF6A6A6A), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
+            }
+        }
+        if (tiles.isNotEmpty()) item { Text2("すべてを見る", 16, FontWeight.Bold, Modifier.padding(start = 16.dp, top = 24.dp, bottom = 12.dp)) }
+        items(tiles.chunked(2)) { row ->
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { t -> GenreTile(t, Modifier.weight(1f)) { typing = true } }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+    if (typing) SearchTyping(bridge, onClose = { typing = false }, onOpen = onOpen)
+}
+
+@Composable
+private fun GenreTile(t: Card, m: Modifier, onClick: () -> Unit) {
+    val bg = runCatching { Color(android.graphics.Color.parseColor(t.subtitle)) }.getOrDefault(Card2)
+    Box(m.height(100.dp).clip(RoundedCornerShape(6.dp)).background(bg).clickable(onClick = onClick)) {
+        Text(t.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, modifier = Modifier.padding(12.dp))
+        AsyncImage(
+            t.image, null,
+            Modifier.align(Alignment.BottomEnd).offset(x = 14.dp, y = 4.dp).size(68.dp).rotate(25f).clip(RoundedCornerShape(4.dp)),
+            contentScale = ContentScale.Crop,
+        )
+    }
+}
+
+
+private val FILTERS = listOf("" to "すべて", "track" to "曲", "artist" to "アーティスト", "playlist" to "プレイリスト", "album" to "アルバム", "podcast" to "ポッドキャスト")
+
+/** 検索の入力画面（公式アプリと同じく、検索欄を押すと開く） */
+@Composable
+private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> Unit) {
     var q by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Card>>(emptyList()) }
+    var recent by remember { mutableStateOf<List<Card>>(emptyList()) }
+    var filter by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
+    val req = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { req.requestFocus(); recent = runCatching { bridge.recent() }.getOrDefault(emptyList()) }
     LaunchedEffect(q) {
         if (q.isBlank()) { results = emptyList(); return@LaunchedEffect }
-        delay(250)
+        delay(220)
         busy = true
         runCatching { bridge.search(q.trim()) }.onSuccess { results = it }
         busy = false
     }
-    Column(Modifier.fillMaxSize().background(Bg).windowInsetsPadding(WindowInsets.statusBars)) {
-        Text2("検索", 24, FontWeight.Bold, Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp))
-        Row(
-            Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(48.dp).clip(RoundedCornerShape(6.dp)).background(Color.White).padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Image(rememberVectorPainter(Icons.search), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color.Black))
-            Box(Modifier.weight(1f).padding(start = 10.dp)) {
-                if (q.isEmpty()) Text("何を聴きたいですか？", color = Color(0xFF6A6A6A), fontSize = 16.sp)
+    fun pick(c: Card) { focus.clearFocus(); scope.launch { runCatching { bridge.saveRecent(c.uri) } }; onOpen(c) }
+    Column(Modifier.fillMaxSize().background(Bg).clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
+        Row(Modifier.fillMaxWidth().background(Color(0xFF242424)).padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Ico(Icons.back, 22, onClick = onClose)
+            Box(Modifier.weight(1f).padding(start = 4.dp)) {
+                if (q.isEmpty()) Text("何を聴きたいですか？", color = Sub, fontSize = 16.sp)
                 BasicTextField(
-                    q, { q = it }, singleLine = true, textStyle = TextStyle(color = Color.Black, fontSize = 16.sp),
-                    cursorBrush = SolidColor(Color.Black), modifier = Modifier.fillMaxWidth(),
+                    q, { q = it }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().focusRequester(req),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { focus.clearFocus() }),
                 )
             }
-            if (q.isNotEmpty()) Ico(Icons.close, 20, Color.Black, 36) { q = "" }
+            if (q.isNotEmpty()) Ico(Icons.close, 20, onClick = { q = "" })
         }
-        LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp), contentPadding = PaddingValues(bottom = 170.dp)) {
-            items(results, key = { it.uri }) { c -> ResultRow(c) { focus.clearFocus(); onOpen(c) } }
-            if (q.isNotBlank() && results.isEmpty() && !busy) item { Text("「$q」に一致するものは見つかりませんでした", color = Sub, fontSize = 14.sp, modifier = Modifier.padding(24.dp)) }
+        if (q.isBlank()) {
+            LazyColumn(contentPadding = PaddingValues(bottom = 170.dp)) {
+                if (recent.isNotEmpty()) item { Text2("最近の検索", 16, FontWeight.Bold, Modifier.padding(16.dp)) }
+                items(recent, key = { it.uri }) { c ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) { ResultRow(c) { pick(c) } }
+                        Ico(Icons.close, 18, Sub, 44) { recent = recent - c; scope.launch { runCatching { bridge.removeRecent(c.uri) } } }
+                    }
+                }
+            }
+        } else {
+            androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(FILTERS) { (k, label) ->
+                    val on = filter == k
+                    Text(
+                        label, color = if (on) Color.Black else Color.White, fontSize = 14.sp,
+                        modifier = Modifier.clip(CircleShape).background(if (on) Accent else Card2).clickable { filter = k }.padding(horizontal = 14.dp, vertical = 7.dp),
+                    )
+                }
+            }
+            val shown = if (filter.isEmpty()) results else results.filter { it.kind == filter }
+            LazyColumn(contentPadding = PaddingValues(bottom = 170.dp)) {
+                items(shown, key = { it.uri }) { c -> ResultRow(c) { pick(c) } }
+                if (shown.isEmpty() && !busy) item { Text("「$q」に一致するものは見つかりませんでした", color = Sub, fontSize = 14.sp, modifier = Modifier.padding(24.dp)) }
+            }
         }
     }
 }
 
-/** マイライブラリ */
+/** マイライブラリ（公式アプリと同じ：絞り込み・並べ替え・リスト／グリッド、ピン留め） */
 @Composable
 internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onOpen: (Card) -> Unit) {
     var items by remember { mutableStateOf(bridge.cachedLibrary()) }
+    var filter by remember { mutableStateOf("") }
+    var grid by remember { mutableStateOf(false) }
+    var sort by remember { mutableStateOf(0) }
     LaunchedEffect(ready) { if (ready) runCatching { bridge.library() }.onSuccess { items = it } }
+    val liked = Card("spotify:collection:tracks", "お気に入りの曲", "プレイリスト", "", false, "liked", true)
+    val base = listOf(liked) + items.filter { !it.uri.contains(":collection") && it.kind != "your-episodes" }
+    val filtered = base.filter { filter.isEmpty() || it.kind == filter || (filter == "playlist" && it.kind == "liked") }
+    val sorted = when (sort) { 1 -> filtered.sortedBy { it.title.lowercase() }; 2 -> filtered.sortedBy { it.subtitle.substringAfter(" • ", "") }; else -> filtered }
+        .sortedByDescending { it.pinned }
     LazyColumn(Modifier.fillMaxSize().background(Bg), contentPadding = PaddingValues(bottom = 170.dp)) {
         item {
-            Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Avatar(user, 32, onAvatar)
-                Text2("マイライブラリ", 24, FontWeight.Bold, Modifier.padding(start = 12.dp))
+                Text2("マイライブラリ", 24, FontWeight.Bold, Modifier.padding(start = 12.dp).weight(1f))
+                Ico(Icons.search, 24) {}
+                Ico(Icons.add, 26) {}
             }
         }
         item {
-            ResultRow(Card("spotify:collection:tracks", "お気に入りの曲", "プレイリスト", "", false)) { onOpen(Card("spotify:collection:tracks", "お気に入りの曲", "", "", false)) }
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (filter.isNotEmpty()) Ico(Icons.close, 16, Color.White, 34) { filter = "" }
+                listOf("playlist" to "プレイリスト", "album" to "アルバム", "artist" to "アーティスト").forEach { (k, label) ->
+                    if (filter.isEmpty() || filter == k) Text(
+                        label, color = if (filter == k) Color.Black else Color.White, fontSize = 14.sp,
+                        modifier = Modifier.clip(CircleShape).background(if (filter == k) Accent else Card2).clickable { filter = if (filter == k) "" else k }.padding(horizontal = 14.dp, vertical = 7.dp),
+                    )
+                }
+            }
         }
-        items(items.filter { !it.uri.contains(":collection") }, key = { it.uri }) { c -> ResultRow(c) { onOpen(c) } }
+        item {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.clip(CircleShape).clickable { sort = (sort + 1) % 3 }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Image(rememberVectorPainter(LibIcons.sort), null, Modifier.size(18.dp))
+                    Text(listOf("最近", "アルファベット順", "クリエーター")[sort], color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
+                }
+                Spacer(Modifier.weight(1f))
+                Ico(if (grid) LibIcons.list else LibIcons.grid, 20) { grid = !grid }
+            }
+        }
+        if (grid) {
+            items(sorted.chunked(3)) { row ->
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { c ->
+                        Column(Modifier.weight(1f).clickable { onOpen(c) }) {
+                            LibCover(c, Modifier.fillMaxWidth().aspectRatio(1f))
+                            Text(c.title, color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                            Text(c.subtitle.substringBefore(" • "), color = Sub, fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        } else items(sorted, key = { it.uri }) { c ->
+            Row(Modifier.fillMaxWidth().clickable { onOpen(c) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                LibCover(c, Modifier.size(64.dp))
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(c.title, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (c.pinned) Image(rememberVectorPainter(LibIcons.pin), null, Modifier.size(13.dp).padding(end = 2.dp), colorFilter = ColorFilter.tint(Accent))
+                        Text(if (c.kind == "liked") "プレイリスト • ${user?.name ?: ""}" else c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = if (c.pinned) 4.dp else 0.dp))
+                    }
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun LibCover(c: Card, m: Modifier) {
+    if (c.kind == "liked") Box(m.clip(RoundedCornerShape(4.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))), contentAlignment = Alignment.Center) {
+        Text("♥", color = Color.White, fontSize = 24.sp)
+    } else AsyncImage(c.image, null, m.clip(if (c.round) CircleShape else RoundedCornerShape(4.dp)).background(Card2), contentScale = ContentScale.Crop)
+}
+
+private object LibIcons {
+    val sort = line("M7 4v16M3.5 7.5 7 4l3.5 3.5M17 20V4M13.5 16.5 17 20l3.5-3.5", 1.8f)
+    val grid = line("M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z", 1.8f)
+    val list = line("M4 6h16M4 12h16M4 18h16", 1.8f)
+    val pin = icon("M14.5 2.5l7 7-2.2.7-4.6 4.6.4 4.4-1.6 1.6-3.9-3.9L4 22.5 2.5 21l5.6-5.6-3.9-3.9 1.6-1.6 4.4.4 4.6-4.6z")
 }

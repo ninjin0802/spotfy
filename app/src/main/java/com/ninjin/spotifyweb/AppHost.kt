@@ -9,5 +9,7 @@ interface AppHost {
     val metered: Boolean
     fun share(url: String, title: String)
     fun outputSwitch()
+    /** このスマホの出力先（Bluetooth イヤホンなど。スピーカーなら空） */
+    fun outputName(): String
     fun logout()
 }

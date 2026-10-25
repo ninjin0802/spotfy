@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /** ホームなどに並ぶカード（アルバム・プレイリスト・アーティストなど） */
-data class Card(val uri: String, val title: String, val subtitle: String, val image: String, val round: Boolean)
+data class Card(val uri: String, val title: String, val subtitle: String, val image: String, val round: Boolean, val kind: String = "", val pinned: Boolean = false)
 
 data class Shelf(val title: String, val items: List<Card>)
 
@@ -42,6 +42,10 @@ data class PlayerState(
     val liked: Boolean = false,
     val contextName: String = "",
     val contextUri: String = "",
+    /** ほかの機器（Spotify Connect）で再生中ならその名前。このスマホなら空 */
+    val device: String = "",
+    val artistUri: String = "",
+    val deviceType: String = "",
     val receivedAt: Long = 0,
 ) {
     /** 「プレイリストから再生中」などの見出し */
@@ -156,14 +160,55 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     }
 
     suspend fun search(q: String): List<Card> = cards(call("search", JSONObject().put("q", q)) as? JSONArray)
-    suspend fun library(): List<Card> = cards(call("library") as? JSONArray).also { cache.edit().putString("library", JSONArray(it.map { c -> JSONObject().put("uri", c.uri).put("title", c.title).put("subtitle", c.subtitle).put("image", c.image).put("round", c.round) }).toString()).apply() }
+    suspend fun library(): List<Card> = cards(call("library") as? JSONArray).also { cache.edit().putString("library", JSONArray(it.map { c -> JSONObject().put("uri", c.uri).put("title", c.title).put("subtitle", c.subtitle).put("image", c.image).put("round", c.round).put("kind", c.kind).put("pinned", c.pinned) }).toString()).apply() }
     fun cachedLibrary(): List<Card> = cache.getString("library", null)?.let { runCatching { cards(JSONArray(it)) }.getOrNull() } ?: emptyList()
+    suspend fun browse(): List<Card> = cards(call("browse") as? JSONArray).also { cache.edit().putString("browse", JSONArray(it.map { c -> JSONObject().put("uri", c.uri).put("title", c.title).put("subtitle", c.subtitle).put("image", c.image) }).toString()).apply() }
+    fun cachedBrowse(): List<Card> = cache.getString("browse", null)?.let { runCatching { cards(JSONArray(it)) }.getOrNull() } ?: emptyList()
+    suspend fun recent(): List<Card> = cards(call("recent") as? JSONArray)
+    suspend fun saveRecent(uri: String) = call("saveRecent", JSONObject().put("uri", uri))
+    suspend fun removeRecent(uri: String) = call("removeRecent", JSONObject().put("uri", uri))
     suspend fun follow(uri: String, on: Boolean) = call("follow", JSONObject().put("uri", uri).put("on", on))
 
     private fun tracks(a: JSONArray?): List<Track> = if (a == null) emptyList() else (0 until a.length()).mapNotNull { i ->
         val t = a.optJSONObject(i) ?: return@mapNotNull null
         Track(t.optString("uri"), t.optString("title"), t.optString("artist"), t.optString("image"), t.optLong("dur"))
     }
+
+    data class TrackInfo(val album: String, val albumName: String, val artist: String, val artistName: String, val liked: Boolean)
+
+    suspend fun trackInfo(uri: String): TrackInfo {
+        val o = call("trackInfo", JSONObject().put("uri", uri)) as JSONObject
+        return TrackInfo(o.optString("album"), o.optString("albumName"), o.optString("artist"), o.optString("artistName"), o.optBoolean("liked"))
+    }
+    suspend fun inLibrary(uri: String) = call("inLibrary", JSONObject().put("uri", uri)) == true
+    suspend fun addToQueue(uri: String) = call("queue", JSONObject().put("uri", uri))
+
+    data class Device(val id: String, val name: String, val type: String)
+    data class Devices(val self: String, val active: String, val list: List<Device>)
+
+    suspend fun devices(): Devices {
+        val o = call("devices") as JSONObject
+        val a = o.optJSONArray("list") ?: JSONArray()
+        return Devices(o.optString("self"), o.optString("active"), (0 until a.length()).map { i -> a.getJSONObject(i).let { Device(it.optString("id"), it.optString("name"), it.optString("type")) } })
+    }
+    suspend fun transfer(id: String) = call("transfer", JSONObject().put("id", id)) == true
+
+    data class Lyrics(val synced: Boolean, val lines: List<Pair<Long, String>>, val bg: Int)
+
+    suspend fun lyrics(uri: String, image: String): Lyrics {
+        val o = call("lyrics", JSONObject().put("uri", uri).put("image", image)) as JSONObject
+        val a = o.optJSONArray("lines") ?: JSONArray()
+        return Lyrics(o.optBoolean("synced"), (0 until a.length()).map { i -> a.getJSONObject(i).let { it.optLong("t") to it.optString("w") } }, o.optInt("bg"))
+    }
+
+    data class About(val uri: String, val name: String, val image: String, val listeners: Long, val saved: Boolean, val bio: String, val verified: Boolean)
+
+    suspend fun about(uri: String): About {
+        val o = call("about", JSONObject().put("uri", uri)) as JSONObject
+        return About(o.optString("uri"), o.optString("name"), o.optString("image"), o.optLong("listeners"), o.optBoolean("saved"), o.optString("bio"), o.optBoolean("verified"))
+    }
+
+    suspend fun nextUp(): Track? = (call("nextUp") as? JSONObject)?.let { Track(it.optString("uri"), it.optString("title"), it.optString("artist"), it.optString("image"), 0) }
 
     data class User(val name: String, val image: String)
 
@@ -178,7 +223,7 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
 
     private fun cards(a: JSONArray?): List<Card> = if (a == null) emptyList() else (0 until a.length()).mapNotNull { i ->
         val c = a.optJSONObject(i) ?: return@mapNotNull null
-        Card(c.optString("uri"), c.optString("title"), c.optString("subtitle"), c.optString("image"), c.optBoolean("round"))
+        Card(c.optString("uri"), c.optString("title"), c.optString("subtitle"), c.optString("image"), c.optBoolean("round"), c.optString("kind"), c.optBoolean("pinned"))
     }
 
     private fun parseState(o: JSONObject) = PlayerState(
@@ -195,6 +240,9 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
         liked = o.optBoolean("liked"),
         contextName = o.optString("contextName"),
         contextUri = o.optString("contextUri"),
+        device = o.optString("device"),
+        artistUri = o.optString("artistUri"),
+        deviceType = o.optString("deviceType"),
         receivedAt = SystemClock.elapsedRealtime(),
     )
 }
