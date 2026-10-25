@@ -154,7 +154,6 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
                 user, player,
                 onProfile = { drawerOpen = false; profileOpen = true },
                 onAddAccount = { drawerOpen = false; confirmSwitch = true },
-                onReport = { drawerOpen = false; profileOpen = true },
                 onRecent = { drawerOpen = false; recentsOpen = true },
                 onNews = { drawerOpen = false; newsOpen = true },
                 onSettings = { drawerOpen = false; settingsOpen = true },
@@ -208,15 +207,14 @@ internal fun TabBar(tab: Tab, onSelect: (Tab) -> Unit) {
 }
 
 internal object DrawerIcons {
-    val report = line("M4 20V10M9.5 20V4M15 20v-7M20.5 20V8", 1.8f)
     val history = line("M12 21a9 9 0 1 0-8.5-6M3 20v-5h5M12 7v5l3 2", 1.8f)
     val news = line("M13 2 4 14h7l-1 8 9-12h-7z", 1.6f)
     val plus = line("M12 5v14M5 12h14", 2f)
 }
 
-/** サイドメニュー（公式アプリと同じ：アカウントのカード、リスニングレポート・最近・新着・設定、アクティビティと友達を招待） */
+/** サイドメニュー（公式アプリと同じ：アカウントのカード、最近・新着・設定、アクティビティと友達を招待） */
 @Composable
-internal fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Unit, onAddAccount: () -> Unit, onReport: () -> Unit, onRecent: () -> Unit, onNews: () -> Unit, onSettings: () -> Unit, onInvite: () -> Unit) {
+internal fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Unit, onAddAccount: () -> Unit, onRecent: () -> Unit, onNews: () -> Unit, onSettings: () -> Unit, onInvite: () -> Unit) {
     Column(
         Modifier.fillMaxHeight().width(310.dp).background(Color(0xFF1F1F1F))
             .clickable(remember { MutableInteractionSource() }, null) {}
@@ -238,7 +236,6 @@ internal fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Un
                 Text(tr("アカウントを追加する", "Add account"), color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp))
             }
         }
-        DrawerItem(DrawerIcons.report, tr("リスニングレポート", "Listening stats"), onReport)
         DrawerItem(DrawerIcons.history, tr("最近", "Recents"), onRecent)
         DrawerItem(DrawerIcons.news, tr("あなたへのおすすめ新着", "What's new"), onNews)
         DrawerItem(Icons.gear, tr("設定とプライバシー", "Settings and privacy"), onSettings)
