@@ -39,6 +39,7 @@
     getAlbum: '0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f',
     fetchPlaylist: '21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf',
     queryArtistOverview: '9f8134ef565e78621f1e1793555bd6633c5ac144ae0f89604ed3ae3f80b3c8e6',
+    queryWhatsNewFeed: 'd889c8c936ab192af8ced595427f5ba2acdf63478fdc0a181c8d477f8322630e',
     browsePage: 'f5c4e6d668f5716464a231c1cc8b22c1cbf6ad68b09929fd7de813a30581298b',
     browseAll: 'dbd8b55e09a58afc52eab438bc228ba28fd72ac2f2148c6c26354980e4579001',
     recentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
@@ -86,8 +87,8 @@
       case 'Playlist': return { uri: d.uri, title: d.name, subtitle: strip(d.description) || (d.ownerV2 && d.ownerV2.data && d.ownerV2.data.name) || '', image: pickImg(d.images) };
       case 'Album': return { uri: d.uri, title: d.name, subtitle: names(d.artists), image: pickImg(d.coverArt), color: darkColor(d.coverArt), kind: (d.albumType || d.type || 'album').toLowerCase() };
       case 'Artist': return { uri: d.uri, title: d.profile && d.profile.name, subtitle: 'アーティスト', image: pickImg(d.visuals || d), round: true };
-      case 'Podcast': return { uri: d.uri, title: d.name, subtitle: d.publisher && d.publisher.name || 'ポッドキャスト', image: pickImg(d.coverArt) };
-      case 'Episode': return { uri: d.uri, title: d.name, subtitle: d.podcastV2 && d.podcastV2.data && d.podcastV2.data.name || 'エピソード', image: pickImg(d.coverArt) };
+      case 'Podcast': return { uri: d.uri, title: d.name, subtitle: d.publisher && d.publisher.name || 'ポッドキャスト', image: pickImg(d.coverArt), kind: 'show' };
+      case 'Episode': return { uri: d.uri, title: d.name, subtitle: (d.podcastV2 && d.podcastV2.data && d.podcastV2.data.name || 'エピソード') + (d.releaseDate && d.releaseDate.isoString ? ' • ' + d.releaseDate.isoString.slice(0, 10).replace(/^(\d+)-0?(\d+)-0?(\d+)$/, '$1年$2月$3日') : ''), image: pickImg(d.coverArt), color: darkColor(d.coverArt), kind: 'episode' };
       case 'Track': return { uri: d.uri, title: d.name, subtitle: names(d.artists), image: pickImg(d.albumOfTrack) };
       case 'BrowseSectionContainer': {
         var cr = d.data && d.data.cardRepresentation;
@@ -111,6 +112,12 @@
       }).then(function (r) {
         var h = r.data && r.data.home;
         if (!h) throw new Error('no home');
+        // ポッドキャストの「フォロー中」は、Web 版では新着フィード（エピソードのみ）から作る
+        if (a.facet === 'podcasts-following-chip') return gql('queryWhatsNewFeed', { offset: 0, limit: 30, onlyUnPlayedItems: false, includedContentTypes: ['EPISODE'] }).then(function (w) {
+          var items = (((w.data || {}).whatsNewFeedItems || {}).items || []).map(function (x) { return card(x.content || x); }).filter(function (c) { return c && c.uri; });
+          return { greeting: '', shortcuts: [], chips: (h.homeChips || []).map(function (c) { return { id: c.id, label: c.label && c.label.transformedLabel || '', sub: (c.subChips || []).map(function (x) { return { id: x.id, label: x.label && x.label.transformedLabel || '' }; }) }; }),
+            sections: items.map(function (c) { return { title: '', items: [c], feed: true }; }), emptyPodcasts: !items.length };
+        });
         var out = { greeting: h.greeting && h.greeting.transformedLabel || '', shortcuts: [], sections: [],
           // 上の「音楽」「ポッドキャスト」（選ぶと「フォロー中」が続く）
           chips: (h.homeChips || []).map(function (c) { return { id: c.id, label: c.label && c.label.transformedLabel || '', sub: (c.subChips || []).map(function (x) { return { id: x.id, label: x.label && x.label.transformedLabel || '' }; }) }; }) };
@@ -127,6 +134,8 @@
           items = items.filter(function (c) { return c && c.uri && c.title; });
           if (!items.length) return;
           if (type === 'HomeShortsSectionData') out.shortcuts = items.slice(0, 8);
+          // ポッドキャストのタブの「視聴番組」は、公式アプリと同じく上に小さく並べる
+          else if (a.facet === 'podcasts-chip' && items.every(function (c) { return c.kind === 'show'; })) out.shows = items;
           // ポッドキャストのおすすめなどは 1 件ずつの大きなカード（公式アプリと同じ）
           else out.sections.push({ title: s.data && s.data.title && s.data.title.transformedLabel || '', items: items, feed: type === 'HomeFeedBaselineSectionData' || items.length === 1 });
         });

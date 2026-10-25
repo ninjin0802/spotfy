@@ -27,7 +27,7 @@ data class Page(
 
 data class Chip(val id: String, val label: String, val sub: List<Chip> = emptyList())
 
-data class HomeFeed(val greeting: String, val shortcuts: List<Card>, val shelves: List<Shelf>, val chips: List<Chip> = emptyList())
+data class HomeFeed(val greeting: String, val shortcuts: List<Card>, val shelves: List<Shelf>, val chips: List<Chip> = emptyList(), val shows: List<Card> = emptyList(), val emptyPodcasts: Boolean = false)
 
 /** 再生状態。位置は [at]（Web Player の時刻）時点の値なので、表示時に経過分を足す */
 data class PlayerState(
@@ -128,6 +128,8 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
         return HomeFeed(
             greeting = o.optString("greeting"),
             shortcuts = cards(o.optJSONArray("shortcuts")),
+            shows = cards(o.optJSONArray("shows")),
+            emptyPodcasts = o.optBoolean("emptyPodcasts"),
             chips = (o.optJSONArray("chips") ?: JSONArray()).let { a ->
                 (0 until a.length()).map { i -> a.getJSONObject(i).let { c ->
                     Chip(c.optString("id"), c.optString("label"), (c.optJSONArray("sub") ?: JSONArray()).let { b -> (0 until b.length()).map { j -> b.getJSONObject(j).let { Chip(it.optString("id"), it.optString("label")) } } })

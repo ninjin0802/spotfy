@@ -84,8 +84,10 @@ fun QueueSheet(bridge: Bridge, player: PlayerState, onDismiss: () -> Unit) {
     var q by remember { mutableStateOf<Bridge.Queue?>(null) }
     var edit by remember { mutableStateOf(false) }
     var timerOpen by remember { mutableStateOf(false) }
+    // 並べ替えで指を動かしている間は、シートや一覧が一緒に動かないようにする（引っかかりの原因）
+    var dragging by remember { mutableStateOf(false) }
     LaunchedEffect(player.uri) { q = runCatching { bridge.queue() }.getOrNull() ?: q }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424), dragHandle = { Grip() }) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424), dragHandle = { Grip() }, sheetGesturesEnabled = !dragging) {
         Column(Modifier.fillMaxHeight(0.92f).windowInsetsPadding(WindowInsets.navigationBars)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -94,16 +96,16 @@ fun QueueSheet(bridge: Bridge, player: PlayerState, onDismiss: () -> Unit) {
                 }
                 Text(if (edit) "完了" else "編集", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(CircleShape).clickable { edit = !edit }.padding(10.dp))
             }
-            LazyColumn(Modifier.weight(1f)) {
+            LazyColumn(Modifier.weight(1f), userScrollEnabled = !dragging) {
                 q?.current?.let { c -> item { QRow(c, true, false, {}, {}) } }
                 fun refresh() { scope.launch { kotlinx.coroutines.delay(300); q = runCatching { bridge.queue() }.getOrNull() ?: q } }
                 q?.queued?.takeIf { it.isNotEmpty() }?.let { list ->
                     item { Text("次に再生", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
-                    item { DragList(list, edit, onSkip = { scope.launch { runCatching { bridge.skipTo(it) }; refresh() } }, onRemove = { scope.launch { runCatching { bridge.unqueue(it) }; refresh() } }) { item, target, after -> scope.launch { runCatching { bridge.reorder(item, target, after) }; refresh() } } }
+                    item { DragList(list, edit, onDragging = { dragging = it }, onSkip = { scope.launch { runCatching { bridge.skipTo(it) }; refresh() } }, onRemove = { scope.launch { runCatching { bridge.unqueue(it) }; refresh() } }) { item, target, after -> scope.launch { runCatching { bridge.reorder(item, target, after) }; refresh() } } }
                 }
                 q?.next?.takeIf { it.isNotEmpty() }?.let { list ->
                     item { Text("この後に再生" + (q?.context?.takeIf { it.isNotEmpty() }?.let { "：$it" } ?: ""), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
-                    item { DragList(list, edit, onSkip = { scope.launch { runCatching { bridge.skipTo(it) }; refresh() } }, onRemove = { scope.launch { runCatching { bridge.unqueue(it) }; refresh() } }) { item, target, after -> scope.launch { runCatching { bridge.reorder(item, target, after) }; refresh() } } }
+                    item { DragList(list, edit, onDragging = { dragging = it }, onSkip = { scope.launch { runCatching { bridge.skipTo(it) }; refresh() } }, onRemove = { scope.launch { runCatching { bridge.unqueue(it) }; refresh() } }) { item, target, after -> scope.launch { runCatching { bridge.reorder(item, target, after) }; refresh() } } }
                 }
             }
             // 下：シャッフル・リピート・タイマー
@@ -119,7 +121,7 @@ fun QueueSheet(bridge: Bridge, player: PlayerState, onDismiss: () -> Unit) {
 
 /** 右の「≡」を押さえたまま上下に動かすと並べ替えられる一覧（公式アプリと同じ） */
 @Composable
-private fun DragList(items: List<Bridge.QItem>, edit: Boolean, onSkip: (Bridge.QItem) -> Unit, onRemove: (Bridge.QItem) -> Unit, onMove: (Bridge.QItem, Bridge.QItem, Boolean) -> Unit) {
+private fun DragList(items: List<Bridge.QItem>, edit: Boolean, onDragging: (Boolean) -> Unit, onSkip: (Bridge.QItem) -> Unit, onRemove: (Bridge.QItem) -> Unit, onMove: (Bridge.QItem, Bridge.QItem, Boolean) -> Unit) {
     val list = remember(items) { androidx.compose.runtime.mutableStateListOf<Bridge.QItem>().apply { addAll(items) } }
     var dragKey by remember { mutableStateOf<String?>(null) }
     var offset by remember { mutableStateOf(0f) }
@@ -134,17 +136,17 @@ private fun DragList(items: List<Bridge.QItem>, edit: Boolean, onSkip: (Bridge.Q
             ) {
                 QRow(it, false, edit, { onSkip(it) }, { onRemove(it) }, handle = Modifier.pointerInput(key) {
                     detectDragGestures(
-                        onDragStart = { dragKey = key; offset = 0f; startIndex = list.indexOfFirst { x -> x.uid + x.uri == key } },
+                        onDragStart = { onDragging(true); dragKey = key; offset = 0f; startIndex = list.indexOfFirst { x -> x.uid + x.uri == key } },
                         onDragEnd = {
                             val from = startIndex
                             val to = list.indexOfFirst { x -> x.uid + x.uri == key }
-                            dragKey = null; offset = 0f
+                            dragKey = null; offset = 0f; onDragging(false)
                             if (from >= 0 && to >= 0 && from != to) {
                                 val moved = list[to]
                                 if (to > from) onMove(moved, list[to - 1], true) else onMove(moved, list[to + 1], false)
                             }
                         },
-                        onDragCancel = { dragKey = null; offset = 0f },
+                        onDragCancel = { dragKey = null; offset = 0f; onDragging(false) },
                         onDrag = { change, d ->
                             change.consume()
                             offset += d.y

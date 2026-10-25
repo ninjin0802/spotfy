@@ -14,8 +14,8 @@ android {
         applicationId = "com.ninjin.spotifyweb"
         minSdk = 26
         targetSdk = 36
-        versionCode = 105
-        versionName = "2.0.0-alpha6"
+        versionCode = 106
+        versionName = "2.0.0-alpha7"
     }
     buildFeatures { buildConfig = true; compose = true }
     // 署名鍵の情報はリポジトリの外（~/.config/spotfy/keystore.properties）に置く
@@ -52,7 +52,7 @@ kotlin { jvmToolchain(17) }
 dependencies {
     implementation("androidx.webkit:webkit:1.14.0")
     // 画面は Jetpack Compose で描く（データと再生は裏の Web Player から）
-    implementation(platform("androidx.compose:compose-bom:2025.08.00"))
+    implementation(platform("androidx.compose:compose-bom:2025.10.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")

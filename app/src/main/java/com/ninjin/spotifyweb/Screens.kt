@@ -212,14 +212,14 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
         }
         item {
             Row(
-                Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(48.dp).clip(RoundedCornerShape(6.dp)).background(Color.White).clickable { typing = true }.padding(horizontal = 12.dp),
+                Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(46.dp).clip(RoundedCornerShape(6.dp)).background(Color.White).clickable { typing = true }.padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(rememberVectorPainter(Icons.search), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color.Black))
                 Text("何を聴きたいですか？", color = Color(0xFF6A6A6A), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
             }
         }
-        if (tiles.isNotEmpty()) item { Text2("すべてを見る", 16, FontWeight.Bold, Modifier.padding(start = 16.dp, top = 24.dp, bottom = 12.dp)) }
+        if (tiles.isNotEmpty()) item { Spacer(Modifier.height(16.dp)) }
         items(tiles.chunked(2)) { row ->
             Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { t -> GenreTile(t, Modifier.weight(1f)) { onOpen(t) } }
@@ -233,11 +233,12 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
 @Composable
 private fun GenreTile(t: Card, m: Modifier, onClick: () -> Unit) {
     val bg = runCatching { Color(android.graphics.Color.parseColor(t.subtitle)) }.getOrDefault(Card2)
-    Box(m.height(100.dp).clip(RoundedCornerShape(6.dp)).background(bg).clickable(onClick = onClick)) {
-        Text(t.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, modifier = Modifier.padding(12.dp))
+    // 公式アプリと同じ、横長で低いタイル（右下にジャケットを斜めに）
+    Box(m.height(46.dp).clip(RoundedCornerShape(4.dp)).background(bg).clickable(onClick = onClick)) {
+        Text(t.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 15.sp, modifier = Modifier.padding(start = 8.dp, top = 6.dp, end = 44.dp))
         AsyncImage(
             t.image, null,
-            Modifier.align(Alignment.BottomEnd).offset(x = 14.dp, y = 4.dp).size(68.dp).rotate(25f).clip(RoundedCornerShape(4.dp)),
+            Modifier.align(Alignment.BottomEnd).offset(x = 8.dp, y = 6.dp).size(42.dp).rotate(25f).clip(RoundedCornerShape(3.dp)),
             contentScale = ContentScale.Crop,
         )
     }
@@ -321,8 +322,11 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
     var sort by remember { mutableStateOf(0) }
     LaunchedEffect(ready) { if (ready) runCatching { bridge.library() }.onSuccess { items = it } }
     val liked = Card("spotify:collection:tracks", "お気に入りの曲", "プレイリスト", "", false, "liked", true)
-    val base = listOf(liked) + items.filter { !it.uri.contains(":collection") && it.kind != "your-episodes" }
-    val filtered = base.filter { filter.isEmpty() || it.kind == filter || (filter == "playlist" && it.kind == "liked") }
+    val base = listOf(liked) + items.filter { !it.uri.contains(":collection") && (it.kind != "liked-songs") }
+    val filtered = base.filter {
+        filter.isEmpty() || it.kind == filter || (filter == "playlist" && (it.kind == "liked" || it.kind == "your-episodes")) ||
+            (filter == "show" && (it.kind == "show" || it.kind == "your-episodes"))
+    }
         .filter { query.isNullOrBlank() || it.title.contains(query!!, ignoreCase = true) || it.subtitle.contains(query!!, ignoreCase = true) }
     val sorted = when (sort) { 1 -> filtered.sortedBy { it.title.lowercase() }; 2 -> filtered.sortedBy { it.subtitle.substringAfter(" • ", "") }; else -> filtered }
         .sortedByDescending { it.pinned }
@@ -350,9 +354,9 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
             }
         }
         item {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (filter.isNotEmpty()) Ico(Icons.close, 16, Color.White, 34) { filter = "" }
-                listOf("playlist" to "プレイリスト", "album" to "アルバム", "artist" to "アーティスト").forEach { (k, label) ->
+                listOf("playlist" to "プレイリスト", "show" to "ポッドキャスト", "album" to "アルバム", "artist" to "アーティスト").forEach { (k, label) ->
                     if (filter.isEmpty() || filter == k) Text(
                         label, color = if (filter == k) Color.Black else Color.White, fontSize = 14.sp,
                         modifier = Modifier.clip(CircleShape).background(if (filter == k) Accent else Card2).clickable { filter = if (filter == k) "" else k }.padding(horizontal = 14.dp, vertical = 7.dp),
@@ -361,10 +365,11 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
             }
         }
         item {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(1.dp).background(Color(0xFF2A2A2A)))
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.clip(CircleShape).clickable { sort = (sort + 1) % 3 }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Image(rememberVectorPainter(LibIcons.sort), null, Modifier.size(18.dp))
-                    Text(listOf("最近", "アルファベット順", "クリエーター")[sort], color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
+                    Text(listOf("再生履歴", "アルファベット順", "クリエーター")[sort], color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
                 }
                 Spacer(Modifier.weight(1f))
                 Ico(if (grid) LibIcons.list else LibIcons.grid, 20) { grid = !grid }
@@ -385,12 +390,12 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
             }
         } else items(sorted, key = { it.uri }) { c ->
             Row(Modifier.fillMaxWidth().clickable { onOpen(c) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                LibCover(c, Modifier.size(64.dp))
+                LibCover(c, Modifier.size(56.dp))
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(c.title, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (c.pinned) Image(rememberVectorPainter(LibIcons.pin), null, Modifier.size(13.dp).padding(end = 2.dp), colorFilter = ColorFilter.tint(Accent))
-                        Text(if (c.kind == "liked") "プレイリスト • ${user?.name ?: ""}" else c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = if (c.pinned) 4.dp else 0.dp))
+                        Text(if (c.kind == "liked") "プレイリスト • ${user?.name ?: ""}" else if (c.kind == "your-episodes") "プレイリスト • 保存済み＆ダウンロード済みのエピソード" else c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = if (c.pinned) 4.dp else 0.dp))
                     }
                 }
             }
@@ -400,7 +405,9 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
 
 @Composable
 private fun LibCover(c: Card, m: Modifier) {
-    if (c.kind == "liked") Box(m.clip(RoundedCornerShape(4.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))), contentAlignment = Alignment.Center) {
+    if (c.kind == "your-episodes") Box(m.clip(RoundedCornerShape(4.dp)).background(Color(0xFF006450)), contentAlignment = Alignment.Center) {
+        Image(rememberVectorPainter(LibIcons.bookmark), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Accent))
+    } else if (c.kind == "liked") Box(m.clip(RoundedCornerShape(4.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))), contentAlignment = Alignment.Center) {
         Text("♥", color = Color.White, fontSize = 24.sp)
     } else AsyncImage(c.image, null, m.clip(if (c.round) CircleShape else RoundedCornerShape(4.dp)).background(Card2), contentScale = ContentScale.Crop)
 }
@@ -409,5 +416,6 @@ private object LibIcons {
     val sort = line("M7 4v16M3.5 7.5 7 4l3.5 3.5M17 20V4M13.5 16.5 17 20l3.5-3.5", 1.8f)
     val grid = line("M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z", 1.8f)
     val list = line("M4 6h16M4 12h16M4 18h16", 1.8f)
+    val bookmark = icon("M6 3h12v18l-6-4.5L6 21z")
     val pin = icon("M14.5 2.5l7 7-2.2.7-4.6 4.6.4 4.4-1.6 1.6-3.9-3.9L4 22.5 2.5 21l5.6-5.6-3.9-3.9 1.6-1.6 4.4.4 4.6-4.6z")
 }

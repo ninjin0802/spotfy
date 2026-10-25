@@ -59,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -84,10 +85,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal val Bg = Color(0xFF121212)
+/** テーマ（myspoti と同じく、アクセントカラー 5 色と真っ黒の背景を選べる） */
+object Theme {
+    val accents = listOf("green" to Color(0xFF1ED760), "blue" to Color(0xFF509BF5), "purple" to Color(0xFFAF7AF6), "pink" to Color(0xFFF573A0), "orange" to Color(0xFFFF9E3D))
+    var accent by mutableStateOf(accents[0].second)
+    var amoled by mutableStateOf(false)
+    fun load(host: AppHost) {
+        accent = accents.firstOrNull { it.first == host.setting("accent", "green") }?.second ?: accents[0].second
+        amoled = host.setting("amoled", "false") == "true"
+    }
+}
+
+internal val Bg: Color get() = if (Theme.amoled) Color.Black else Color(0xFF121212)
 internal val Card2 = Color(0xFF2A2A2A)
 internal val Sub = Color(0xFFB3B3B3)
-internal val Accent = Color(0xFF1ED760)
+internal val Accent: Color get() = Theme.accent
 
 /** 24x24 の塗りのアイコン */
 internal fun icon(d: String): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
@@ -126,6 +138,7 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 /** アプリの画面（Compose）。データと再生は [bridge] 経由で裏の Web Player に任せる */
 @Composable
 fun NativeApp(bridge: Bridge, host: AppHost) {
+    remember { Theme.load(host); true }
     var tab by remember { mutableStateOf(Tab.Home) }
     var playerOpen by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
@@ -135,6 +148,7 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     var queueOpen by remember { mutableStateOf(false) }
     var createOpen by remember { mutableStateOf(false) }
     var profileOpen by remember { mutableStateOf(false) }
+    var confirmSwitch by remember { mutableStateOf(false) }
     BackHandler(enabled = profileOpen && !playerOpen) { profileOpen = false }
     val player by bridge.player.collectAsState()
     val ready by bridge.ready.collectAsState()
@@ -159,7 +173,7 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
         // タブごとに開いたページを覚えておく（タブを切り替えて戻っても、そのまま）
         Box(Modifier.fillMaxSize()) {
             when (tab) {
-                Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open, onMenu = { menu = it })
+                Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open, onMenu = { menu = it }, onBrowse = { tab = Tab.Search })
                 Tab.Search -> SearchScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
                 Tab.Library -> LibraryScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open, onCreate = { createOpen = true })
             }
@@ -184,7 +198,16 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(remember { MutableInteractionSource() }, null) { drawerOpen = false })
         }
         AnimatedVisibility(drawerOpen, enter = slideInHorizontally { -it }, exit = slideOutHorizontally { -it }) {
-            Drawer(user, onProfile = { drawerOpen = false; profileOpen = true }, onSettings = { drawerOpen = false; settingsOpen = true })
+            Drawer(
+                user, player,
+                onProfile = { drawerOpen = false; profileOpen = true },
+                onAddAccount = { drawerOpen = false; confirmSwitch = true },
+                onReport = { drawerOpen = false; profileOpen = true },
+                onRecent = { drawerOpen = false; tab = Tab.Library },
+                onNews = { drawerOpen = false; tab = Tab.Home },
+                onSettings = { drawerOpen = false; settingsOpen = true },
+                onInvite = { drawerOpen = false; host.share("https://open.spotify.com/", "Spotify に招待") },
+            )
         }
         AnimatedVisibility(
             visible = playerOpen && player.has,
@@ -194,6 +217,15 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
                 onMenu = { menu = MenuTarget.OfTrack(Track(player.uri, player.title, player.artist, player.image, player.dur)) },
                 onOpen = { c -> playerOpen = false; open(c) })
         }
+        // 別のアカウントを使うには、いまのアカウントからログアウトしてログインし直す（確認してから）
+        if (confirmSwitch) androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmSwitch = false },
+            title = { Text("アカウントを追加する") },
+            text = { Text("いまのアカウントからログアウトして、別のアカウントでログインします。") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false; host.logout() }) { Text("ログアウトして続ける", color = Accent) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false }) { Text("キャンセル", color = Color.White) } },
+            containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
+        )
         if (devicesOpen) DevicesSheet(bridge, host) { devicesOpen = false }
         if (queueOpen) QueueSheet(bridge, player) { queueOpen = false }
         if (createOpen) CreateSheet(bridge, onCreated = { c -> open(c) }) { createOpen = false }
@@ -244,7 +276,7 @@ internal fun Avatar(user: Bridge.User?, size: Int, onClick: (() -> Unit)? = null
 }
 
 @Composable
-private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onPlay: (Card) -> Unit, onMenu: (MenuTarget) -> Unit = {}) {
+private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onPlay: (Card) -> Unit, onMenu: (MenuTarget) -> Unit = {}, onBrowse: () -> Unit = {}) {
     // 起動直後は前回のホームをすぐ出し、Web Player の準備ができたら新しい内容に差し替える
     var feed by remember { mutableStateOf(bridge.cachedHome()) }
     var chips by remember { mutableStateOf(feed?.chips ?: emptyList()) }
@@ -279,8 +311,28 @@ private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAva
         if (loading) { item { Box(Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) { Text("読み込み中…", color = Sub, fontSize = 14.sp) } }; return@LazyColumn }
         if (f.shortcuts.isNotEmpty()) item { Shortcuts(f.shortcuts, onPlay) }
         // フォロー中のページなど、見出しのない 1 件ずつのカードが並ぶときは「最新リリース」の見出し
-        if (f.shelves.firstOrNull()?.let { it.feed && it.title.isEmpty() } == true) item {
-            Text("最新リリース", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+        val podcastFollow = facet == "podcasts-following-chip"
+        if (podcastFollow || f.shelves.firstOrNull()?.let { it.feed && it.title.isEmpty() } == true) item {
+            Text(if (podcastFollow) "最新エピソード" else "最新リリース", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+        }
+        // 公式アプリと同じ、フォローしている番組がないときの案内
+        if (podcastFollow && f.emptyPodcasts) item {
+            Column(
+                Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF242424)).padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("フォローしているポッドキャストはありません", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("お気に入りをフォローして、最新情報を逃さずチェックしましょう。", color = Sub, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                Text("ポッドキャストをブラウズ", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 20.dp).clip(CircleShape).background(Color.White).clickable { onBrowse() }.padding(horizontal = 22.dp, vertical = 11.dp))
+            }
+        }
+        // ポッドキャストのタブの上：視聴番組の小さいタイルと「＋」
+        if (f.shows.isNotEmpty()) item {
+            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(f.shows) { c -> AsyncImage(c.image, null, Modifier.size(100.dp).clip(RoundedCornerShape(6.dp)).background(Card2).clickable { onPlay(c) }, contentScale = ContentScale.Crop) }
+                item { Box(Modifier.size(100.dp).clip(RoundedCornerShape(6.dp)).background(Card2).clickable { onBrowse() }, contentAlignment = Alignment.Center) { Image(rememberVectorPainter(Icons.close), null, Modifier.size(28.dp).rotate(45f), colorFilter = ColorFilter.tint(Sub)) } }
+            }
         }
         items(f.shelves) { s -> if (s.feed) FeedCard(bridge, s, onPlay, onMenu) else ShelfRow(s, onPlay) }
     }
@@ -361,7 +413,7 @@ private fun FeedCard(bridge: Bridge, s: Shelf, onPlay: (Card) -> Unit, onMenu: (
     // ジャケットの濃い色をさらに少し暗くした色（公式アプリと同じ見え方）
     val bg = runCatching { Color(android.graphics.Color.parseColor(c.color)) }.getOrNull()?.let { Color(it.red * 0.62f, it.green * 0.62f, it.blue * 0.62f) } ?: Card2
     Column(Modifier.padding(horizontal = 16.dp).padding(top = 16.dp)) {
-        if (s.title.isNotEmpty()) Text(s.title, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
+        if (s.title.isNotEmpty()) Text(s.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 12.dp))
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(bg).clickable { onPlay(c) }.padding(16.dp)) {
             Row {
                 AsyncImage(c.image, null, Modifier.size(88.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
@@ -475,7 +527,7 @@ private fun MiniPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Colo
 private fun TabBar(tab: Tab, onSelect: (Tab) -> Unit) {
     Row(
         Modifier.fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color(0x00121212), Color(0xE6121212), Color(0xFF121212))))
+            .background(Brush.verticalGradient(listOf(Color(0x99121212), Color(0xF2121212), Color(0xFF121212))))
             .windowInsetsPadding(WindowInsets.navigationBars).padding(top = 12.dp, bottom = 4.dp),
     ) {
         Tab.entries.forEach { t ->
@@ -598,28 +650,65 @@ private fun Color.compositeOver(bg: Color): Color {
     return Color(red * a + bg.red * (1 - a), green * a + bg.green * (1 - a), blue * a + bg.blue * (1 - a))
 }
 
+private object DrawerIcons {
+    val report = line("M4 20V10M9.5 20V4M15 20v-7M20.5 20V8", 1.8f)
+    val history = line("M12 21a9 9 0 1 0-8.5-6M3 20v-5h5M12 7v5l3 2", 1.8f)
+    val news = line("M13 2 4 14h7l-1 8 9-12h-7z", 1.6f)
+    val plus = line("M12 5v14M5 12h14", 2f)
+}
+
+/** サイドメニュー（公式アプリと同じ：アカウントのカード、リスニングレポート・最近・新着・設定、アクティビティと友達を招待） */
 @Composable
-private fun Drawer(user: Bridge.User?, onProfile: () -> Unit, onSettings: () -> Unit) {
+private fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Unit, onAddAccount: () -> Unit, onReport: () -> Unit, onRecent: () -> Unit, onNews: () -> Unit, onSettings: () -> Unit, onInvite: () -> Unit) {
     Column(
-        Modifier.fillMaxHeight().width(300.dp).background(Color(0xFF1F1F1F))
+        Modifier.fillMaxHeight().width(310.dp).background(Color(0xFF1F1F1F))
             .clickable(remember { MutableInteractionSource() }, null) {}
-            .windowInsetsPadding(WindowInsets.statusBars).padding(top = 16.dp),
+            .windowInsetsPadding(WindowInsets.statusBars).padding(top = 8.dp),
     ) {
-        Row(Modifier.fillMaxWidth().clickable(onClick = onProfile).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Avatar(user, 52)
-            Column(Modifier.padding(start = 12.dp)) {
-                Text(user?.name ?: "", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("プロフィールを表示", color = Sub, fontSize = 13.sp)
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF2A2A2A))) {
+            Row(Modifier.fillMaxWidth().clickable(onClick = onProfile).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Avatar(user, 52)
+                Column(Modifier.padding(start = 12.dp)) {
+                    Text(user?.name ?: "", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("プロフィールを表示", color = Sub, fontSize = 13.sp)
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x1FFFFFFF)))
+            Row(Modifier.fillMaxWidth().clickable(onClick = onAddAccount).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(32.dp).clip(CircleShape).background(Color(0xFF3E3E3E)), contentAlignment = Alignment.Center) {
+                    Image(rememberVectorPainter(DrawerIcons.plus), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Sub))
+                }
+                Text("アカウントを追加する", color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp))
             }
         }
-        Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(Color(0xFF333333)))
-        Row(
-            Modifier.fillMaxWidth().clickable(onClick = onSettings).padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Image(rememberVectorPainter(Icons.gear), null, Modifier.size(24.dp))
-            Text("設定とプライバシー", color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 16.dp))
+        DrawerItem(DrawerIcons.report, "リスニングレポート", onReport)
+        DrawerItem(DrawerIcons.history, "最近", onRecent)
+        DrawerItem(DrawerIcons.news, "あなたへのおすすめ新着", onNews)
+        DrawerItem(Icons.gear, "設定とプライバシー", onSettings)
+        // アクティビティ（自分のアイコンに再生中のジャケット）と友達を招待
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(Modifier.clickable(onClick = onProfile), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(64.dp)) {
+                    Box(Modifier.size(64.dp).clip(CircleShape).background(Color(0xFF3E3E3E)).padding(3.dp)) { Avatar(user, 58) }
+                    if (player.image.isNotEmpty()) AsyncImage(player.image, null, Modifier.size(26.dp).align(Alignment.BottomEnd).clip(RoundedCornerShape(3.dp)), contentScale = ContentScale.Crop)
+                }
+                Text("アクティビティ", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            }
+            Column(Modifier.clickable(onClick = onInvite), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(64.dp).clip(CircleShape).background(Color(0xFF3E3E3E)), contentAlignment = Alignment.Center) {
+                    Image(rememberVectorPainter(DrawerIcons.plus), null, Modifier.size(26.dp), colorFilter = ColorFilter.tint(Color.White))
+                }
+                Text("友達を招待", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            }
         }
+    }
+}
+
+@Composable
+private fun DrawerItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Image(rememberVectorPainter(icon), null, Modifier.size(26.dp))
+        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 16.dp))
     }
 }
 
@@ -639,7 +728,7 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 24) { if (page != null) page = null else onBack() }
             Text(
-                when (page) { "quality" -> "メディアの音質"; "playback" -> "再生"; "account" -> "アカウント"; else -> "設定" },
+                when (page) { "quality" -> "メディアの音質"; "playback" -> "再生"; "account" -> "アカウント"; "look" -> "コンテンツと表示"; else -> "設定" },
                 color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp),
             )
         }
@@ -647,6 +736,7 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
             when (page) {
                 null -> {
                     SettingRow("アカウント", user?.name ?: "") { page = "account" }
+                    SettingRow("コンテンツと表示", "テーマカラー・背景") { page = "look" }
                     SettingRow("再生", "バックグラウンド再生") { page = "playback" }
                     SettingRow("メディアの音質", "Wi-Fi・モバイルデータ通信でのストリーミング") { page = "quality" }
                     SettingRow("このアプリについて", "Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません") {}
@@ -654,6 +744,18 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
                 "account" -> {
                     SettingRow("ユーザー名", user?.name ?: "") {}
                     SettingRow("ログアウト", "このアプリからログアウトします") { host.logout() }
+                }
+                "look" -> {
+                    Section("テーマカラー")
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Theme.accents.forEach { (key, color) ->
+                            Box(
+                                Modifier.size(44.dp).clip(CircleShape).background(if (Theme.accent == color) Color.White else Color.Transparent).padding(3.dp)
+                                    .clip(CircleShape).background(color).clickable { Theme.accent = color; host.setSetting("accent", key) },
+                            )
+                        }
+                    }
+                    SwitchRow("AMOLED ブラック", "背景を真っ黒にして電池を節約", Theme.amoled) { Theme.amoled = it; host.setSetting("amoled", it.toString()) }
                 }
                 "playback" -> {
                     var bg by remember { mutableStateOf(host.setting("background", "true") == "true") }
