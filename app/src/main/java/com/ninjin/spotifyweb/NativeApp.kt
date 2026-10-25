@@ -75,10 +75,14 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     var queueOpen by remember { mutableStateOf(false) }
     var createOpen by remember { mutableStateOf(false) }
     var profileOpen by remember { mutableStateOf(false) }
+    var newsOpen by remember { mutableStateOf(false) }
+    var recentsOpen by remember { mutableStateOf(false) }
     var confirmSwitch by remember { mutableStateOf(false) }
     var otherUser by remember { mutableStateOf<String?>(null) }
     BackHandler(enabled = otherUser != null && !playerOpen) { otherUser = null }
     BackHandler(enabled = profileOpen && !playerOpen) { profileOpen = false }
+    BackHandler(enabled = newsOpen && !playerOpen) { newsOpen = false }
+    BackHandler(enabled = recentsOpen && !playerOpen) { recentsOpen = false }
     val rawPlayer by bridge.player.collectAsState()
     // ほかの機器の名前は、2.5 秒続いたときだけ出す（起動直後に前の再生先が一瞬見えるのを防ぐ）
     val shownDevice by androidx.compose.runtime.produceState("" to "", rawPlayer.device) {
@@ -123,6 +127,12 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true }, onDevices = { devicesOpen = true })
             TabBar(tab) { if (it == tab) stacks[it]!!.clear() else tab = it }
         }
+        AnimatedVisibility(newsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
+            WhatsNewScreen(bridge, onBack = { newsOpen = false }, onPlay = { c -> newsOpen = false; open(c) }, onMenu = { menu = it })
+        }
+        AnimatedVisibility(recentsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
+            RecentsScreen(bridge, onBack = { recentsOpen = false }, onOpen = { c -> recentsOpen = false; open(c) })
+        }
         AnimatedVisibility(profileOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             ProfileScreen(bridge, user, onBack = { profileOpen = false }, onOpen = { c -> profileOpen = false; open(c) },
                 onEdited = { scope.launch { runCatching { bridge.user() }.getOrNull()?.let { user = it } } })
@@ -145,8 +155,8 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
                 onProfile = { drawerOpen = false; profileOpen = true },
                 onAddAccount = { drawerOpen = false; confirmSwitch = true },
                 onReport = { drawerOpen = false; profileOpen = true },
-                onRecent = { drawerOpen = false; tab = Tab.Library },
-                onNews = { drawerOpen = false; tab = Tab.Home },
+                onRecent = { drawerOpen = false; recentsOpen = true },
+                onNews = { drawerOpen = false; newsOpen = true },
                 onSettings = { drawerOpen = false; settingsOpen = true },
                 onInvite = { drawerOpen = false; host.share("https://open.spotify.com/", tr("Spotify に招待", "Invite to Spotify")) },
             )

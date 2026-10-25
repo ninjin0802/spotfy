@@ -244,6 +244,11 @@ class Bridge(
         val a = o.optJSONArray("list") ?: JSONArray()
         return Devices(o.optString("self"), o.optString("active"), (0 until a.length()).map { i -> a.getJSONObject(i).let { Device(it.optString("id"), it.optString("name"), it.optString("type")) } })
     }
+    suspend fun whatsNew(type: String): List<Card> = cards(call("whatsNew", JSONObject().put("type", type)) as? JSONArray)
+    /** 最近再生したもの（URI と再生した時刻 ms、新しい順） */
+    suspend fun recents(): List<Pair<String, Long>> = (call("recents") as? JSONArray)?.let { a ->
+        (0 until a.length()).map { a.getJSONObject(it).let { o -> o.optString("uri") to o.optLong("at") } }
+    } ?: emptyList()
     suspend fun transfer(id: String) = call("transfer", JSONObject().put("id", id)) == true
 
     data class Lyrics(val synced: Boolean, val lines: List<Pair<Long, String>>, val bg: Int)
