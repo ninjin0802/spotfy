@@ -41,6 +41,7 @@ and looks and behaves much closer to the official app.
 | 🔎 **Search** | Genre tiles, recent searches, live results with type filters |
 | 📚 **Library** | Filters, sorting, list / grid, pins, search in library, create playlists and folders |
 | 🎵 **Player** | Mini and full-screen players tinted by the artwork, lyrics, About the artist, Next up |
+| 🚫 **Ad suppression** | Toggle it in Settings; disables the Web Player's ad managers and mutes/skips playback identified as an ad |
 | 📋 **Queue** | Drag to reorder, remove, shuffle / repeat, sleep timer |
 | ⋮ **Menus** | Bottom sheets for tracks, albums, playlists and artists (swipe down to close) |
 | 📡 **Cast** | Spotify Connect to PCs, speakers and TVs; switch between phone speaker and Bluetooth earphones |
@@ -107,4 +108,4 @@ keyPassword=...
 ## Disclaimer
 
 This software is provided as is, without warranty of any kind. It may stop working without notice if Spotify changes its service.
-Please use it in accordance with Spotify's Terms of Use.
+Blocking ads may violate Spotify's Terms of Use and may affect your account. Please use it in accordance with those terms.

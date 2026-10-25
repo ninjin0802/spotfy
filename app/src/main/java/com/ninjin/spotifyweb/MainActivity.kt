@@ -451,13 +451,14 @@ class MainActivity : ComponentActivity() {
                     "values",
                     JSONObject().put("orientation", settings.getString("orientation", "portrait"))
                         .put("background", settings.getString("background", "true"))
+                        .put("adblock", settings.getString("adblock", "true"))
                         .put("webdebug", settings.getString("webdebug", "false"))
                         .put("deviceName", deviceName()),
                 ).toString()
             )
             "setting" -> {
                 val name = m.optString("name")
-                if (name !in setOf("orientation", "background", "webdebug")) return
+                if (name !in setOf("orientation", "background", "adblock", "webdebug")) return
                 settings.edit().putString(name, m.optString("value")).apply()
                 if (name == "orientation") applyOrientation()
             }

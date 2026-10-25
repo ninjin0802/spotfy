@@ -743,7 +743,7 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
                 null -> {
                     SettingRow("アカウント", user?.name ?: "") { page = "account" }
                     SettingRow("コンテンツと表示", "テーマカラー・背景") { page = "look" }
-                    SettingRow("再生", "バックグラウンド再生・クロスフェード") { page = "playback" }
+                    SettingRow("再生", "バックグラウンド再生・広告抑制・クロスフェード") { page = "playback" }
                     SettingRow("メディアの音質", "Wi-Fi・モバイルデータ通信でのストリーミング") { page = "quality" }
                     SettingRow("このアプリについて", "Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません") {}
                 }
@@ -766,6 +766,8 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
                 "playback" -> {
                     var bg by remember { mutableStateOf(host.setting("background", "true") == "true") }
                     SwitchRow("バックグラウンド再生", "アプリを閉じても再生を続ける", bg) { bg = it; host.setSetting("background", it.toString()) }
+                    var ads by remember { mutableStateOf(host.setting("adblock", "true") == "true") }
+                    SwitchRow("広告をブロック", "広告マネージャーを停止し、広告再生をミュート・スキップする", ads) { ads = it; host.setSetting("adblock", it.toString()) }
                     // クロスフェード：公式アプリと同じく、オンにするとスライダーで 1〜12 秒を選ぶ
                     var xf by remember { mutableStateOf(host.setting("crossfade", "0").toIntOrNull() ?: 0) }
                     var xfLast by remember { mutableStateOf(if (xf > 0) xf else 5) }

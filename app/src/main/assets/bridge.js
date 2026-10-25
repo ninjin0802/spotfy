@@ -33,6 +33,85 @@
     return key ? reg.resolve(key) : null;
   }
 
+  // Web Player が自分で有効化する音声／インストリーム広告マネージャーを停止する。
+  // ページ再読込後やプレーヤー更新後にも再適用できるよう、呼び出しは冪等にしておく。
+  function adBlockingEnabled() {
+    return !window.__native || !__native.getSetting || __native.getSetting('adblock', 'true') !== 'false';
+  }
+  function syncAdManagers() {
+    var managers;
+    try { managers = service('AdManagers'); } catch (e) { return; }
+    var audio = managers && managers.audio;
+    [audio, audio && audio.inStreamApi].forEach(function (manager) {
+      if (!manager) return;
+      var saved = manager.__nativeAdBlockState;
+      try {
+        if (adBlockingEnabled()) {
+          if (saved) return;
+          saved = { enable: manager.enable, descriptor: Object.getOwnPropertyDescriptor(manager, 'enable'), enabled: manager.enabled };
+          if (typeof manager.disable === 'function') manager.disable();
+          if (typeof manager.enable === 'function') Object.defineProperty(manager, 'enable', { value: function () { return false; }, configurable: true, writable: true });
+          if ('enabled' in manager) manager.enabled = false;
+          Object.defineProperty(manager, '__nativeAdBlockState', { value: saved, configurable: true });
+        } else if (saved) {
+          if (saved.descriptor) Object.defineProperty(manager, 'enable', saved.descriptor);
+          else delete manager.enable;
+          if (typeof saved.enable === 'function') saved.enable.call(manager);
+          else if ('enabled' in manager) manager.enabled = saved.enabled;
+          delete manager.__nativeAdBlockState;
+        }
+      } catch (e) {}
+    });
+  }
+
+  // 広告は通常の曲と同じ PlayerAPI state に入る。広告識別子がある場合だけ扱い、
+  // 通常の曲やポッドキャストには影響させない。
+  function isAd(item) {
+    var md = item && item.metadata || {};
+    return !!item && (item.type === 'ad' || /^spotify:ad:/.test(item.uri || '') ||
+      item.provider === 'ad' || !!item.advertiser || md.is_advertisement === true ||
+      md.is_advertisement === 'true' || !!md.ad_id);
+  }
+  var mutedAdUri = '', mutedAdVolume = 1, skippedAdUri = '';
+  function restoreAdVolume() {
+    if (!mutedAdUri) return;
+    var restore = mutedAdVolume;
+    mutedAdUri = '';
+    audioEl().then(function (el) { if (el && !mutedAdUri) el.volume = restore; });
+  }
+  function handleAdPlayback() {
+    syncAdManagers();
+    if (!adBlockingEnabled()) {
+      restoreAdVolume();
+      skippedAdUri = '';
+      return;
+    }
+    var p = service('PlayerAPI');
+    var state = p && p.getState();
+    var item = state && state.item;
+    if (!isAd(item)) {
+      restoreAdVolume();
+      skippedAdUri = '';
+      return;
+    }
+    var uri = item.uri || item.metadata && item.metadata.ad_id || 'advertisement';
+    if (uri !== mutedAdUri) {
+      mutedAdUri = uri;
+    }
+    audioEl().then(function (el) {
+      if (!el || mutedAdUri !== uri) return;
+      if (el.volume > 0.001) mutedAdVolume = el.volume;
+      el.muted = false;
+      el.volume = 0.001;
+    });
+    // 一部の広告はサーバー側キューから挿入され、広告 manager の停止だけでは外れない。
+    // 同じ広告状態の間に複数回送ると次の曲まで飛ばす恐れがあるため、一度だけ試す。
+    if (uri !== skippedAdUri) {
+      skippedAdUri = uri;
+      try { Promise.resolve(p.skipToNext()).catch(function () {}); } catch (e) {}
+    }
+  }
+
   // ---- GraphQL（Web Player 自身のローダーを使う。ログイン情報もそのまま使われる） ----
   var GQL = {
     home: '5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1',
@@ -520,6 +599,7 @@
   }
   var lastKey = '';
   function pushState() {
+    handleAdPlayback();
     var s = snapshot();
     var key = JSON.stringify([s.uri, s.device, s.liked, s.playing, s.shuffle, s.repeat, s.buffering, Math.round(s.pos / 5000)]);
     if (key === lastKey) return;
@@ -560,6 +640,8 @@
     try { p.getEvents().addListener('update', pushState); } catch (e) {}
     if (window.__mConnect) __mConnect.onChange(function () { lastKey = ''; pushState(); });
     setInterval(pushState, 1000);
+    // update event が来ない広告切替にも対応する。
+    setInterval(handleAdPlayback, 300);
     var st = document.createElement('style');
     st.textContent = '.Root, #main > div { content-visibility: hidden !important; }';
     document.head.appendChild(st);
