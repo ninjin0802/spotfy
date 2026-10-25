@@ -42,6 +42,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -92,21 +96,14 @@ fun QueueSheet(bridge: Bridge, player: PlayerState, onDismiss: () -> Unit) {
             }
             LazyColumn(Modifier.weight(1f)) {
                 q?.current?.let { c -> item { QRow(c, true, false, {}, {}) } }
+                fun refresh() { scope.launch { kotlinx.coroutines.delay(300); q = runCatching { bridge.queue() }.getOrNull() ?: q } }
                 q?.queued?.takeIf { it.isNotEmpty() }?.let { list ->
                     item { Text("次に再生", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
-                    items(list, key = { "q" + it.uid + it.uri }) { i ->
-                        QRow(i, false, edit, { scope.launch { runCatching { bridge.skipTo(i) }; q = runCatching { bridge.queue() }.getOrNull() ?: q } }) {
-                            scope.launch { runCatching { bridge.unqueue(i) }; q = runCatching { bridge.queue() }.getOrNull() ?: q }
-                        }
-                    }
+                    item { DragList(list, edit, onSkip = { scope.launch { runCatching { bridge.skipTo(it) }; refresh() } }, onRemove = { scope.launch { runCatching { bridge.unqueue(it) }; refresh() } }) { item, target, after -> scope.launch { runCatching { bridge.reorder(item, target, after) }; refresh() } } }
                 }
                 q?.next?.takeIf { it.isNotEmpty() }?.let { list ->
                     item { Text("この後に再生" + (q?.context?.takeIf { it.isNotEmpty() }?.let { "：$it" } ?: ""), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
-                    items(list, key = { "n" + it.uid + it.uri }) { i ->
-                        QRow(i, false, edit, { scope.launch { runCatching { bridge.skipTo(i) }; q = runCatching { bridge.queue() }.getOrNull() ?: q } }) {
-                            scope.launch { runCatching { bridge.unqueue(i) }; q = runCatching { bridge.queue() }.getOrNull() ?: q }
-                        }
-                    }
+                    item { DragList(list, edit, onSkip = { scope.launch { runCatching { bridge.skipTo(it) }; refresh() } }, onRemove = { scope.launch { runCatching { bridge.unqueue(it) }; refresh() } }) { item, target, after -> scope.launch { runCatching { bridge.reorder(item, target, after) }; refresh() } } }
                 }
             }
             // 下：シャッフル・リピート・タイマー
@@ -120,7 +117,53 @@ fun QueueSheet(bridge: Bridge, player: PlayerState, onDismiss: () -> Unit) {
     if (timerOpen) SleepTimerSheet(bridge) { timerOpen = false }
 }
 
+/** 右の「≡」を押さえたまま上下に動かすと並べ替えられる一覧（公式アプリと同じ） */
+@Composable
+private fun DragList(items: List<Bridge.QItem>, edit: Boolean, onSkip: (Bridge.QItem) -> Unit, onRemove: (Bridge.QItem) -> Unit, onMove: (Bridge.QItem, Bridge.QItem, Boolean) -> Unit) {
+    val list = remember(items) { androidx.compose.runtime.mutableStateListOf<Bridge.QItem>().apply { addAll(items) } }
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var offset by remember { mutableStateOf(0f) }
+    var startIndex by remember { mutableStateOf(-1) }
+    val rowPx = with(androidx.compose.ui.platform.LocalDensity.current) { 60.dp.toPx() }
+    Column {
+        list.forEachIndexed { idx, it ->
+            val key = it.uid + it.uri
+            val dragging = key == dragKey
+            Box(
+                Modifier.zIndexIf(dragging).graphicsLayerY(if (dragging) offset else 0f).background(if (dragging) Color(0xFF333333) else Color.Transparent),
+            ) {
+                QRow(it, false, edit, { onSkip(it) }, { onRemove(it) }, handle = Modifier.pointerInput(key) {
+                    detectDragGestures(
+                        onDragStart = { dragKey = key; offset = 0f; startIndex = list.indexOfFirst { x -> x.uid + x.uri == key } },
+                        onDragEnd = {
+                            val from = startIndex
+                            val to = list.indexOfFirst { x -> x.uid + x.uri == key }
+                            dragKey = null; offset = 0f
+                            if (from >= 0 && to >= 0 && from != to) {
+                                val moved = list[to]
+                                if (to > from) onMove(moved, list[to - 1], true) else onMove(moved, list[to + 1], false)
+                            }
+                        },
+                        onDragCancel = { dragKey = null; offset = 0f },
+                        onDrag = { change, d ->
+                            change.consume()
+                            offset += d.y
+                            val cur = list.indexOfFirst { x -> x.uid + x.uri == key }
+                            if (offset > rowPx / 2 && cur < list.lastIndex) { list.add(cur + 1, list.removeAt(cur)); offset -= rowPx }
+                            else if (offset < -rowPx / 2 && cur > 0) { list.add(cur - 1, list.removeAt(cur)); offset += rowPx }
+                        },
+                    )
+                })
+            }
+        }
+    }
+}
+
+private fun Modifier.zIndexIf(on: Boolean) = if (on) this.then(androidx.compose.ui.Modifier.zIndex(1f)) else this
+private fun Modifier.graphicsLayerY(y: Float) = this.then(androidx.compose.ui.Modifier.graphicsLayer { translationY = y })
+
 private object QIcons {
+    val handle = line("M4 8h16M4 12h16M4 16h16", 1.8f)
     val timer = line("M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2.5 2.5M9.5 2.5h5", 1.6f)
     val remove = line("M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM7.5 12h9", 1.6f)
 }
@@ -134,13 +177,16 @@ private fun BarButton(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 }
 
 @Composable
-private fun QRow(i: Bridge.QItem, current: Boolean, edit: Boolean, onClick: () -> Unit, onRemove: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(enabled = !current, onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun QRow(i: Bridge.QItem, current: Boolean, edit: Boolean, onClick: () -> Unit, onRemove: () -> Unit, handle: Modifier? = null) {
+    Row(Modifier.fillMaxWidth().height(60.dp).clickable(enabled = !current, onClick = onClick).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         if (edit && !current) Box(Modifier.padding(end = 10.dp)) { Ico(QIcons.remove, 24, Color(0xFFE91429), 36, onClick = onRemove) }
         AsyncImage(i.image, null, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(i.title, color = if (current) Accent else Color.White, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(i.artist, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (handle != null) Box(handle.size(44.dp), contentAlignment = Alignment.Center) {
+            Image(rememberVectorPainter(QIcons.handle), null, Modifier.size(22.dp), colorFilter = ColorFilter.tint(Sub))
         }
     }
 }

@@ -70,6 +70,7 @@
     })(o, 0);
     return best;
   }
+  function darkColor(art) { var c = art && art.extractedColors && art.extractedColors.colorDark; return c && !c.isFallback ? c.hex : ''; }
   function names(list) {
     return ((list && list.items) || []).map(function (a) { return a.profile && a.profile.name || a.name || ''; }).filter(Boolean).join(', ');
   }
@@ -83,7 +84,7 @@
     if (!d) return null;
     switch (d.__typename) {
       case 'Playlist': return { uri: d.uri, title: d.name, subtitle: strip(d.description) || (d.ownerV2 && d.ownerV2.data && d.ownerV2.data.name) || '', image: pickImg(d.images) };
-      case 'Album': return { uri: d.uri, title: d.name, subtitle: names(d.artists), image: pickImg(d.coverArt) };
+      case 'Album': return { uri: d.uri, title: d.name, subtitle: names(d.artists), image: pickImg(d.coverArt), color: darkColor(d.coverArt), kind: (d.albumType || d.type || 'album').toLowerCase() };
       case 'Artist': return { uri: d.uri, title: d.profile && d.profile.name, subtitle: 'アーティスト', image: pickImg(d.visuals || d), round: true };
       case 'Podcast': return { uri: d.uri, title: d.name, subtitle: d.publisher && d.publisher.name || 'ポッドキャスト', image: pickImg(d.coverArt) };
       case 'Episode': return { uri: d.uri, title: d.name, subtitle: d.podcastV2 && d.podcastV2.data && d.podcastV2.data.name || 'エピソード', image: pickImg(d.coverArt) };
@@ -142,7 +143,7 @@
         return {
           kind: 'album', uri: d.uri, title: d.name, image: pickImg(d.coverArt), artist: names(d.artists),
           artistUri: d.artists && d.artists.items[0] && d.artists.items[0].uri || '',
-          subtitle: kind + (year ? ' • ' + year : ''), saved: !!d.saved,
+          subtitle: kind + (year ? ' • ' + year : ''), saved: !!d.saved, date: d.date && d.date.isoString || '',
           tracks: (d.tracksV2.items || []).map(function (x) { var t = x.track; return { uri: t.uri, title: t.name, artist: names(t.artists), image: '', dur: t.duration && t.duration.totalMilliseconds || 0 }; }),
           shelves: d.moreAlbumsByArtist ? [{ title: names(d.artists) + 'のその他の作品', items: ((d.moreAlbumsByArtist.items[0] || {}).discography || { popularReleasesAlbums: { items: [] } }).popularReleasesAlbums.items.map(card).filter(Boolean) }] : []
         };
@@ -311,6 +312,11 @@
       });
     },
     skipTo: function (a) { return Promise.resolve(service('PlayerAPI').skipTo({ uri: a.uri, uid: a.uid })).then(function () { return true; }); },
+    // キューの並べ替え：item を target の前（before）／後ろ（after）へ
+    reorder: function (a) {
+      var opt = a.after ? { after: { uri: a.target.uri, uid: a.target.uid } } : { before: { uri: a.target.uri, uid: a.target.uid } };
+      return Promise.resolve(service('PlayerAPI').reorderQueue([{ uri: a.item.uri, uid: a.item.uid }], opt)).then(function () { return true; });
+    },
     unqueue: function (a) { return Promise.resolve(service('PlayerAPI').removeFromQueue([{ uri: a.uri, uid: a.uid }])).then(function () { return true; }); },
     createPlaylist: function (a) { return Promise.resolve(service('RootlistAPI').createPlaylist(a.name, { before: 'start' })).then(function (uri) { return uri || ''; }); },
     createFolder: function (a) { return Promise.resolve(service('RootlistAPI').createFolder(a.name, { before: 'start' })).then(function () { return true; }); },

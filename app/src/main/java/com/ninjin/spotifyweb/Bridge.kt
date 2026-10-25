@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /** ホームなどに並ぶカード（アルバム・プレイリスト・アーティストなど） */
-data class Card(val uri: String, val title: String, val subtitle: String, val image: String, val round: Boolean, val kind: String = "", val pinned: Boolean = false)
+data class Card(val uri: String, val title: String, val subtitle: String, val image: String, val round: Boolean, val kind: String = "", val pinned: Boolean = false, val color: String = "")
 
 data class Shelf(val title: String, val items: List<Card>, val feed: Boolean = false)
 
@@ -22,7 +22,7 @@ data class Track(val uri: String, val title: String, val artist: String, val ima
 data class Page(
     val kind: String, val uri: String, val title: String, val subtitle: String, val image: String,
     val round: Boolean, val header: Boolean, val description: String, val artist: String, val artistUri: String,
-    val saved: Boolean, val tracks: List<Track>, val shelves: List<Shelf>,
+    val saved: Boolean, val tracks: List<Track>, val shelves: List<Shelf>, val date: String = "",
 )
 
 data class Chip(val id: String, val label: String, val sub: List<Chip> = emptyList())
@@ -166,6 +166,7 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
             o.optBoolean("round"), o.optBoolean("header"), o.optString("description"), o.optString("artist"), o.optString("artistUri"),
             o.optBoolean("saved"), tracks(o.optJSONArray("tracks")),
             (o.optJSONArray("shelves") ?: JSONArray()).let { a -> (0 until a.length()).map { i -> a.getJSONObject(i).let { Shelf(it.optString("title"), cards(it.optJSONArray("items"))) } } },
+            o.optString("date"),
         )
     }
 
@@ -237,6 +238,10 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
         return Queue(q(o.optJSONObject("current")), ql(o.optJSONArray("queued")), ql(o.optJSONArray("next")), o.optString("context"))
     }
     suspend fun skipTo(i: QItem) = call("skipTo", JSONObject().put("uri", i.uri).put("uid", i.uid))
+    suspend fun reorder(item: QItem, target: QItem, after: Boolean) = call(
+        "reorder",
+        JSONObject().put("item", JSONObject().put("uri", item.uri).put("uid", item.uid)).put("target", JSONObject().put("uri", target.uri).put("uid", target.uid)).put("after", after),
+    )
     suspend fun unqueue(i: QItem) = call("unqueue", JSONObject().put("uri", i.uri).put("uid", i.uid))
     suspend fun createPlaylist(name: String) = (call("createPlaylist", JSONObject().put("name", name)) as? String ?: "").also { libraryVersion.intValue++ }
     suspend fun createFolder(name: String) = call("createFolder", JSONObject().put("name", name)).also { libraryVersion.intValue++ }
@@ -255,7 +260,7 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
 
     private fun cards(a: JSONArray?): List<Card> = if (a == null) emptyList() else (0 until a.length()).mapNotNull { i ->
         val c = a.optJSONObject(i) ?: return@mapNotNull null
-        Card(c.optString("uri"), c.optString("title"), c.optString("subtitle"), c.optString("image"), c.optBoolean("round"), c.optString("kind"), c.optBoolean("pinned"))
+        Card(c.optString("uri"), c.optString("title"), c.optString("subtitle"), c.optString("image"), c.optBoolean("round"), c.optString("kind"), c.optBoolean("pinned"), c.optString("color"))
     }
 
     private fun parseState(o: JSONObject) = PlayerState(

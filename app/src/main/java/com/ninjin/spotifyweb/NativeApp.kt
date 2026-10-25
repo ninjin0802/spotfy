@@ -159,7 +159,7 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
         // タブごとに開いたページを覚えておく（タブを切り替えて戻っても、そのまま）
         Box(Modifier.fillMaxSize()) {
             when (tab) {
-                Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open)
+                Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open, onMenu = { menu = it })
                 Tab.Search -> SearchScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
                 Tab.Library -> LibraryScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open, onCreate = { createOpen = true })
             }
@@ -244,23 +244,27 @@ internal fun Avatar(user: Bridge.User?, size: Int, onClick: (() -> Unit)? = null
 }
 
 @Composable
-private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onPlay: (Card) -> Unit) {
+private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onPlay: (Card) -> Unit, onMenu: (MenuTarget) -> Unit = {}) {
     // 起動直後は前回のホームをすぐ出し、Web Player の準備ができたら新しい内容に差し替える
     var feed by remember { mutableStateOf(bridge.cachedHome()) }
     var chips by remember { mutableStateOf(feed?.chips ?: emptyList()) }
     var facet by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val feeds = remember { mutableMapOf<String, HomeFeed>() }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var loading by remember { mutableStateOf(false) }
     LaunchedEffect(ready, facet) {
-        feeds[facet]?.let { feed = it }
-        if (ready) runCatching { bridge.home(facet) }.onSuccess { feeds[facet] = it; feed = it; if (it.chips.isNotEmpty()) chips = it.chips }.onFailure { if (feed == null) error = it.message }
+        // タブを切り替えたら一番上から。読み込むまでは前のタブの中身を出さない
+        listState.scrollToItem(0)
+        feeds[facet]?.let { feed = it; loading = false } ?: run { if (facet.isNotEmpty()) loading = true }
+        if (ready) runCatching { bridge.home(facet) }.onSuccess { feeds[facet] = it; feed = it; loading = false; if (it.chips.isNotEmpty()) chips = it.chips }.onFailure { loading = false; if (feed == null) error = it.message }
     }
     val f = feed
     if (f == null) {
         Placeholder(if (error != null) "読み込めませんでした" else "読み込み中…")
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 170.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 170.dp)) {
         // 上のアイコンとタブはスクロールしても上に残す（公式アプリと同じ）
         stickyHeader {
             Row(
@@ -272,8 +276,13 @@ private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAva
                 Chips(chips, facet) { facet = it }
             }
         }
+        if (loading) { item { Box(Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) { Text("読み込み中…", color = Sub, fontSize = 14.sp) } }; return@LazyColumn }
         if (f.shortcuts.isNotEmpty()) item { Shortcuts(f.shortcuts, onPlay) }
-        items(f.shelves) { s -> if (s.feed) FeedCard(s, onPlay) else ShelfRow(s, onPlay) }
+        // フォロー中のページなど、見出しのない 1 件ずつのカードが並ぶときは「最新リリース」の見出し
+        if (f.shelves.firstOrNull()?.let { it.feed && it.title.isEmpty() } == true) item {
+            Text("最新リリース", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+        }
+        items(f.shelves) { s -> if (s.feed) FeedCard(bridge, s, onPlay, onMenu) else ShelfRow(s, onPlay) }
     }
 }
 
@@ -285,9 +294,13 @@ private fun Chips(chips: List<Chip>, facet: String, onSelect: (String) -> Unit) 
         items(chips) { c ->
             val selected = c.id == facet || c.sub.any { it.id == facet }
             if (!selected) ChipText(c.label, false) { onSelect(c.id) }
-            else Row(Modifier.clip(CircleShape).background(Card2)) {
-                ChipText(c.label, true) { onSelect(if (facet == c.id) "" else c.id) }
-                c.sub.forEach { sc -> ChipText(sc.label, facet == sc.id) { onSelect(if (facet == sc.id) c.id else sc.id) } }
+            else {
+                // 「フォロー中」まで選ぶと、つながった丸ボタン全体が緑になる（公式アプリと同じ）
+                val subOn = c.sub.any { it.id == facet }
+                Row(Modifier.clip(CircleShape).background(if (subOn) Accent else Card2)) {
+                    ChipText(c.label, true) { onSelect(if (facet == c.id) "" else c.id) }
+                    c.sub.forEach { sc -> ChipText(sc.label, facet == sc.id) { onSelect(if (facet == sc.id) c.id else sc.id) } }
+                }
             }
         }
     }
@@ -324,16 +337,51 @@ private fun Shortcuts(items: List<Card>, onPlay: (Card) -> Unit) {
     }
 }
 
+/** 「〇日前」 */
+private fun ago(iso: String): String {
+    val t = runCatching { java.time.LocalDate.parse(iso.take(10)) }.getOrNull() ?: return ""
+    val d = java.time.temporal.ChronoUnit.DAYS.between(t, java.time.LocalDate.now())
+    return when { d <= 0 -> "今日"; d < 7 -> "${d}日前"; d < 30 -> "${d / 7}週間前"; d < 365 -> "${d / 30}か月前"; else -> "${d / 365}年前" }
+}
+
+/** フォロー中やポッドキャストの、1 件ずつの大きなカード（公式アプリと同じく、ジャケットの色・曲の一覧・プレビュー・追加・再生） */
 @Composable
-private fun FeedCard(s: Shelf, onPlay: (Card) -> Unit) {
+private fun FeedCard(bridge: Bridge, s: Shelf, onPlay: (Card) -> Unit, onMenu: (MenuTarget) -> Unit) {
     val c = s.items.first()
-    Column(Modifier.padding(horizontal = 16.dp).padding(top = 20.dp)) {
+    val scope = rememberCoroutineScope()
+    val isAlbum = c.uri.startsWith("spotify:album:")
+    var page by remember(c.uri) { mutableStateOf<Page?>(null) }
+    var saved by remember(c.uri) { mutableStateOf(false) }
+    LaunchedEffect(c.uri) { if (isAlbum) runCatching { bridge.page(c.uri) }.getOrNull()?.let { page = it; saved = it.saved } }
+    val bg = runCatching { Color(android.graphics.Color.parseColor(c.color)) }.getOrNull()?.let { it.copy(alpha = 1f) } ?: Card2
+    Column(Modifier.padding(horizontal = 16.dp).padding(top = 16.dp)) {
         if (s.title.isNotEmpty()) Text(s.title, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Card2).clickable { onPlay(c) }.padding(12.dp)) {
-            AsyncImage(c.image, null, Modifier.size(96.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
-            Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                Text(c.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 20.sp)
-                Text(c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(bg).clickable { onPlay(c) }.padding(14.dp)) {
+            Row {
+                AsyncImage(c.image, null, Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(if (isAlbum) c.subtitle else c.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    val sub = if (isAlbum) c.title + (page?.date?.let { ago(it) }?.takeIf { it.isNotEmpty() }?.let { " • $it" } ?: "") else c.subtitle
+                    Text(sub, color = Color(0xCCFFFFFF), fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                }
+                Ico(Icons.more, 18, Color.White, 32) { onMenu(MenuTarget.OfPage(c.uri, c.title, c.subtitle, c.image, "", c.subtitle)) }
+            }
+            page?.tracks?.takeIf { it.isNotEmpty() }?.let { t ->
+                Text("${t.size}曲 • " + t.joinToString(" • ") { it.title }, color = Color(0xCCFFFFFF), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.clip(CircleShape).background(Color(0x33000000)).clickable { scope.launch { runCatching { bridge.play(c.uri) } } }.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(if (!isAlbum) "エピソードのプレビュー" else if ((page?.tracks?.size ?: 1) <= 1 || c.kind == "single") "シングルをプレビュー" else "アルバムをプレビュー", color = Color.White, fontSize = 13.sp)
+                }
+                Spacer(Modifier.weight(1f))
+                Ico(if (saved) Icons.check else Icons.add, 26, if (saved) Accent else Color.White, 40) { saved = !saved; scope.launch { runCatching { bridge.follow(c.uri, saved) } } }
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White).clickable { scope.launch { runCatching { bridge.play(c.uri) } } }, contentAlignment = Alignment.Center) {
+                    Image(rememberVectorPainter(Icons.play), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Color.Black))
+                }
             }
         }
     }
