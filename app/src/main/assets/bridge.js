@@ -26,11 +26,16 @@
     }
     return null;
   }
+  // 登録簿のキーは変わらないので、名前→キーを覚えておく（再生の見張りで毎秒何十回も呼ぶため、毎回全件を探さない）
+  var serviceKeys = {};
   function service(name) {
     if (!reg && platform()) reg = platform().getRegistry();
     if (!reg) return null;
-    var key = null;
-    reg._map.forEach(function (_, rk) { if (rk && rk.description === name) key = rk; });
+    var key = serviceKeys[name];
+    if (!key) {
+      reg._map.forEach(function (_, rk) { if (rk && rk.description === name) key = rk; });
+      if (key) serviceKeys[name] = key;
+    }
     return key ? reg.resolve(key) : null;
   }
 
