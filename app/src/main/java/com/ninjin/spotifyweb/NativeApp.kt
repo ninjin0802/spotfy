@@ -352,7 +352,7 @@ private fun Chips(chips: List<Chip>, facet: String, onSelect: (String) -> Unit) 
                 Row(Modifier.clip(CircleShape).background(if (subOn) Accent else Card2)) {
                     ChipText(c.label, true) { onSelect(if (facet == c.id) "" else c.id) }
                     // 「フォロー中」を選んだときは、そこだけ少し濃い緑（公式アプリと同じ）
-                    c.sub.forEach { sc -> ChipText(sc.label, facet == sc.id, Color(0xFF1BBD55)) { onSelect(if (facet == sc.id) c.id else sc.id) } }
+                    c.sub.forEach { sc -> ChipText(sc.label, facet == sc.id, Color(Accent.red * 0.87f, Accent.green * 0.87f, Accent.blue * 0.87f)) { onSelect(if (facet == sc.id) c.id else sc.id) } }
                 }
             }
         }
