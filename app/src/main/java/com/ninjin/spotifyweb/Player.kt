@@ -84,7 +84,7 @@ internal fun MiniPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Col
                         null, Modifier.size(14.dp), colorFilter = ColorFilter.tint(if (onOther) Accent else Color(0xCCFFFFFF)),
                     )
                     Text(
-                        p.device.ifEmpty { out.ifEmpty { "このスマホ" } }, color = if (onOther) Accent else Color(0xCCFFFFFF), fontSize = 13.sp,
+                        p.device.ifEmpty { out.ifEmpty { tr("このスマホ", "This phone") } }, color = if (onOther) Accent else Color(0xCCFFFFFF), fontSize = 13.sp,
                         fontWeight = if (onOther) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp),
                     )
                 }
@@ -229,7 +229,7 @@ internal fun PlayerExtras(bridge: Bridge, p: PlayerState, tint: Color, lyrics: B
         if (lyrics != null && lyrics.lines.isNotEmpty()) {
             val cur = lyricsLine(lyrics, now)
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(lyricsColor(lyrics, tint)).clickable(onClick = onLyrics).padding(16.dp)) {
-                Text("歌詞", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(tr("歌詞", "Lyrics"), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
                 val start = (cur - 1).coerceAtLeast(0)
                 lyrics.lines.drop(start).take(6).forEachIndexed { k, l ->
@@ -247,19 +247,20 @@ internal fun PlayerExtras(bridge: Bridge, p: PlayerState, tint: Color, lyrics: B
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF242424)).clickable { onOpen(Card(a.uri, a.name, "", a.image, true)) }) {
                 Box(Modifier.fillMaxWidth().height(200.dp)) {
                     AsyncImage(a.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    Text("アーティストについて", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
+                    Text(tr("アーティストについて", "About the artist"), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
                 }
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(a.name, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                             if (a.listeners > 0) Text(
-                                (if (a.listeners >= 10000) "%.1f万".format(a.listeners / 10000.0) else "%,d".format(a.listeners)) + "人の月間リスナー",
+                                if (isJapanese) (if (a.listeners >= 10000) "%.1f万".format(a.listeners / 10000.0) else "%,d".format(a.listeners)) + "人の月間リスナー"
+                                else "%,d monthly listeners".format(a.listeners),
                                 color = Sub, fontSize = 13.sp,
                             )
                         }
                         Text(
-                            if (following) "フォロー中" else "フォローする", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            if (following) tr("フォロー中", "Following") else tr("フォローする", "Follow"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.clip(CircleShape).background(Color(0x33FFFFFF)).clickable {
                                 following = !following; scope.launch { runCatching { bridge.follow(a.uri, following) } }
                             }.padding(horizontal = 16.dp, vertical = 7.dp),
@@ -272,7 +273,7 @@ internal fun PlayerExtras(bridge: Bridge, p: PlayerState, tint: Color, lyrics: B
         // 次に再生
         next?.let { t ->
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF242424)).padding(16.dp)) {
-                Text("次に再生", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(tr("次に再生", "Next in queue"), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     AsyncImage(t.image, null, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(Card2), contentScale = ContentScale.Crop)
                     Column(Modifier.padding(start = 12.dp)) {
@@ -312,7 +313,7 @@ internal fun LyricsScreen(p: PlayerState, lyrics: Bridge.Lyrics?, tint: Color, o
                     modifier = Modifier.padding(vertical = 6.dp),
                 )
             }
-            if (lines.isEmpty()) item { Text("この曲の歌詞はありません", color = Color.White, fontSize = 16.sp) }
+            if (lines.isEmpty()) item { Text(tr("この曲の歌詞はありません", "No lyrics for this song"), color = Color.White, fontSize = 16.sp) }
         }
     }
 }

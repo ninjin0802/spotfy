@@ -23,7 +23,7 @@ An unofficial Android app powered by a native UI and the Web Player's playback e
 > "Spotify" and its logo are trademarks of Spotify AB. Use at your own risk.
 
 > [!NOTE]
-> The app's own UI is currently available in **Japanese only**. Content provided by Spotify (track names, home shelves, etc.) follows your account and device language.
+> The app follows your device language: **English or Japanese**. On Android 13+ you can also pick the language for this app alone in system settings.
 
 <br>
 
@@ -100,10 +100,10 @@ Share a debug log with a single tap.
 
 | Symptom | What to do |
 |:--|:--|
-| "Spotify に接続できません" (can't connect to Spotify) | Check your connection. The app reloads automatically once you're back online |
-| "Android System WebView が必要です" (WebView required) | Update Android System WebView from the Play Store |
-| "⚠ 一部の機能が使えません" (some features unavailable) in Settings | Probably caused by a Spotify update. Tap it to share a debug log |
-| Anything else | Settings → "デバッグログを共有" (Share debug log) helps track it down |
+| "Can't connect to Spotify" | Check your connection. The app reloads automatically once you're back online |
+| "This app needs a newer Android System WebView" | Update Android System WebView from the Play Store |
+| "⚠ Some features aren't working" in Settings | Probably caused by a Spotify update. Tap it to share a debug log |
+| Anything else | Settings → "Share debug log" helps track it down |
 
 </details>
 

@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
                 pageFailed = true
                 failedUrl = request.url.toString()
                 recordDebug("page.error", "${error.errorCode} ${request.url.host}")
-                loadError.text = "Spotify に接続できません（${error.description}）\n\nタップして再読み込み"
+                loadError.text = tr("Spotify に接続できません（${error.description}）\n\nタップして再読み込み", "Can't connect to Spotify (${error.description})\n\nTap to reload")
                 loadError.visibility = View.VISIBLE
             }
             // WebView の描画プロセスが落ちると真っ暗のまま固まるので、画面を作り直す
@@ -271,7 +271,7 @@ class MainActivity : ComponentActivity() {
         val wired = setOf(AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET)
         val outs = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
         outs.firstOrNull { it.type in wireless }?.let { return it.productName?.toString().orEmpty().ifBlank { "Bluetooth" } }
-        outs.firstOrNull { it.type in wired }?.let { return it.productName?.toString().orEmpty().ifBlank { "ヘッドホン" } }
+        outs.firstOrNull { it.type in wired }?.let { return it.productName?.toString().orEmpty().ifBlank { tr("ヘッドホン", "Headphones") } }
         return ""
     }
 
@@ -325,7 +325,7 @@ class MainActivity : ComponentActivity() {
         override fun outputName() = currentOutputName()
         override fun shareDebugLog() {
             val log = debug.lines().joinToString("\n").ifBlank { "No playback debug events recorded." }
-            shareText("spotfy ${BuildConfig.VERSION_NAME} debug log\n$log", "デバッグログを共有", subject = "spotfy debug log")
+            shareText("spotfy ${BuildConfig.VERSION_NAME} debug log\n$log", tr("デバッグログを共有", "Share debug log"), subject = "spotfy debug log")
         }
         override fun logout() {
             // Cookie を消して最初からログインページへ

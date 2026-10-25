@@ -65,7 +65,7 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
     }
     val f = feed
     if (f == null) {
-        if (error != null) Placeholder("読み込めませんでした") else Loading()
+        if (error != null) Placeholder(tr("読み込めませんでした", "Couldn't load")) else Loading()
         return
     }
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 170.dp)) {
@@ -85,7 +85,7 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
         // フォロー中のページなど、見出しのない 1 件ずつのカードが並ぶときは「最新リリース」の見出し
         val podcastFollow = facet == "podcasts-following-chip"
         if (podcastFollow || f.shelves.firstOrNull()?.let { it.feed && it.title.isEmpty() } == true) item {
-            Text(if (podcastFollow) "最新エピソード" else "最新リリース", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+            Text(if (podcastFollow) tr("最新エピソード", "New episodes") else tr("最新リリース", "New releases"), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
         }
         // 公式アプリと同じ、フォローしている番組がないときの案内
         if (podcastFollow && f.emptyPodcasts) item {
@@ -93,9 +93,9 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
                 Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF242424)).padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("フォローしているポッドキャストはありません", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                Text("お気に入りをフォローして、最新情報を逃さずチェックしましょう。", color = Sub, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
-                Text("ポッドキャストをブラウズ", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                Text(tr("フォローしているポッドキャストはありません", "No podcasts followed yet"), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text(tr("お気に入りをフォローして、最新情報を逃さずチェックしましょう。", "Follow your favorites so you never miss a new episode."), color = Sub, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                Text(tr("ポッドキャストをブラウズ", "Browse podcasts"), color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 20.dp).clip(CircleShape).background(Color.White).clickable { onBrowse() }.padding(horizontal = 22.dp, vertical = 11.dp))
             }
         }
@@ -114,7 +114,7 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
 @Composable
 internal fun Chips(chips: List<Chip>, facet: String, onSelect: (String) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        item { ChipText("すべて", facet.isEmpty()) { onSelect("") } }
+        item { ChipText(tr("すべて", "All"), facet.isEmpty()) { onSelect("") } }
         items(chips) { c ->
             val selected = c.id == facet || c.sub.any { it.id == facet }
             if (!selected) ChipText(c.label, false) { onSelect(c.id) }
@@ -170,7 +170,7 @@ internal object FeedIcons {
 internal fun ago(iso: String): String {
     val t = runCatching { java.time.LocalDate.parse(iso.take(10)) }.getOrNull() ?: return ""
     val d = java.time.temporal.ChronoUnit.DAYS.between(t, java.time.LocalDate.now())
-    return when { d <= 0 -> "今日"; d < 7 -> "$d 日前"; d < 30 -> "${d / 7}週間前"; d < 365 -> "${d / 30}か月前"; else -> "${d / 365}年前" }
+    return when { d <= 0 -> tr("今日", "Today"); d < 7 -> tr("$d 日前", "${d}d ago"); d < 30 -> tr("${d / 7}週間前", "${d / 7}w ago"); d < 365 -> tr("${d / 30}か月前", "${d / 30}mo ago"); else -> tr("${d / 365}年前", "${d / 365}y ago") }
 }
 
 /** フォロー中やポッドキャストの、1 件ずつの大きなカード（公式アプリと同じく、ジャケットの色・曲の一覧・プレビュー・追加・再生） */
@@ -199,7 +199,7 @@ internal fun FeedCard(bridge: Bridge, s: Shelf, onPlay: (Card) -> Unit, onMenu: 
             page?.tracks?.takeIf { it.isNotEmpty() }?.let { t ->
                 Text(
                     androidx.compose.ui.text.buildAnnotatedString {
-                        pushStyle(androidx.compose.ui.text.SpanStyle(color = Color.White)); append("${t.size}曲"); pop()
+                        pushStyle(androidx.compose.ui.text.SpanStyle(color = Color.White)); append(songs(t.size)); pop()
                         append(" • " + t.joinToString(" • ") { it.title })
                     },
                     color = Color(0xB3FFFFFF), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 20.dp),
@@ -213,7 +213,7 @@ internal fun FeedCard(bridge: Bridge, s: Shelf, onPlay: (Card) -> Unit, onMenu: 
                 ) {
                     Image(rememberVectorPainter(FeedIcons.mute), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color(0x66FFFFFF)))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (!isAlbum) "エピソードのプレビュー" else if ((page?.tracks?.size ?: 1) <= 1 || c.kind == "single") "シングルをプレビュー" else "アルバムをプレビュー", color = Color(0x80FFFFFF), fontSize = 14.sp)
+                    Text(if (!isAlbum) tr("エピソードのプレビュー", "Episode preview") else if ((page?.tracks?.size ?: 1) <= 1 || c.kind == "single") tr("シングルをプレビュー", "Preview single") else tr("アルバムをプレビュー", "Preview album"), color = Color(0x80FFFFFF), fontSize = 14.sp)
                 }
                 Spacer(Modifier.weight(1f))
                 Ico(if (saved) Icons.check else Icons.add, 28, if (saved) Accent else Color.White, 44) { saved = !saved; scope.launch { runCatching { bridge.follow(c.uri, saved) } } }

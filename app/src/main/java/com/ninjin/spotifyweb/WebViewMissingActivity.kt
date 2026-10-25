@@ -21,9 +21,15 @@ class WebViewMissingActivity : Activity() {
             runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$WEBVIEW_PACKAGE"))) }
                 .onFailure { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$WEBVIEW_PACKAGE"))) } }
         }.apply {
-            text = "このアプリには新しい「Android System WebView」が必要です" +
-                (if (version != null) "（今は $version）" else "（入っていないか、無効になっています）") +
-                "\n\nタップして Play ストアで更新してください"
+            text = if (isJapanese) {
+                "このアプリには新しい「Android System WebView」が必要です" +
+                    (if (version != null) "（今は $version）" else "（入っていないか、無効になっています）") +
+                    "\n\nタップして Play ストアで更新してください"
+            } else {
+                "This app needs a newer Android System WebView" +
+                    (if (version != null) " (currently $version)." else " (it's missing or disabled).") +
+                    "\n\nTap to update it on the Play Store"
+            }
         })
     }
 

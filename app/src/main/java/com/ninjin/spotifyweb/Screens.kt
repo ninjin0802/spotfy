@@ -76,7 +76,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
     Box(Modifier.fillMaxSize().background(Bg)) {
         val p = page
         if (p == null) {
-            if (failed) Placeholder("読み込めませんでした") else Loading()
+            if (failed) Placeholder(tr("読み込めませんでした", "Couldn't load")) else Loading()
         } else LazyColumn(state = list, contentPadding = PaddingValues(bottom = 170.dp)) {
             if (p.kind == "genre") item {
                 val c = runCatching { Color(android.graphics.Color.parseColor(p.subtitle)) }.getOrDefault(Card2)
@@ -116,7 +116,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                     if (p.subtitle.isNotEmpty()) Text(p.subtitle, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (p.kind == "artist") Text(
-                            if (saved) "フォロー中" else "フォローする", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            if (saved) tr("フォロー中", "Following") else tr("フォローする", "Follow"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.clip(CircleShape).background(Color.Transparent).clickable {
                                 saved = !saved; scope.launch { runCatching { bridge.follow(p.uri, saved) } }
                             }.padding(1.dp).clip(CircleShape).background(Color(0x22FFFFFF)).padding(horizontal = 16.dp, vertical = 7.dp),
@@ -137,7 +137,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                             Image(rememberVectorPainter(if (isThis) Icons.pause else Icons.play), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color.Black))
                         }
                     }
-                    if (p.kind == "artist" && p.tracks.isNotEmpty()) Text2("人気曲", 20, FontWeight.Bold, Modifier.padding(top = 8.dp, bottom = 4.dp))
+                    if (p.kind == "artist" && p.tracks.isNotEmpty()) Text2(tr("人気曲", "Popular"), 20, FontWeight.Bold, Modifier.padding(top = 8.dp, bottom = 4.dp))
                 }
             }
             itemsIndexed(p.tracks, key = { i, t -> "$i${t.uri}" }) { i, t ->
@@ -208,7 +208,7 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
         item {
             Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Avatar(user, 32, onAvatar)
-                Text2("検索", 24, FontWeight.Bold, Modifier.padding(start = 12.dp))
+                Text2(tr("検索", "Search"), 24, FontWeight.Bold, Modifier.padding(start = 12.dp))
             }
         }
         item {
@@ -217,7 +217,7 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(rememberVectorPainter(Icons.search), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color.Black))
-                Text("何を聴きたいですか？", color = Color(0xFF6A6A6A), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
+                Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = Color(0xFF6A6A6A), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
             }
         }
         if (tiles.isNotEmpty()) item { Spacer(Modifier.height(16.dp)) }
@@ -246,7 +246,8 @@ private fun GenreTile(t: Card, m: Modifier, onClick: () -> Unit) {
 }
 
 
-private val FILTERS = listOf("" to "すべて", "track" to "曲", "artist" to "アーティスト", "playlist" to "プレイリスト", "album" to "アルバム", "podcast" to "ポッドキャスト")
+// 端末の言語が変わったときに読み直すよう、毎回作る
+private val FILTERS get() = listOf("" to tr("すべて", "All"), "track" to tr("曲", "Songs"), "artist" to tr("アーティスト", "Artists"), "playlist" to tr("プレイリスト", "Playlists"), "album" to tr("アルバム", "Albums"), "podcast" to tr("ポッドキャスト", "Podcasts"))
 
 /** 検索の入力画面（公式アプリと同じく、検索欄を押すと開く） */
 @Composable
@@ -272,7 +273,7 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
         Row(Modifier.fillMaxWidth().background(Color(0xFF242424)).padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 22, onClick = onClose)
             Box(Modifier.weight(1f).padding(start = 4.dp)) {
-                if (q.isEmpty()) Text("何を聴きたいですか？", color = Sub, fontSize = 16.sp)
+                if (q.isEmpty()) Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = Sub, fontSize = 16.sp)
                 BasicTextField(
                     q, { q = it }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
                     cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().focusRequester(req),
@@ -284,7 +285,7 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
         }
         if (q.isBlank()) {
             LazyColumn(contentPadding = PaddingValues(bottom = 170.dp)) {
-                if (recent.isNotEmpty()) item { Text2("最近の検索", 16, FontWeight.Bold, Modifier.padding(16.dp)) }
+                if (recent.isNotEmpty()) item { Text2(tr("最近の検索", "Recent searches"), 16, FontWeight.Bold, Modifier.padding(16.dp)) }
                 items(recent, key = { it.uri }) { c ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { ResultRow(c) { pick(c) } }
@@ -305,7 +306,7 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
             val shown = if (filter.isEmpty()) results else results.filter { it.kind == filter }
             LazyColumn(contentPadding = PaddingValues(bottom = 170.dp)) {
                 items(shown, key = { it.uri }) { c -> ResultRow(c) { pick(c) } }
-                if (shown.isEmpty() && !busy) item { Text("「$q」に一致するものは見つかりませんでした", color = Sub, fontSize = 14.sp, modifier = Modifier.padding(24.dp)) }
+                if (shown.isEmpty() && !busy) item { Text(tr("「$q」に一致するものは見つかりませんでした", "Couldn't find anything for \"$q\""), color = Sub, fontSize = 14.sp, modifier = Modifier.padding(24.dp)) }
             }
         }
     }
@@ -322,7 +323,7 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
     var grid by remember { mutableStateOf(false) }
     var sort by remember { mutableStateOf(0) }
     LaunchedEffect(ready) { if (ready) runCatching { bridge.library() }.onSuccess { items = it } }
-    val liked = Card("spotify:collection:tracks", "お気に入りの曲", "プレイリスト", "", false, "liked", true)
+    val liked = Card("spotify:collection:tracks", tr("お気に入りの曲", "Liked Songs"), tr("プレイリスト", "Playlist"), "", false, "liked", true)
     val base = listOf(liked) + items.filter { !it.uri.contains(":collection") && (it.kind != "liked-songs") }
     val filtered = base.filter {
         filter.isEmpty() || it.kind == filter || (filter == "playlist" && (it.kind == "liked" || it.kind == "your-episodes")) ||
@@ -336,7 +337,7 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
             Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (query == null) {
                     Avatar(user, 32, onAvatar)
-                    Text2("マイライブラリ", 24, FontWeight.Bold, Modifier.padding(start = 12.dp).weight(1f))
+                    Text2(tr("マイライブラリ", "Your Library"), 24, FontWeight.Bold, Modifier.padding(start = 12.dp).weight(1f))
                     Ico(Icons.search, 24) { query = "" }
                     Ico(Icons.add, 26, onClick = onCreate)
                 } else {
@@ -346,18 +347,18 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
                     Row(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(6.dp)).background(Card2).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Image(rememberVectorPainter(Icons.search), null, Modifier.size(18.dp))
                         Box(Modifier.weight(1f).padding(start = 8.dp)) {
-                            if (query!!.isEmpty()) Text("マイライブラリを検索", color = Sub, fontSize = 14.sp)
+                            if (query!!.isEmpty()) Text(tr("マイライブラリを検索", "Search Your Library"), color = Sub, fontSize = 14.sp)
                             BasicTextField(query!!, { query = it }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 14.sp), cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().focusRequester(req))
                         }
                     }
-                    Text("キャンセル", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { query = null }.padding(12.dp))
+                    Text(tr("キャンセル", "Cancel"), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { query = null }.padding(12.dp))
                 }
             }
         }
         item {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (filter.isNotEmpty()) Ico(Icons.close, 16, Color.White, 34) { filter = "" }
-                listOf("playlist" to "プレイリスト", "show" to "ポッドキャスト", "album" to "アルバム", "artist" to "アーティスト").forEach { (k, label) ->
+                listOf("playlist" to tr("プレイリスト", "Playlists"), "show" to tr("ポッドキャスト", "Podcasts"), "album" to tr("アルバム", "Albums"), "artist" to tr("アーティスト", "Artists")).forEach { (k, label) ->
                     if (filter.isEmpty() || filter == k) Text(
                         label, color = if (filter == k) Color.Black else Color.White, fontSize = 14.sp,
                         modifier = Modifier.clip(CircleShape).background(if (filter == k) Accent else Card2).clickable { filter = if (filter == k) "" else k }.padding(horizontal = 14.dp, vertical = 7.dp),
@@ -370,7 +371,7 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.clip(CircleShape).clickable { sort = (sort + 1) % 3 }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Image(rememberVectorPainter(LibIcons.sort), null, Modifier.size(18.dp))
-                    Text(listOf("再生履歴", "アルファベット順", "クリエーター")[sort], color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
+                    Text(listOf(tr("再生履歴", "Recents"), tr("アルファベット順", "Alphabetical"), tr("クリエーター", "Creator"))[sort], color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
                 }
                 Spacer(Modifier.weight(1f))
                 Ico(if (grid) LibIcons.list else LibIcons.grid, 20) { grid = !grid }
@@ -396,7 +397,7 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
                     Text(c.title, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (c.pinned) Image(rememberVectorPainter(LibIcons.pin), null, Modifier.size(13.dp).padding(end = 2.dp), colorFilter = ColorFilter.tint(Accent))
-                        Text(if (c.kind == "liked") "プレイリスト • ${user?.name ?: ""}" else if (c.kind == "your-episodes") "プレイリスト • 保存済み＆ダウンロード済みのエピソード" else c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = if (c.pinned) 4.dp else 0.dp))
+                        Text(if (c.kind == "liked") tr("プレイリスト", "Playlist") + " • ${user?.name ?: ""}" else if (c.kind == "your-episodes") tr("プレイリスト • 保存済み＆ダウンロード済みのエピソード", "Playlist • Saved and downloaded episodes") else c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = if (c.pinned) 4.dp else 0.dp))
                     }
                 }
             }

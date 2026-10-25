@@ -56,8 +56,10 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-internal enum class Tab(val label: String, val icon: ImageVector) {
-    Home("ホーム", Icons.home), Search("検索", Icons.search), Library("ライブラリ", Icons.library)
+internal enum class Tab(private val ja: String, private val en: String, val icon: ImageVector) {
+    Home("ホーム", "Home", Icons.home), Search("検索", "Search", Icons.search), Library("ライブラリ", "Your Library", Icons.library);
+
+    val label get() = tr(ja, en)
 }
 
 /** アプリの画面（Compose）。データと再生は [bridge] 経由で裏の Web Player に任せる */
@@ -146,7 +148,7 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
                 onRecent = { drawerOpen = false; tab = Tab.Library },
                 onNews = { drawerOpen = false; tab = Tab.Home },
                 onSettings = { drawerOpen = false; settingsOpen = true },
-                onInvite = { drawerOpen = false; host.share("https://open.spotify.com/", "Spotify に招待") },
+                onInvite = { drawerOpen = false; host.share("https://open.spotify.com/", tr("Spotify に招待", "Invite to Spotify")) },
             )
         }
         AnimatedVisibility(
@@ -160,10 +162,10 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
         // 別のアカウントを使うには、いまのアカウントからログアウトしてログインし直す（確認してから）
         if (confirmSwitch) androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmSwitch = false },
-            title = { Text("アカウントを追加する") },
-            text = { Text("いまのアカウントからログアウトして、別のアカウントでログインします。") },
-            confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false; host.logout() }) { Text("ログアウトして続ける", color = Accent) } },
-            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false }) { Text("キャンセル", color = Color.White) } },
+            title = { Text(tr("アカウントを追加する", "Add account")) },
+            text = { Text(tr("いまのアカウントからログアウトして、別のアカウントでログインします。", "You'll be logged out of this account so you can log in with another one.")) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false; host.logout() }) { Text(tr("ログアウトして続ける", "Log out and continue"), color = Accent) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false }) { Text(tr("キャンセル", "Cancel"), color = Color.White) } },
             containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
         )
         if (devicesOpen) DevicesSheet(bridge, host) { devicesOpen = false }
@@ -215,7 +217,7 @@ internal fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Un
                 Avatar(user, 52)
                 Column(Modifier.padding(start = 12.dp)) {
                     Text(user?.name ?: "", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("プロフィールを表示", color = Sub, fontSize = 13.sp)
+                    Text(tr("プロフィールを表示", "View profile"), color = Sub, fontSize = 13.sp)
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x1FFFFFFF)))
@@ -223,13 +225,13 @@ internal fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Un
                 Box(Modifier.size(32.dp).clip(CircleShape).background(Color(0xFF3E3E3E)), contentAlignment = Alignment.Center) {
                     Image(rememberVectorPainter(DrawerIcons.plus), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Sub))
                 }
-                Text("アカウントを追加する", color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp))
+                Text(tr("アカウントを追加する", "Add account"), color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp))
             }
         }
-        DrawerItem(DrawerIcons.report, "リスニングレポート", onReport)
-        DrawerItem(DrawerIcons.history, "最近", onRecent)
-        DrawerItem(DrawerIcons.news, "あなたへのおすすめ新着", onNews)
-        DrawerItem(Icons.gear, "設定とプライバシー", onSettings)
+        DrawerItem(DrawerIcons.report, tr("リスニングレポート", "Listening stats"), onReport)
+        DrawerItem(DrawerIcons.history, tr("最近", "Recents"), onRecent)
+        DrawerItem(DrawerIcons.news, tr("あなたへのおすすめ新着", "What's new"), onNews)
+        DrawerItem(Icons.gear, tr("設定とプライバシー", "Settings and privacy"), onSettings)
         // アクティビティ（自分のアイコンに再生中のジャケット）と友達を招待
         Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Column(Modifier.clickable(onClick = onProfile), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -237,13 +239,13 @@ internal fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Un
                     Box(Modifier.size(64.dp).clip(CircleShape).background(Color(0xFF3E3E3E)).padding(3.dp)) { Avatar(user, 58) }
                     if (player.image.isNotEmpty()) AsyncImage(player.image, null, Modifier.size(26.dp).align(Alignment.BottomEnd).clip(RoundedCornerShape(3.dp)), contentScale = ContentScale.Crop)
                 }
-                Text("アクティビティ", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(tr("アクティビティ", "Activity"), color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             }
             Column(Modifier.clickable(onClick = onInvite), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.size(64.dp).clip(CircleShape).background(Color(0xFF3E3E3E)), contentAlignment = Alignment.Center) {
                     Image(rememberVectorPainter(DrawerIcons.plus), null, Modifier.size(26.dp), colorFilter = ColorFilter.tint(Color.White))
                 }
-                Text("友達を招待", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(tr("友達を招待", "Invite friends"), color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
     }
