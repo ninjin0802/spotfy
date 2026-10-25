@@ -6,6 +6,8 @@
   var NAV_H = 56;
   var css = `
     html, body, #main, .Root, [data-testid="now-playing-bar"] { min-width: 0 !important; }
+    html { touch-action: manipulation; }
+    #m-tm, #m-devices, #m-vis, #m-invite, #m-q, #m-player, #m-drawer { will-change: transform; }
     html, body { width: 100vw !important; overflow: hidden !important; }
     .Root { height: 100vh !important; width: 100vw !important; overflow: hidden !important; }
     #onetrust-consent-sdk { display: none !important; }
@@ -2415,7 +2417,13 @@
       b.innerHTML = ICONS[t[0]] + '<span>' + t[1] + '</span>';
       b.addEventListener('click', function () {
         if (t[0] === 'home') {
-          click('[data-testid="home-button"]') || (location.href = '/');
+          // Spotify のホームボタンを押すより、直接ページを切り替えたほうが速い
+          if (!/^\/(intl-[a-z-]+\/?)?(home\/?)?$/i.test(location.pathname)) spaGo('/')
+          else if (!document.documentElement.classList.contains('m-lib') && !document.documentElement.classList.contains('m-search')) {
+            // ホームでもう一度押したら一番上へ（公式アプリと同じ）
+            var sc = document.querySelector('.main-view-container__scroll-node [data-overlayscrollbars-viewport]') || document.querySelector('.main-view-container__scroll-node');
+            if (sc) sc.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         } else if (t[0] === 'search') {
           if (location.pathname.indexOf('/search') !== 0) spaGo('/search');
         } else if (document.documentElement.classList.contains('m-lib')) {
@@ -2436,7 +2444,7 @@
     var grid = document.querySelector('.Root > div:first-child');
     if (grid) for (var i = 0; i < grid.children.length; i++) {
       var c = grid.children[i];
-      if (getComputedStyle(c).gridArea.indexOf('right-sidebar') === 0) c.classList.add('m-right');
+      if (!c.dataset.mGrid) { c.dataset.mGrid = '1'; if (getComputedStyle(c).gridArea.indexOf('right-sidebar') === 0) c.classList.add('m-right'); }
     }
     var vol = document.querySelector('[data-testid="now-playing-bar"] [data-testid="volume-bar"]');
     var ctl = document.querySelector('[data-testid="now-playing-bar"] [data-testid="player-controls"]');
@@ -2532,14 +2540,19 @@
     tidyBigCards();
     // main の中で position: sticky のもの（ホームのフィルター欄など）に目印を付ける
     // ホーム上部の色付きグラデーション背景は公式アプリにないので消す
-    if (document.documentElement.classList.contains('m-home') && tidy.bgPath !== location.pathname + document.querySelectorAll('#main-view div').length) {
-      tidy.bgPath = location.pathname + document.querySelectorAll('#main-view div').length;
-      document.querySelectorAll('#main-view > div div, .main-view-container__scroll-node-child > div').forEach(function (e) {
-        if (e.classList.contains('m-nobg') || e.closest('main')) return;
-        var r = e.getBoundingClientRect();
-        if (r.top > 320 || r.width < 300) return;
-        var cs = getComputedStyle(e);
-        if (cs.backgroundImage.indexOf('gradient') >= 0 || /^rgb\(/.test(cs.backgroundColor) && cs.backgroundColor !== 'rgb(18, 18, 18)' && cs.backgroundColor !== 'rgb(0, 0, 0)') e.classList.add('m-nobg');
+    // （ページ中の全要素を測ると重いので、背景の入る浅い階層だけを、ページが変わったときに一度だけ見る）
+    if (document.documentElement.classList.contains('m-home') && tidy.bgPath !== location.pathname) {
+      tidy.bgPath = location.pathname;
+      setTimeout(function () { tidy.bgPath = ''; }, 3000);   // 読み込みが遅れた背景のため、少しあとにもう一度
+      // 測るのは描画が落ち着いた空き時間に（描画の途中で測ると配置の計算をやり直させて重い）
+      (window.requestIdleCallback || setTimeout)(function () {
+      document.querySelectorAll('#main-view > div > div, #main-view > div > div > div, .main-view-container__scroll-node-child > div').forEach(function (e) {
+          if (e.classList.contains('m-nobg') || e.closest('main')) return;
+          var r = e.getBoundingClientRect();
+          if (r.top > 320 || r.width < 300) return;
+          var cs = getComputedStyle(e);
+          if (cs.backgroundImage.indexOf('gradient') >= 0 || /^rgb\(/.test(cs.backgroundColor) && cs.backgroundColor !== 'rgb(18, 18, 18)' && cs.backgroundColor !== 'rgb(0, 0, 0)') e.classList.add('m-nobg');
+        });
       });
     }
     if (!document.querySelector('#main-view .m-sticky')) document.querySelectorAll('#main-view [data-encore-id="chip"]').forEach(function (ch) {
@@ -2599,9 +2612,10 @@
     // ホームのアイコンは「すべて／音楽…」の丸ボタンと同じ高さにそろえる
     if (av && document.documentElement.classList.contains('m-home')) {
       var chip = document.querySelector('main [data-encore-id="chip"]');
-      if (chip) {
+      // 位置を測るとページ全体の配置計算が走るので、ページが変わったときと丸ボタンが入れ替わったときだけ測る
+      if (chip && av.dataset.chipFor !== location.pathname) {
         var cr = chip.getBoundingClientRect();
-        if (cr.height) av.style.top = Math.round(cr.top + cr.height / 2 - 16) + 'px';
+        if (cr.height) { av.style.top = Math.round(cr.top + cr.height / 2 - 16) + 'px'; av.dataset.chipFor = location.pathname; }
       }
     } else if (av) av.style.top = '';
     if (av && !av.dataset.ready) {
@@ -3568,9 +3582,35 @@
       tidy();
     }, delay);
   }
+  // ページが切り替わったら、待たずにすぐ整える（ホームだけの見た目などが遅れて当たり、もたついて見えるのを防ぐ）
+  ['pushState', 'replaceState'].forEach(function (k) {
+    var orig = history[k];
+    history[k] = function () {
+      var r = orig.apply(this, arguments);
+      var h = document.documentElement.classList;
+      h.toggle('m-home', /^\/(intl-[a-z-]+\/?)?(home\/?)?$/i.test(location.pathname) && !h.contains('m-lib') && !h.contains('m-search'));
+      if (pending) { clearTimeout(pending); pending = null; }
+      schedule(16);
+      return r;
+    };
+  });
+  window.addEventListener('popstate', function () { if (pending) { clearTimeout(pending); pending = null; } schedule(16); });
   document.addEventListener('scroll', function () { scrolling = Date.now(); }, { capture: true, passive: true });
   document.addEventListener('touchmove', function () { scrolling = Date.now(); }, { capture: true, passive: true });
-  new MutationObserver(function () { tidyBigCards(); schedule(120); })
+  // おすすめカードは描かれた直後（次の描画の前）にまとめて整える（変化のたびに走らせると重い）
+  var bigCardsQueued = false;
+  var lastPath = location.pathname;
+  new MutationObserver(function () {
+    if (location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      var h = document.documentElement.classList;
+      h.toggle('m-home', /^\/(intl-[a-z-]+\/?)?(home\/?)?$/i.test(location.pathname) && !h.contains('m-lib') && !h.contains('m-search'));
+      if (pending) { clearTimeout(pending); pending = null; }
+      schedule(16);
+    }
+    if (!bigCardsQueued) { bigCardsQueued = true; requestAnimationFrame(function () { bigCardsQueued = false; tidyBigCards(); }); }
+    schedule(120);
+  })
     .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label'] });
   tidy();
 })();
