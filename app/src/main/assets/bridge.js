@@ -76,7 +76,7 @@
       md.is_advertisement === 'true' || !!md.ad_id);
   }
   var mutedAdUri = '', mutedAdVolume = 1, mutedAdElements = [], adMuteAppliedAt = 0, adMuteTimedOut = false, lastAdLogUri = '';
-  var adBreakActive = false;
+  var adBreakActive = false, AD_RATE = 16, adSpeedLoggedUri = '';
   var adSkipUri = '', adSkipAttempts = 0, adSkipTimer = 0, adSkipPending = false;
   function resetAdSkip() {
     if (adSkipTimer) clearTimeout(adSkipTimer);
@@ -127,13 +127,37 @@
     var elements = mutedAdElements.slice();
     mutedAdElements = [];
     elements.forEach(function (el) {
-      try { el.muted = false; el.volume = restore; } catch (e) {}
+      try { el.muted = false; el.volume = restore; el.playbackRate = 1; } catch (e) {}
     });
     return elements.length;
+  }
+  // 広告のあとで Web Player が音量を小さいまま付け直すことがあるので、しばらく見張って戻す。
+  // クロスフェード中は曲の始まりがわざと小さいので、そのときは見張らない
+  var adVolumeGuardTimer = 0;
+  function guardVolumeAfterAd(restore) {
+    if (adVolumeGuardTimer) clearInterval(adVolumeGuardTimer);
+    var started = Date.now(), checked = false;
+    adVolumeGuardTimer = setInterval(function () {
+      if (Date.now() - started > 15000 || mutedAdUri) { clearInterval(adVolumeGuardTimer); adVolumeGuardTimer = 0; return; }
+      audioEl().then(function (el) {
+        if (!el || mutedAdUri) return;
+        if (!checked && Date.now() - started > 3000) {
+          checked = true;
+          pageDebug('ad.volume.check', 'volume=' + el.volume + ' muted=' + el.muted + ' xf=' + xfSec + ' xfBase=' + xfBase);
+        }
+        if (xfSec) return;
+        if (el.muted || el.volume < restore * 0.5) {
+          pageDebug('ad.volume.fixed', 'volume=' + el.volume + ' muted=' + el.muted + ' -> ' + restore);
+          el.muted = false;
+          el.volume = restore;
+        }
+      });
+    }, 500);
   }
   function restoreAdVolume() {
     if (!mutedAdUri) return;
     var restore = mutedAdVolume;
+    guardVolumeAfterAd(restore);
     mutedAdUri = '';
     adMuteAppliedAt = 0;
     var count = restoreMutedElements(restore);
@@ -142,6 +166,7 @@
       if (!el || mutedAdUri) return pageDebug('ad.mute.restore_missing');
       el.muted = false;
       el.volume = restore;
+      el.playbackRate = 1;
       pageDebug('ad.mute.restored', 'fallback volume=' + el.volume);
     });
   }
@@ -189,7 +214,7 @@
         mutedAdUri = '';
         adMuteAppliedAt = 0;
         var restored = restoreMutedElements(restore);
-        if (!restored) { el.muted = false; el.volume = restore; restored = 1; }
+        if (!restored) { el.muted = false; el.volume = restore; el.playbackRate = 1; restored = 1; }
         pageDebug('ad.mute.failsafe', 'elements=' + restored + ' volume=' + restore);
         return;
       }
@@ -197,6 +222,15 @@
       el.muted = false;
       if (mutedAdElements.indexOf(el) < 0) mutedAdElements.push(el);
       el.volume = 0.001;
+      // スキップは断られ、音声を止めると先へ進めなくなるので、広告を速く最後まで再生させる
+      if (el.playbackRate < AD_RATE) {
+        try { el.playbackRate = AD_RATE; } catch (e) { try { el.playbackRate = 4; } catch (e2) {} }
+        // Web Player が速度を何度も戻してくるので付け直すが、ログは広告 1 本につき 1 回だけ
+        if (adSpeedLoggedUri !== uri) {
+          adSpeedLoggedUri = uri;
+          pageDebug('ad.speed.applied', 'rate=' + el.playbackRate + ' duration=' + (isFinite(el.duration) ? Math.round(el.duration) : '?'));
+        }
+      }
       if (!adMuteAppliedAt) {
         adMuteAppliedAt = Date.now();
         pageDebug('ad.mute.applied');
@@ -691,13 +725,15 @@
     if (xfTimer) return;
     xfTimer = setInterval(function () {
       if (!xfSec && xfBase == null) return;
+      // 広告のミュート中に音量を拾うと、広告後の曲がミュートの音量のままになる
+      if (mutedAdUri || adBreakActive) return;
       audioEl().then(function (el) {
-        if (!el) return;
+        if (!el || mutedAdUri) return;
         if (!xfSec || el.paused || !isFinite(el.duration) || el.duration < xfSec * 3) {
           if (xfBase != null) { el.volume = xfBase; xfBase = null; }
           return;
         }
-        if (xfBase == null) xfBase = el.volume || 1;
+        if (xfBase == null) xfBase = el.volume > 0.01 ? el.volume : 1;
         var t = el.currentTime, rest = el.duration - t;
         el.volume = Math.max(0, Math.min(1, xfBase * Math.min(1, t / xfSec, rest / xfSec)));
       });
