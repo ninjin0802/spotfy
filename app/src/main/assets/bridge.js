@@ -605,6 +605,8 @@
         .filter(function (d) { return !d.hidden; });
       return { self: st.self || '', active: c.active_device_id || st.self || '', list: list };
     },
+    // ほかの機器で再生中なら、その機器の音量を変える（v は 0〜1）
+    remoteVolume: function (a) { return setRemoteVolume(a.v); },
     transfer: function (a) {
       if (!window.__mConnect) throw new Error('not ready');
       return __mConnect.transfer(a.id).then(function (r) { return !!(r && (r.ok || r.status < 300)); });
@@ -732,7 +734,17 @@
     // ほかの機器で再生中なら、その名前（このスマホなら空）
     var cst = window.__mConnect ? __mConnect.get() : {}, cl = cst.cluster || {};
     var act = cl.active_device_id && cl.active_device_id !== cst.self && cl.devices && cl.devices[cl.active_device_id];
+    // 再生先が変わったら、音量を変えられる機器かどうかをログに残す（Spotify の更新で判定が変わったときに追えるように）
+    if (act && act.device_id !== loggedActive) {
+      loggedActive = act.device_id;
+      var caps = act.capabilities || {};
+      pageDebug('connect.active', 'type=' + (act.device_type || '?') + ' volume=' + act.volume + ' disable_volume=' + !!caps.disable_volume + ' volume_steps=' + caps.volume_steps);
+    }
+    // 再生先の音量（音量を変えられない機器では canVolume が false）
+    var canVolume = !!act && typeof act.volume === 'number' && !(act.capabilities && act.capabilities.disable_volume) &&
+      !(act.capabilities && act.capabilities.volume_steps === 0);
     return {
+      volume: canVolume ? act.volume / 65535 : 0, canVolume: canVolume,
       has: true, artistUri: it.artists && it.artists[0] && it.artists[0].uri || '', device: act ? act.name || '' : '', deviceType: act ? (act.device_type || '').toLowerCase() : '', uri: it.uri, liked: likedFor === it.uri ? liked : false,
       contextName: ctx.metadata && ctx.metadata.context_description || '', contextUri: ctx.uri || '', title: it.name || md.title || '', artist: (it.artists || []).map(function (a) { return a.name; }).join(', ') || md.artist_name || '',
       album: it.album && it.album.name || md.album_title || '', image: img, playing: !st.isPaused, buffering: !!st.isBuffering,
@@ -742,7 +754,7 @@
     };
   }
   // 再生中の曲がお気に入りかどうか（曲が変わったときに一度だけ調べる）
-  var likedFor = '', liked = false;
+  var likedFor = '', liked = false, loggedActive = '';
   function checkLiked(uri) {
     likedFor = uri; liked = false;
     var lib = service('LibraryAPI');
@@ -753,13 +765,14 @@
   function pushState() {
     handleAdPlayback();
     var s = snapshot();
-    var key = JSON.stringify([s.uri, s.device, s.liked, s.playing, s.shuffle, s.repeat, s.buffering, Math.round(s.pos / 5000)]);
+    var key = JSON.stringify([s.uri, s.device, s.liked, s.playing, s.shuffle, s.repeat, s.buffering, Math.round(s.pos / 5000), Math.round((s.volume || 0) * 100), !!s.canVolume]);
     if (key === lastKey) return;
     lastKey = key;
     send({ type: 'bstate', value: s });
     // 通知のメディア操作と、裏で動き続けるためのサービスにも伝える
     send({ type: 'playing', value: !!s.playing });
-    if (s.has) send({ type: 'meta', title: s.title, artist: s.artist, album: s.album, art: s.image, playing: s.playing, pos: Math.round(s.pos), dur: Math.round(s.dur) });
+    if (s.has) send({ type: 'meta', title: s.title, artist: s.artist, album: s.album, art: s.image, playing: s.playing, pos: Math.round(s.pos), dur: Math.round(s.dur),
+      remote: !!s.device, volume: Math.round(s.volume * 100), canVolume: !!s.canVolume });
   }
 
   // 通知のボタン（Android のメディアコントロール）から
@@ -771,7 +784,22 @@
     else if (action === 'next') p.skipToNext();
     else if (action === 'prev') p.skipToPrevious();
     else if (action === 'seek') p.seekTo(pos);
+    else if (action === 'volume') setRemoteVolume(pos / 100).catch(function (e) { pageDebug('connect.volume.failed', String(e && e.message || e)); });
   };
+
+  function setRemoteVolume(v) {
+    var cst = window.__mConnect ? __mConnect.get() : {}, cl = cst.cluster || {}, id = cl.active_device_id;
+    if (!id || id === cst.self) return Promise.reject(new Error('not casting'));
+    var volume = Math.round(Math.max(0, Math.min(1, v)) * 65535);
+    return __mConnect.setVolume(id, volume).then(function (r) {
+      if (!r || !(r.ok || r.status < 300)) throw new Error('volume ' + (r && r.status));
+      // 返事を待たずに表示へ反映する（次のデバイス一覧の更新でも同じ値が届く）
+      if (cl.devices && cl.devices[id]) cl.devices[id].volume = volume;
+      lastKey = '';
+      pushState();
+      return true;
+    });
+  }
 
   window.__mb = {
     call: function (id, method, args) {

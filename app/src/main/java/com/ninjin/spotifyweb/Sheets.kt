@@ -19,6 +19,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -213,6 +216,7 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
                     ) {
                         if (dev.id == d.active) close() else { busy = dev.id; failed = null; scope.launch { val ok = runCatching { bridge.transfer(dev.id) }.getOrDefault(false); busy = null; if (ok) close() else failed = dev.id } }
                     }
+                    if (dev.id == d.active) RemoteVolume(bridge)
                 }
                 Text(
                     "同じ Spotify アカウントでログインしているスピーカー・テレビ・PC・ゲーム機などが表示されます。", color = Sub, fontSize = 13.sp,
@@ -220,6 +224,36 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+/** 再生中のほかの機器の音量（公式アプリと同じく、デバイスの一覧の中に出す） */
+@Composable
+private fun RemoteVolume(bridge: Bridge) {
+    val player by bridge.player.collectAsState()
+    if (!player.canVolume) return
+    val scope = rememberCoroutineScope()
+    // 動かしている間は手元の値を出し、送るのは 0.15 秒に 1 回まで（送りすぎると機器が追いつかない）
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    var sending by remember { mutableStateOf(false) }
+    fun send() {
+        if (sending) return
+        sending = true
+        scope.launch {
+            kotlinx.coroutines.delay(150)
+            sending = false
+            dragging?.let { runCatching { bridge.remoteVolume(it) } }
+        }
+    }
+    Row(Modifier.fillMaxWidth().padding(start = 64.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Image(rememberVectorPainter(DevIcons.speaker), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Sub))
+        Slider(
+            value = dragging ?: player.volume,
+            onValueChange = { dragging = it; send() },
+            onValueChangeFinished = { val v = dragging; scope.launch { v?.let { runCatching { bridge.remoteVolume(it) } }; dragging = null } },
+            modifier = Modifier.weight(1f).padding(start = 8.dp),
+            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Accent, inactiveTrackColor = Color(0xFF555555)),
+        )
     }
 }
 

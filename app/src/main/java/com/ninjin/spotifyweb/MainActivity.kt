@@ -551,6 +551,7 @@ class MainActivity : ComponentActivity() {
             "meta" -> media.update(
                 m.optString("title"), m.optString("artist"), m.optString("album"), m.optString("art"),
                 m.optBoolean("playing"), m.optLong("pos"), m.optLong("dur"),
+                remote = m.optBoolean("remote"), volume = m.optInt("volume"), canVolume = m.optBoolean("canVolume"),
             )
             "relay" -> {
                 val id = m.optInt("id")

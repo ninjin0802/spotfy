@@ -48,6 +48,9 @@ data class PlayerState(
     val device: String = "",
     val artistUri: String = "",
     val deviceType: String = "",
+    /** 再生先の音量（0〜1）。ほかの機器で再生中で、その機器の音量を変えられるときだけ canVolume が true */
+    val volume: Float = 0f,
+    val canVolume: Boolean = false,
     val receivedAt: Long = 0,
 ) {
     /** 「プレイリストから再生中」などの見出し */
@@ -245,6 +248,7 @@ class Bridge(
         return Devices(o.optString("self"), o.optString("active"), (0 until a.length()).map { i -> a.getJSONObject(i).let { Device(it.optString("id"), it.optString("name"), it.optString("type")) } })
     }
     suspend fun transfer(id: String) = call("transfer", JSONObject().put("id", id)) == true
+    suspend fun remoteVolume(v: Float) = call("remoteVolume", JSONObject().put("v", v.toDouble())) == true
 
     data class Lyrics(val synced: Boolean, val lines: List<Pair<Long, String>>, val bg: Int)
 
@@ -340,6 +344,8 @@ class Bridge(
         device = o.optString("device"),
         artistUri = o.optString("artistUri"),
         deviceType = o.optString("deviceType"),
+        volume = o.optDouble("volume", 0.0).toFloat(),
+        canVolume = o.optBoolean("canVolume"),
         receivedAt = SystemClock.elapsedRealtime(),
     )
 }

@@ -52,7 +52,11 @@ class MediaControls(private val context: Context, private val onAction: (String,
         instance = this
     }
 
-    fun update(title: String, artist: String, album: String, artUrl: String, playing: Boolean, positionMs: Long, durationMs: Long) {
+    fun update(
+        title: String, artist: String, album: String, artUrl: String, playing: Boolean, positionMs: Long, durationMs: Long,
+        remote: Boolean = false, volume: Int = 0, canVolume: Boolean = false,
+    ) {
+        updateVolumeTarget(remote && canVolume, volume)
         val trackChanged = title != this.title || artist != this.artist || album != this.album
         this.title = title
         this.artist = artist
@@ -79,6 +83,39 @@ class MediaControls(private val context: Context, private val onAction: (String,
     }
 
     private var lastDuration = 0L
+
+    /**
+     * ほかの機器で再生中は、音量ボタン・音量パネル・ロック画面の音量を再生先につなぐ（公式アプリと同じ）。
+     * このスマホで再生中・音量を変えられない機器では、ふつうにスマホの音量を変える。
+     */
+    private var remoteVolume: android.media.VolumeProvider? = null
+
+    private fun updateVolumeTarget(remote: Boolean, volume: Int) {
+        val provider = remoteVolume
+        if (!remote) {
+            if (provider != null) {
+                remoteVolume = null
+                session.setPlaybackToLocal(
+                    android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).build()
+                )
+            }
+            return
+        }
+        if (provider != null) {
+            if (provider.currentVolume != volume) provider.currentVolume = volume
+            return
+        }
+        remoteVolume = object : android.media.VolumeProvider(VOLUME_CONTROL_ABSOLUTE, 100, volume) {
+            override fun onSetVolumeTo(volume: Int) = setRemote(volume)
+            override fun onAdjustVolume(direction: Int) = setRemote(currentVolume + direction * VOLUME_STEP)
+            private fun setRemote(target: Int) {
+                val v = target.coerceIn(0, 100)
+                currentVolume = v
+                onAction("volume", v.toLong())
+            }
+        }.also { session.setPlaybackToRemote(it) }
+    }
 
     private fun publishMetadata(durationMs: Long) {
         session.setMetadata(
@@ -153,6 +190,8 @@ class MediaControls(private val context: Context, private val onAction: (String,
     companion object {
         const val CHANNEL_ID = "playback"
         const val NOTIFICATION_ID = 1
+        /** 音量ボタン 1 回で変える量（100 段階のうち） */
+        private const val VOLUME_STEP = 5
         @Volatile var instance: MediaControls? = null
             private set
     }
