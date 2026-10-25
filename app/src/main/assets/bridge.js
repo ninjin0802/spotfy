@@ -39,6 +39,7 @@
     getAlbum: '0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f',
     fetchPlaylist: '21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf',
     queryArtistOverview: '9f8134ef565e78621f1e1793555bd6633c5ac144ae0f89604ed3ae3f80b3c8e6',
+    browsePage: 'f5c4e6d668f5716464a231c1cc8b22c1cbf6ad68b09929fd7de813a30581298b',
     browseAll: 'dbd8b55e09a58afc52eab438bc228ba28fd72ac2f2148c6c26354980e4579001',
     recentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     saveRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
@@ -76,8 +77,9 @@
   function strip(html) { return new DOMParser().parseFromString(html || '', 'text/html').body.textContent || ''; }
 
   // GraphQL の各種カードを { uri, title, subtitle, image, round } にそろえる
-  function card(w) {
+  function card(w, uri) {
     var d = w && (w.data || w);
+    if (w && uri && !w.uri) w.uri = uri;
     if (!d) return null;
     switch (d.__typename) {
       case 'Playlist': return { uri: d.uri, title: d.name, subtitle: strip(d.description) || (d.ownerV2 && d.ownerV2.data && d.ownerV2.data.name) || '', image: pickImg(d.images) };
@@ -86,6 +88,10 @@
       case 'Podcast': return { uri: d.uri, title: d.name, subtitle: d.publisher && d.publisher.name || 'ポッドキャスト', image: pickImg(d.coverArt) };
       case 'Episode': return { uri: d.uri, title: d.name, subtitle: d.podcastV2 && d.podcastV2.data && d.podcastV2.data.name || 'エピソード', image: pickImg(d.coverArt) };
       case 'Track': return { uri: d.uri, title: d.name, subtitle: names(d.artists), image: pickImg(d.albumOfTrack) };
+      case 'BrowseSectionContainer': {
+        var cr = d.data && d.data.cardRepresentation;
+        return cr ? { uri: w.uri || d.uri || '', title: cr.title && cr.title.transformedLabel || '', subtitle: cr.backgroundColor && cr.backgroundColor.hex || '', image: pickImg(cr.artwork), kind: 'genre' } : null;
+      }
       case 'List':
         // 「最近」の棚は中にまとめて入っている
         return null;
@@ -97,14 +103,16 @@
 
   var methods = {
     // ホーム：あいさつ・ショートカット・棚
-    home: function () {
+    home: function (a) {
       return gql('home', {
         homeEndUserIntegration: 'INTEGRATION_WEB_PLAYER', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        sp_t: cookie('sp_t'), facet: '', sectionItemsLimit: 12, includeHomeChapterVideoCards: false, includeEpisodeContentRatingsV2: false
+        sp_t: cookie('sp_t'), facet: a.facet || '', sectionItemsLimit: 12, includeHomeChapterVideoCards: false, includeEpisodeContentRatingsV2: false
       }).then(function (r) {
         var h = r.data && r.data.home;
         if (!h) throw new Error('no home');
-        var out = { greeting: h.greeting && h.greeting.transformedLabel || '', shortcuts: [], sections: [] };
+        var out = { greeting: h.greeting && h.greeting.transformedLabel || '', shortcuts: [], sections: [],
+          // 上の「音楽」「ポッドキャスト」（選ぶと「フォロー中」が続く）
+          chips: (h.homeChips || []).map(function (c) { return { id: c.id, label: c.label && c.label.transformedLabel || '', sub: (c.subChips || []).map(function (x) { return { id: x.id, label: x.label && x.label.transformedLabel || '' }; }) }; }) };
         (h.sectionContainer && h.sectionContainer.sections.items || []).forEach(function (s) {
           var type = s.data && s.data.__typename;
           var items = ((s.sectionItems && s.sectionItems.items) || []).map(function (it) { return card(it.content); });
@@ -118,7 +126,8 @@
           items = items.filter(function (c) { return c && c.uri && c.title; });
           if (!items.length) return;
           if (type === 'HomeShortsSectionData') out.shortcuts = items.slice(0, 8);
-          else out.sections.push({ title: s.data && s.data.title && s.data.title.transformedLabel || '', items: items });
+          // ポッドキャストのおすすめなどは 1 件ずつの大きなカード（公式アプリと同じ）
+          else out.sections.push({ title: s.data && s.data.title && s.data.title.transformedLabel || '', items: items, feed: type === 'HomeFeedBaselineSectionData' || items.length === 1 });
         });
         return out;
       });
@@ -257,6 +266,54 @@
         return { uri: t.uri, title: t.name || md.title || '', artist: (t.artists || []).map(function (x) { return x.name; }).join(', ') || md.artist_name || '', image: (t.images && t.images[0] && t.images[0].url) || md.image_url || '', dur: 0 };
       });
     },
+    // ジャンルのページ（棚が並ぶ）
+    genre: function (a) {
+      return gql('browsePage', { uri: a.uri, browseEndUserIntegration: 'INTEGRATION_WEB_PLAYER', includeEpisodeContentRatingsV2: false, pagePagination: { offset: 0, limit: 20 }, sectionPagination: { offset: 0, limit: 20 } }).then(function (r) {
+        var b = r.data.browse;
+        var shelves = [];
+        (b.sections.items || []).forEach(function (sec) {
+          var items = (sec.sectionItems.items || []).map(function (it) { return card(it.content, it.uri); }).filter(function (c) { return c && c.uri && c.title; });
+          if (items.length) shelves.push({ title: sec.data && sec.data.title && sec.data.title.transformedLabel || '', items: items });
+        });
+        return { kind: 'genre', uri: a.uri, title: b.header && b.header.title && b.header.title.transformedLabel || '', image: '', subtitle: b.header && b.header.color && b.header.color.hex || '', tracks: [], shelves: shelves };
+      });
+    },
+    // プロフィール（公開プレイリスト・最近聴いたアーティスト・フォロワー）
+    profile: function () {
+      var u = service('UserAPI');
+      return Promise.resolve(u.getUser()).then(function (me) {
+        var h = { accept: 'application/json', 'app-platform': 'WebPlayer' };
+        if (window.__mConnect) { var au = __mConnect.auth(); if (au) h.authorization = au; var ct = __mConnect.clientToken(); if (ct) h['client-token'] = ct; }
+        return fetch('https://spclient.wg.spotify.com/user-profile-view/v3/profile/' + encodeURIComponent(me.username) + '?playlist_limit=20&artist_limit=10&episode_limit=10&market=from_token', { headers: h })
+          .then(function (r) { return r.ok ? r.json() : {}; })
+          .then(function (j) {
+            return {
+              name: j.name || me.displayName || '', image: j.image_url || (me.images && me.images[0] && me.images[0].url) || '',
+              followers: j.followers_count || 0, following: j.following_count || 0,
+              playlists: (j.public_playlists || []).map(function (p) { return { uri: p.uri, title: p.name, subtitle: (p.followers_count ? p.followers_count + '人のフォロワー' : 'プレイリスト'), image: p.image_url || '' }; }),
+              artists: (j.recently_played_artists || []).map(function (x) { return { uri: x.uri, title: x.name, subtitle: 'アーティスト', image: x.image_url || '', round: true }; })
+            };
+          });
+      });
+    },
+    // キュー（再生中・次に再生・その後に続く曲）
+    queueList: function () {
+      var p = service('PlayerAPI');
+      return Promise.resolve(p.getQueue()).then(function (q) {
+        function t(x) {
+          if (!x) return null;
+          var md = x.metadata || {};
+          var img = (x.album && x.album.images && (x.album.images[1] || x.album.images[0]) || {}).url || (x.images && x.images[0] && x.images[0].url) || md.image_url || '';
+          return { uri: x.uri, uid: x.uid || '', title: x.name || md.title || '', artist: (x.artists || []).map(function (z) { return z.name; }).join(', ') || md.artist_name || '', image: img };
+        }
+        var st = p.getState();
+        return { current: t(q.current), queued: (q.queued || []).map(t).filter(Boolean), next: (q.nextUp || []).slice(0, 50).map(t).filter(Boolean), context: st && st.context && st.context.metadata && st.context.metadata.context_description || '' };
+      });
+    },
+    skipTo: function (a) { return Promise.resolve(service('PlayerAPI').skipTo({ uri: a.uri, uid: a.uid })).then(function () { return true; }); },
+    unqueue: function (a) { return Promise.resolve(service('PlayerAPI').removeFromQueue([{ uri: a.uri, uid: a.uid }])).then(function () { return true; }); },
+    createPlaylist: function (a) { return Promise.resolve(service('RootlistAPI').createPlaylist(a.name, { before: 'start' })).then(function (uri) { return uri || ''; }); },
+    createFolder: function (a) { return Promise.resolve(service('RootlistAPI').createFolder(a.name, { before: 'start' })).then(function () { return true; }); },
     library: function () {
       var lib = service('LibraryAPI');
       return Promise.resolve(lib.getContents({ limit: 300, offset: 0 })).then(function (c) {

@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** ホームなどに並ぶカード（アルバム・プレイリスト・アーティストなど） */
 data class Card(val uri: String, val title: String, val subtitle: String, val image: String, val round: Boolean, val kind: String = "", val pinned: Boolean = false)
 
-data class Shelf(val title: String, val items: List<Card>)
+data class Shelf(val title: String, val items: List<Card>, val feed: Boolean = false)
 
 data class Track(val uri: String, val title: String, val artist: String, val image: String, val dur: Long)
 
@@ -25,7 +25,9 @@ data class Page(
     val saved: Boolean, val tracks: List<Track>, val shelves: List<Shelf>,
 )
 
-data class HomeFeed(val greeting: String, val shortcuts: List<Card>, val shelves: List<Shelf>)
+data class Chip(val id: String, val label: String, val sub: List<Chip> = emptyList())
+
+data class HomeFeed(val greeting: String, val shortcuts: List<Card>, val shelves: List<Shelf>, val chips: List<Chip> = emptyList())
 
 /** 再生状態。位置は [at]（Web Player の時刻）時点の値なので、表示時に経過分を足す */
 data class PlayerState(
@@ -73,6 +75,9 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     private val _ready = MutableStateFlow(false)
     val ready: StateFlow<Boolean> = _ready
 
+    /** ライブラリの中身が変わったら増える（ライブラリの画面が読み直す） */
+    val libraryVersion = androidx.compose.runtime.mutableIntStateOf(0)
+
     private val _player = MutableStateFlow(PlayerState())
     val player: StateFlow<PlayerState> = _player
 
@@ -113,9 +118,9 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     /** 前回のホーム（起動直後、Web Player の準備ができるまでの間に表示する。曲名や画像の URL だけで、音声は保存しない） */
     fun cachedHome(): HomeFeed? = cache.getString("home", null)?.let { runCatching { parseHome(JSONObject(it)) }.getOrNull() }
 
-    suspend fun home(): HomeFeed {
-        val o = call("home") as JSONObject
-        cache.edit().putString("home", o.toString()).apply()
+    suspend fun home(facet: String = ""): HomeFeed {
+        val o = call("home", JSONObject().put("facet", facet)) as JSONObject
+        if (facet.isEmpty()) cache.edit().putString("home", o.toString()).apply()
         return parseHome(o)
     }
 
@@ -123,10 +128,15 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
         return HomeFeed(
             greeting = o.optString("greeting"),
             shortcuts = cards(o.optJSONArray("shortcuts")),
+            chips = (o.optJSONArray("chips") ?: JSONArray()).let { a ->
+                (0 until a.length()).map { i -> a.getJSONObject(i).let { c ->
+                    Chip(c.optString("id"), c.optString("label"), (c.optJSONArray("sub") ?: JSONArray()).let { b -> (0 until b.length()).map { j -> b.getJSONObject(j).let { Chip(it.optString("id"), it.optString("label")) } } })
+                } }
+            },
             shelves = (o.optJSONArray("sections") ?: JSONArray()).let { a ->
                 (0 until a.length()).map { i ->
                     val s = a.getJSONObject(i)
-                    Shelf(s.optString("title"), cards(s.optJSONArray("items")))
+                    Shelf(s.optString("title"), cards(s.optJSONArray("items")), s.optBoolean("feed"))
                 }
             },
         )
@@ -149,7 +159,7 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
             val a = call("liked") as JSONArray
             return Page("playlist", uri, "お気に入りの曲", "${a.length()}曲", "", false, false, "", "", "", true, tracks(a), emptyList())
         }
-        val method = when (uri.split(':').getOrNull(1)) { "album" -> "album"; "artist" -> "artist"; else -> "playlist" }
+        val method = when (uri.split(':').getOrNull(1)) { "album" -> "album"; "artist" -> "artist"; "page", "genre" -> "genre"; else -> "playlist" }
         val o = call(method, JSONObject().put("uri", uri)) as JSONObject
         return Page(
             o.optString("kind"), o.optString("uri"), o.optString("title"), o.optString("subtitle"), o.optString("image"),
@@ -167,7 +177,7 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     suspend fun recent(): List<Card> = cards(call("recent") as? JSONArray)
     suspend fun saveRecent(uri: String) = call("saveRecent", JSONObject().put("uri", uri))
     suspend fun removeRecent(uri: String) = call("removeRecent", JSONObject().put("uri", uri))
-    suspend fun follow(uri: String, on: Boolean) = call("follow", JSONObject().put("uri", uri).put("on", on))
+    suspend fun follow(uri: String, on: Boolean) = call("follow", JSONObject().put("uri", uri).put("on", on)).also { libraryVersion.intValue++ }
 
     private fun tracks(a: JSONArray?): List<Track> = if (a == null) emptyList() else (0 until a.length()).mapNotNull { i ->
         val t = a.optJSONObject(i) ?: return@mapNotNull null
@@ -209,6 +219,28 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     }
 
     suspend fun nextUp(): Track? = (call("nextUp") as? JSONObject)?.let { Track(it.optString("uri"), it.optString("title"), it.optString("artist"), it.optString("image"), 0) }
+
+    data class Profile(val name: String, val image: String, val followers: Int, val following: Int, val playlists: List<Card>, val artists: List<Card>)
+
+    suspend fun profile(): Profile {
+        val o = call("profile") as JSONObject
+        return Profile(o.optString("name"), o.optString("image"), o.optInt("followers"), o.optInt("following"), cards(o.optJSONArray("playlists")), cards(o.optJSONArray("artists")))
+    }
+
+    data class QItem(val uri: String, val uid: String, val title: String, val artist: String, val image: String)
+    data class Queue(val current: QItem?, val queued: List<QItem>, val next: List<QItem>, val context: String)
+
+    suspend fun queue(): Queue {
+        val o = call("queueList") as JSONObject
+        fun q(j: JSONObject?) = j?.let { QItem(it.optString("uri"), it.optString("uid"), it.optString("title"), it.optString("artist"), it.optString("image")) }
+        fun ql(a: JSONArray?) = if (a == null) emptyList() else (0 until a.length()).mapNotNull { q(a.optJSONObject(it)) }
+        return Queue(q(o.optJSONObject("current")), ql(o.optJSONArray("queued")), ql(o.optJSONArray("next")), o.optString("context"))
+    }
+    suspend fun skipTo(i: QItem) = call("skipTo", JSONObject().put("uri", i.uri).put("uid", i.uid))
+    suspend fun unqueue(i: QItem) = call("unqueue", JSONObject().put("uri", i.uri).put("uid", i.uid))
+    suspend fun createPlaylist(name: String) = (call("createPlaylist", JSONObject().put("name", name)) as? String ?: "").also { libraryVersion.intValue++ }
+    suspend fun createFolder(name: String) = call("createFolder", JSONObject().put("name", name)).also { libraryVersion.intValue++ }
+    suspend fun pause() = call("pause")
 
     data class User(val name: String, val image: String)
 

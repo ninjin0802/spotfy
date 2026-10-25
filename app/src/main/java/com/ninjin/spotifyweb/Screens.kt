@@ -59,7 +59,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** カードを押したとき：曲なら再生、それ以外はそのページを開く */
-internal fun isPage(uri: String) = uri.split(':').getOrNull(1) in setOf("album", "playlist", "artist", "collection", "user") || uri.contains(":collection")
+internal fun isPage(uri: String) = uri.split(':').getOrNull(1) in setOf("album", "playlist", "artist", "collection", "user", "page", "genre") || uri.contains(":collection")
 
 /** アルバム・プレイリスト・アーティスト・お気に入りの曲のページ */
 @Composable
@@ -77,7 +77,12 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
         if (p == null) {
             Placeholder(if (failed) "読み込めませんでした" else "読み込み中…")
         } else LazyColumn(state = list, contentPadding = PaddingValues(bottom = 170.dp)) {
-            item {
+            if (p.kind == "genre") item {
+                val c = runCatching { Color(android.graphics.Color.parseColor(p.subtitle)) }.getOrDefault(Card2)
+                Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(c, Bg))).windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 64.dp, bottom = 16.dp)) {
+                    Text2(p.title, 32, FontWeight.Black)
+                }
+            } else item {
                 if (p.kind == "artist" && p.header) {
                     Box(Modifier.fillMaxWidth().aspectRatio(1.25f)) {
                         AsyncImage(p.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -105,7 +110,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                     }
                 }
             }
-            item {
+            if (p.kind != "genre") item {
                 Column(Modifier.padding(horizontal = 16.dp)) {
                     if (p.subtitle.isNotEmpty()) Text(p.subtitle, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -217,7 +222,7 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
         if (tiles.isNotEmpty()) item { Text2("すべてを見る", 16, FontWeight.Bold, Modifier.padding(start = 16.dp, top = 24.dp, bottom = 12.dp)) }
         items(tiles.chunked(2)) { row ->
             Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { t -> GenreTile(t, Modifier.weight(1f)) { typing = true } }
+                row.forEach { t -> GenreTile(t, Modifier.weight(1f)) { onOpen(t) } }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
@@ -306,8 +311,11 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
 
 /** マイライブラリ（公式アプリと同じ：絞り込み・並べ替え・リスト／グリッド、ピン留め） */
 @Composable
-internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onOpen: (Card) -> Unit) {
+internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onOpen: (Card) -> Unit, onCreate: () -> Unit) {
     var items by remember { mutableStateOf(bridge.cachedLibrary()) }
+    var query by remember { mutableStateOf<String?>(null) }
+    androidx.activity.compose.BackHandler(enabled = query != null) { query = null }
+    LaunchedEffect(bridge.libraryVersion.value) { if (ready && bridge.libraryVersion.value > 0) runCatching { bridge.library() }.onSuccess { items = it } }
     var filter by remember { mutableStateOf("") }
     var grid by remember { mutableStateOf(false) }
     var sort by remember { mutableStateOf(0) }
@@ -315,15 +323,30 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
     val liked = Card("spotify:collection:tracks", "お気に入りの曲", "プレイリスト", "", false, "liked", true)
     val base = listOf(liked) + items.filter { !it.uri.contains(":collection") && it.kind != "your-episodes" }
     val filtered = base.filter { filter.isEmpty() || it.kind == filter || (filter == "playlist" && it.kind == "liked") }
+        .filter { query.isNullOrBlank() || it.title.contains(query!!, ignoreCase = true) || it.subtitle.contains(query!!, ignoreCase = true) }
     val sorted = when (sort) { 1 -> filtered.sortedBy { it.title.lowercase() }; 2 -> filtered.sortedBy { it.subtitle.substringAfter(" • ", "") }; else -> filtered }
         .sortedByDescending { it.pinned }
     LazyColumn(Modifier.fillMaxSize().background(Bg), contentPadding = PaddingValues(bottom = 170.dp)) {
         item {
             Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Avatar(user, 32, onAvatar)
-                Text2("マイライブラリ", 24, FontWeight.Bold, Modifier.padding(start = 12.dp).weight(1f))
-                Ico(Icons.search, 24) {}
-                Ico(Icons.add, 26) {}
+                if (query == null) {
+                    Avatar(user, 32, onAvatar)
+                    Text2("マイライブラリ", 24, FontWeight.Bold, Modifier.padding(start = 12.dp).weight(1f))
+                    Ico(Icons.search, 24) { query = "" }
+                    Ico(Icons.add, 26, onClick = onCreate)
+                } else {
+                    // マイライブラリ内を検索
+                    val req = remember { androidx.compose.ui.focus.FocusRequester() }
+                    LaunchedEffect(Unit) { req.requestFocus() }
+                    Row(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(6.dp)).background(Card2).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Image(rememberVectorPainter(Icons.search), null, Modifier.size(18.dp))
+                        Box(Modifier.weight(1f).padding(start = 8.dp)) {
+                            if (query!!.isEmpty()) Text("マイライブラリを検索", color = Sub, fontSize = 14.sp)
+                            BasicTextField(query!!, { query = it }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 14.sp), cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().focusRequester(req))
+                        }
+                    }
+                    Text("キャンセル", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { query = null }.padding(12.dp))
+                }
             }
         }
         item {

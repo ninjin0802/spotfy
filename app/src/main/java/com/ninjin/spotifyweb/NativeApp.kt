@@ -132,6 +132,10 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     var settingsOpen by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf<MenuTarget?>(null) }
     var devicesOpen by remember { mutableStateOf(false) }
+    var queueOpen by remember { mutableStateOf(false) }
+    var createOpen by remember { mutableStateOf(false) }
+    var profileOpen by remember { mutableStateOf(false) }
+    BackHandler(enabled = profileOpen && !playerOpen) { profileOpen = false }
     val player by bridge.player.collectAsState()
     val ready by bridge.ready.collectAsState()
     var user by remember { mutableStateOf(bridge.cachedUser()) }
@@ -157,7 +161,7 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             when (tab) {
                 Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open)
                 Tab.Search -> SearchScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
-                Tab.Library -> LibraryScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
+                Tab.Library -> LibraryScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open, onCreate = { createOpen = true })
             }
             stack.lastOrNull()?.let { uri ->
                 androidx.compose.runtime.key(uri, stack.size) {
@@ -169,6 +173,9 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true }, onDevices = { devicesOpen = true })
             TabBar(tab) { if (it == tab) stacks[it]!!.clear() else tab = it }
         }
+        AnimatedVisibility(profileOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
+            ProfileScreen(bridge, user, onBack = { profileOpen = false }, onOpen = { c -> profileOpen = false; open(c) })
+        }
         AnimatedVisibility(settingsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             SettingsScreen(bridge, host, user, onBack = { settingsOpen = false })
         }
@@ -177,17 +184,19 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(remember { MutableInteractionSource() }, null) { drawerOpen = false })
         }
         AnimatedVisibility(drawerOpen, enter = slideInHorizontally { -it }, exit = slideOutHorizontally { -it }) {
-            Drawer(user, onSettings = { drawerOpen = false; settingsOpen = true })
+            Drawer(user, onProfile = { drawerOpen = false; profileOpen = true }, onSettings = { drawerOpen = false; settingsOpen = true })
         }
         AnimatedVisibility(
             visible = playerOpen && player.has,
             enter = slideInVertically(tween(280)) { it }, exit = slideOutVertically(tween(240)) { it },
         ) {
-            FullPlayer(bridge, host, player, tint, onClose = { playerOpen = false }, onDevices = { devicesOpen = true },
+            FullPlayer(bridge, host, player, tint, onClose = { playerOpen = false }, onDevices = { devicesOpen = true }, onQueue = { queueOpen = true },
                 onMenu = { menu = MenuTarget.OfTrack(Track(player.uri, player.title, player.artist, player.image, player.dur)) },
                 onOpen = { c -> playerOpen = false; open(c) })
         }
         if (devicesOpen) DevicesSheet(bridge, host) { devicesOpen = false }
+        if (queueOpen) QueueSheet(bridge, player) { queueOpen = false }
+        if (createOpen) CreateSheet(bridge, onCreated = { c -> open(c) }) { createOpen = false }
         menu?.let { m ->
             MenuSheet(bridge, host, m, onOpen = { c -> playerOpen = false; settingsOpen = false; open(c) }, onDismiss = { menu = null })
         }
@@ -238,9 +247,13 @@ internal fun Avatar(user: Bridge.User?, size: Int, onClick: (() -> Unit)? = null
 private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onPlay: (Card) -> Unit) {
     // 起動直後は前回のホームをすぐ出し、Web Player の準備ができたら新しい内容に差し替える
     var feed by remember { mutableStateOf(bridge.cachedHome()) }
+    var chips by remember { mutableStateOf(feed?.chips ?: emptyList()) }
+    var facet by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(ready) {
-        if (ready) runCatching { bridge.home() }.onSuccess { feed = it }.onFailure { if (feed == null) error = it.message }
+    val feeds = remember { mutableMapOf<String, HomeFeed>() }
+    LaunchedEffect(ready, facet) {
+        feeds[facet]?.let { feed = it }
+        if (ready) runCatching { bridge.home(facet) }.onSuccess { feeds[facet] = it; feed = it; if (it.chips.isNotEmpty()) chips = it.chips }.onFailure { if (feed == null) error = it.message }
     }
     val f = feed
     if (f == null) {
@@ -248,31 +261,44 @@ private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAva
         return
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 170.dp)) {
-        item {
+        // 上のアイコンとタブはスクロールしても上に残す（公式アプリと同じ）
+        stickyHeader {
             Row(
-                Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                Modifier.fillMaxWidth().background(Bg).windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Avatar(user, 32, onAvatar)
                 Spacer(Modifier.width(8.dp))
-                Chips()
+                Chips(chips, facet) { facet = it }
             }
         }
         if (f.shortcuts.isNotEmpty()) item { Shortcuts(f.shortcuts, onPlay) }
-        items(f.shelves) { s -> ShelfRow(s, onPlay) }
+        items(f.shelves) { s -> if (s.feed) FeedCard(s, onPlay) else ShelfRow(s, onPlay) }
+    }
+}
+
+/** 上の「すべて／音楽／ポッドキャスト」。公式アプリと同じく全部並んだまま、選んだものの右に「フォロー中」がつながる */
+@Composable
+private fun Chips(chips: List<Chip>, facet: String, onSelect: (String) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { ChipText("すべて", facet.isEmpty()) { onSelect("") } }
+        items(chips) { c ->
+            val selected = c.id == facet || c.sub.any { it.id == facet }
+            if (!selected) ChipText(c.label, false) { onSelect(c.id) }
+            else Row(Modifier.clip(CircleShape).background(Card2)) {
+                ChipText(c.label, true) { onSelect(if (facet == c.id) "" else c.id) }
+                c.sub.forEach { sc -> ChipText(sc.label, facet == sc.id) { onSelect(if (facet == sc.id) c.id else sc.id) } }
+            }
+        }
     }
 }
 
 @Composable
-private fun Chips() {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("すべて", "音楽", "ポッドキャスト").forEachIndexed { i, t ->
-            Text(
-                t, color = if (i == 0) Color.Black else Color.White, fontSize = 14.sp,
-                modifier = Modifier.clip(CircleShape).background(if (i == 0) Accent else Card2).padding(horizontal = 16.dp, vertical = 7.dp),
-            )
-        }
-    }
+private fun ChipText(t: String, on: Boolean, onClick: () -> Unit) {
+    Text(
+        t, color = if (on) Color.Black else Color.White, fontSize = 14.sp,
+        modifier = Modifier.clip(CircleShape).background(if (on) Accent else Card2).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 7.dp),
+    )
 }
 
 @Composable
@@ -293,6 +319,21 @@ private fun Shortcuts(items: List<Card>, onPlay: (Card) -> Unit) {
                     }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedCard(s: Shelf, onPlay: (Card) -> Unit) {
+    val c = s.items.first()
+    Column(Modifier.padding(horizontal = 16.dp).padding(top = 20.dp)) {
+        if (s.title.isNotEmpty()) Text(s.title, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Card2).clickable { onPlay(c) }.padding(12.dp)) {
+            AsyncImage(c.image, null, Modifier.size(96.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(c.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 20.sp)
+                Text(c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -391,7 +432,7 @@ internal fun mmss(ms: Long): String { val s = ms / 1000; return "%d:%02d".format
 
 /** 公式アプリと同じ全画面プレーヤー */
 @Composable
-private fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onMenu: () -> Unit, onOpen: (Card) -> Unit = {}) {
+private fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit, onOpen: (Card) -> Unit = {}) {
     var lyricsOpen by remember { mutableStateOf(false) }
     BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
     var lyrics by remember(p.uri) { mutableStateOf<Bridge.Lyrics?>(null) }
@@ -400,7 +441,7 @@ private fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Colo
     BoxWithConstraints(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}) {
         val h = maxHeight
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Box(Modifier.height(h).fillMaxWidth()) { PlayerMain(bridge, host, p, tint, onClose, onDevices, onMenu) }
+            Box(Modifier.height(h).fillMaxWidth()) { PlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu) }
             PlayerExtras(bridge, p, tint, lyrics, onLyrics = { lyricsOpen = true }, onOpen = onOpen)
         }
         AnimatedVisibility(lyricsOpen, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
@@ -411,7 +452,7 @@ private fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Colo
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun PlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onMenu: () -> Unit) {
+private fun PlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit) {
     val scope = rememberCoroutineScope()
     var now by remember { mutableLongStateOf(p.positionNow()) }
     var dragging by remember { mutableStateOf<Float?>(null) }
@@ -484,7 +525,7 @@ private fun PlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Colo
             }
             Ico(Icons.share, 22) { host.share("https://open.spotify.com/track/" + p.uri.substringAfterLast(':'), p.title) }
             Spacer(Modifier.width(8.dp))
-            Ico(Icons.queue, 22) {}
+            Ico(Icons.queue, 22, onClick = onQueue)
         }
     }
 }
@@ -495,13 +536,13 @@ private fun Color.compositeOver(bg: Color): Color {
 }
 
 @Composable
-private fun Drawer(user: Bridge.User?, onSettings: () -> Unit) {
+private fun Drawer(user: Bridge.User?, onProfile: () -> Unit, onSettings: () -> Unit) {
     Column(
         Modifier.fillMaxHeight().width(300.dp).background(Color(0xFF1F1F1F))
             .clickable(remember { MutableInteractionSource() }, null) {}
             .windowInsetsPadding(WindowInsets.statusBars).padding(top = 16.dp),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onProfile).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Avatar(user, 52)
             Column(Modifier.padding(start = 12.dp)) {
                 Text(user?.name ?: "", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
