@@ -52,7 +52,7 @@ expect_text() {
   while (( SECONDS < deadline )); do
     adb -s $serial shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     local ui; ui=$(adb -s $serial shell cat /sdcard/ui.xml 2>/dev/null)
-    grep -q -- "$1" <<<"$ui" && return 0
+    grep -qE -- "$1" <<<"$ui" && return 0
     # 重いエミュレーターではシステムの「応答していません」が出て画面をふさぐので、「Wait」を押して閉じる
     local wait_btn; wait_btn=$(grep -oE 'text="Wait"[^>]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' <<<"$ui" | grep -oE '[0-9]+' | tail -4 | tr '\n' ' ')
     if [[ -n "$wait_btn" ]]; then
@@ -82,7 +82,8 @@ check "初回起動でログイン画面" 'text="Continue"' 90
 adb -s $serial shell cmd connectivity airplane-mode enable
 sleep 3
 launch
-check "通信できないときの案内" "Spotify に接続できません" 60
+# 端末の言語で表示が変わる（CI のエミュレーターは英語）ので、どちらでも通す
+check "通信できないときの案内" "Spotify に接続できません|Can.t connect to Spotify" 60
 adb -s $serial shell cmd connectivity airplane-mode disable
 check "つながったら自動でログイン画面" 'text="Continue"' 90
 shutdown
