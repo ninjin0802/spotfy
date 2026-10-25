@@ -777,6 +777,8 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
                     SwitchRow("バックグラウンド再生", "アプリを閉じても再生を続ける", bg) { bg = it; host.setSetting("background", it.toString()) }
                     var ads by remember { mutableStateOf(host.setting("adblock", "true") == "true") }
                     SwitchRow("広告をブロック", "広告マネージャーを停止し、広告再生をミュート・スキップする", ads) { ads = it; host.setSetting("adblock", it.toString()) }
+                    var gl by remember { mutableStateOf(host.setting("gapless", "true") == "true") }
+                    SwitchRow("ギャップレス再生", "曲と曲のあいだの無音をなくして、続けて再生する", gl) { gl = it; host.setSetting("gapless", it.toString()) }
                     // クロスフェード：公式アプリと同じく、オンにするとスライダーで 1〜12 秒を選ぶ
                     var xf by remember { mutableStateOf(host.setting("crossfade", "0").toIntOrNull() ?: 0) }
                     var xfLast by remember { mutableStateOf(if (xf > 0) xf else 5) }

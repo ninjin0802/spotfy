@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
             bridge.ready.collect { ready ->
                 // ログインが切れていたら、アプリの画面は出さずにログインページへ
                 if (ready && !isLoggedIn()) { bridge.reset(); webView.loadUrl(LOGIN_URL); updateSurface(); return@collect }
-                if (ready) { applyQuality(); lifecycleScope.launch { runCatching { bridge.crossfade(settings.getString("crossfade", "0")?.toIntOrNull() ?: 0) } } }
+                if (ready) { applyQuality(); lifecycleScope.launch { runCatching { bridge.crossfade(settings.getString("crossfade", "0")?.toIntOrNull() ?: 0); bridge.gapless(settings.getString("gapless", "true") == "true") } } }
                 updateSurface()
             }
         }
@@ -345,6 +345,7 @@ class MainActivity : ComponentActivity() {
         override fun setSetting(name: String, value: String) {
             settings.edit().putString(name, value).apply()
             if (name.startsWith("quality")) applyQuality()
+            if (name == "gapless") lifecycleScope.launch { runCatching { bridge.gapless(value == "true") } }
             if (name == "crossfade") lifecycleScope.launch { runCatching { bridge.crossfade(value.toIntOrNull() ?: 0) } }
             if (name == "orientation") applyOrientation()
         }

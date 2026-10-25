@@ -493,6 +493,7 @@
     },
     // クロスフェード（秒。0 でオフ）
     crossfade: function (a) { xfSec = a.sec | 0; xfWatch(); return true; },
+    gapless: function (a) { gapOn = !!a.on; gapWatch(); return true; },
     library: function () {
       var lib = service('LibraryAPI');
       return Promise.resolve(lib.getContents({ limit: 300, offset: 0 })).then(function (c) {
@@ -605,6 +606,45 @@
         if (xfBase == null) xfBase = el.volume || 1;
         var t = el.currentTime, rest = el.duration - t;
         el.volume = Math.max(0, Math.min(1, xfBase * Math.min(1, t / xfSec, rest / xfSec)));
+      });
+    }, 100);
+  }
+
+  // ---- ギャップレス再生 ----
+  // Web Player は 1 つの再生要素で曲を順番に切り替えるので、曲の終わりから次の曲が鳴るまで無音ができる。
+  //  1) 曲が始まったら次の曲を先読みし、
+  //  2) 残りが「切り替えにかかる時間」を切ったところで次の曲へ進める（時間は実際に測って合わせる）
+  var gapOn = false, gapTimer = null, gapUri = '', gapLatency = 0.4, gapSkippedAt = 0;
+  function gapWatch() {
+    if (gapTimer) return;
+    gapTimer = setInterval(function () {
+      if (!gapOn) return;
+      var p = service('PlayerAPI'), st = p && p.getState();
+      if (!st || !st.item) return;
+      if (st.item.uri !== gapUri) {
+        gapUri = st.item.uri;
+        setTimeout(function () {
+          var sdk = service('PlayerSDK'), s2 = sdk && sdk.harmony && sdk.harmony._streamer, lp = s2 && s2._listPlayer;
+          if (lp && typeof lp._preloadUpcomingTrack === 'function') { try { lp._preloadUpcomingTrack(); } catch (e) {} }
+        }, 3000);
+      }
+      audioEl().then(function (el) {
+        if (!el) return;
+        if (gapSkippedAt) {
+          var waited = (performance.now() - gapSkippedAt) / 1000;
+          if (!el.paused && el.currentTime > 0 && el.currentTime < 2) {
+            var took = Math.max(0, waited - el.currentTime);
+            if (took < 3) gapLatency = Math.min(1.5, Math.max(0.1, gapLatency * 0.6 + took * 0.4));
+            gapSkippedAt = 0;
+          } else if (waited > 5) gapSkippedAt = 0;
+          return;
+        }
+        if (el.paused || !isFinite(el.duration) || el.duration < 10 || st.repeat === 2 || xfSec) return;
+        var rest = el.duration - el.currentTime;
+        if (rest > 0 && rest <= gapLatency && !(st.restrictions && st.restrictions.canSkipNext === false)) {
+          gapSkippedAt = performance.now();
+          Promise.resolve(p.skipToNext()).catch(function () {});
+        }
       });
     }, 100);
   }
