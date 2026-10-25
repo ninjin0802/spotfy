@@ -49,7 +49,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         dumpDebugLogIfAsked(intent)
         // WebView が無い・古いと、ページとの連携が始まらず真っ暗のままになるので、先に案内を出す
-        if (!webViewUsable()) { showWebViewMissing(); return }
+        if (!WebViewMissingActivity.webViewUsable(this)) {
+            startActivity(Intent(this, WebViewMissingActivity::class.java))
+            finish()
+            return
+        }
 
         applyOrientation()
         webView = AwakeWebView(this).apply {
@@ -59,7 +63,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(BG)
             setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         }
-        bridge = Bridge(webView, getSharedPreferences("cache", MODE_PRIVATE))
+        bridge = Bridge(webView, getSharedPreferences("cache", MODE_PRIVATE), ::recordDebug)
         // アプリの画面（Compose）は Web Player の上に重ねる。Web Player は裏で再生とデータ取得だけを受け持つ
         composeView = ComposeView(this).apply {
             visibility = View.GONE
@@ -224,8 +228,6 @@ class MainActivity : ComponentActivity() {
 
     private var fileCallback: ValueCallback<Array<Uri>>? = null
 
-    /** WebView が無いと onCreate を途中でやめるので、ほかの場面でも webView に触らない */
-    private var webViewMissing = false
     private var pageFailed = false
     private var failedUrl: String? = null
 
@@ -238,35 +240,6 @@ class MainActivity : ComponentActivity() {
 
     private val loadError by lazy { messageView { retryFailedPage() }.apply { visibility = View.GONE } }
 
-    /** 真っ暗な画面の代わりに出す、黒地に白い文字の案内 */
-    private fun messageView(onClick: () -> Unit) = android.widget.TextView(this).apply {
-        gravity = android.view.Gravity.CENTER
-        setPadding(64, 0, 64, 0)
-        setTextColor(0xFFFFFFFF.toInt())
-        setBackgroundColor(BG)
-        textSize = 16f
-        setOnClickListener { onClick() }
-    }
-
-    private fun webViewUsable() = runCatching {
-        WebViewCompat.getCurrentWebViewPackage(this) != null &&
-            WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) &&
-            WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
-    }.getOrDefault(false)
-
-    private fun showWebViewMissing() {
-        webViewMissing = true
-        val version = runCatching { WebViewCompat.getCurrentWebViewPackage(this)?.versionName }.getOrNull()
-        setContentView(messageView {
-            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.webview"))) }
-                .onFailure { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.webview"))) } }
-        }.apply {
-            text = "このアプリには新しい「Android System WebView」が必要です" +
-                (if (version != null) "（今は $version）" else "（入っていないか、無効になっています）") +
-                "\n\nタップして Play ストアで更新してください"
-        })
-    }
-
     @Deprecated("Activity の結果 API（ComponentActivity 不使用のため）")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -277,7 +250,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (webViewMissing || dumpDebugLogIfAsked(intent)) return
+        if (dumpDebugLogIfAsked(intent)) return
         intent.data?.takeIf(::isSpotifyUrl)?.let { webView.loadUrl(it.toString()) }
     }
 
@@ -559,6 +532,7 @@ class MainActivity : ComponentActivity() {
                 if (name == "adblock") recordDebug("adblock.setting", m.optString("value"))
                 if (name == "orientation") applyOrientation()
             }
+            "bhealth" -> recordDebug("bridge.health", bridge.missing.value.joinToString(", ").ifEmpty { "ok" })
             "debug" -> {
                 val event = m.optString("event")
                 if (event == "ad.detected") adPlaybackActive = true
@@ -677,7 +651,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (webViewMissing) return
         stopHandler.removeCallbacks(saveDebugLog)
         saveDebugLog.run()
         // バックグラウンド再生をオフにしている場合は裏に回ったら一時停止する
@@ -686,11 +659,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        if (!webViewMissing) webView.saveState(outState)
+        webView.saveState(outState)
     }
 
     override fun onDestroy() {
-        if (webViewMissing) { super.onDestroy(); return }
+        // WebView が使えず onCreate の途中で WebViewMissingActivity に切り替えたときは、何も作っていない
+        if (!::webView.isInitialized) { super.onDestroy(); return }
         audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
         unregisterReceiver(noisyReceiver)
         runCatching { connectivity.unregisterNetworkCallback(networkCallback) }

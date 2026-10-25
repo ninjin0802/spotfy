@@ -68,12 +68,21 @@ data class PlayerState(
  * 裏で動く Web Player（assets/bridge.js）とのやりとり。
  * データの取得と再生の操作は Web Player 自身の仕組み（ログイン情報・DRM を含む）にそのまま任せる。
  */
-class Bridge(private val web: WebView, private val cache: android.content.SharedPreferences) {
+class Bridge(
+    private val web: WebView,
+    private val cache: android.content.SharedPreferences,
+    /** 呼び出しの失敗をデバッグログに残す（Spotify の更新で壊れたとき、どの機能かを後から追えるように） */
+    private val log: (event: String, detail: String) -> Unit = { _, _ -> },
+) {
     private val nextId = AtomicInteger(1)
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<Any?>>()
 
     private val _ready = MutableStateFlow(false)
     val ready: StateFlow<Boolean> = _ready
+
+    /** Web Player の中の部品が見つからず使えない機能（Spotify 側の更新で起きる）。設定画面に出す */
+    private val _missing = MutableStateFlow<List<String>>(emptyList())
+    val missing: StateFlow<List<String>> = _missing
 
     /** ライブラリの中身が変わったら増える（ライブラリの画面が読み直す） */
     val libraryVersion = androidx.compose.runtime.mutableIntStateOf(0)
@@ -93,6 +102,12 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
         }
         return try {
             withTimeout(40_000) { done.await() }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            log("bridge.timeout", method)
+            throw e
+        } catch (e: RuntimeException) {
+            if (e !is kotlinx.coroutines.CancellationException) log("bridge.error", "$method ${e.message.orEmpty()}")
+            throw e
         } finally {
             pending.remove(id)
         }
@@ -102,6 +117,11 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     fun onMessage(m: JSONObject): Boolean {
         when (m.optString("type")) {
             "bready" -> _ready.value = true
+            "bhealth" -> {
+                val list = m.optJSONArray("missing")
+                _missing.value = List(list?.length() ?: 0) { list!!.optString(it) }
+                return false  // アプリ側でもログに残す
+            }
             "bres" -> {
                 val d = pending[m.optInt("id")] ?: return true
                 if (m.optBoolean("ok")) d.complete(m.opt("value")) else d.completeExceptionally(RuntimeException(m.optString("error")))

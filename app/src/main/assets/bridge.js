@@ -785,6 +785,22 @@
     }
   };
 
+  function checkHealth() {
+    var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
+    var player = service('PlayerAPI'), managers = service('AdManagers');
+    var checks = [
+      ['データの取得（ホーム・検索・ライブラリ）', function () { return typeof platform().getGraphQLLoader === 'function'; }],
+      ['再生の操作', function () { return ['getState', 'skipToNext', 'seekTo'].every(function (k) { return typeof player[k] === 'function'; }); }],
+      ['音量・広告の早送り・クロスフェード', function () { return !!st._playerPromise; }],
+      ['音質の切り替え', function () { return typeof st.setMediaPlaybackQuality === 'function'; }],
+      ['ギャップレス再生', function () { return typeof st._listPlayer._preloadUpcomingTrack === 'function'; }],
+      ['広告の停止', function () { return !!managers.audio; }],
+      ['ログイン情報', function () { return typeof service('AuthorizationAPI').getState === 'function'; }]
+    ];
+    var missing = checks.filter(function (c) { try { return !c[1](); } catch (e) { return true; } }).map(function (c) { return c[0]; });
+    send({ type: 'bhealth', missing: missing });
+  }
+
   // 準備ができたらアプリに知らせる。以後、Spotify のページ自体は描かない（アプリの画面の裏で動くだけ）
   (function waitReady(n) {
     var p = service('PlayerAPI');
@@ -798,6 +814,9 @@
     st.textContent = '.Root, #main > div { content-visibility: hidden !important; }';
     document.head.appendChild(st);
     send({ type: 'bready' });
+    // Spotify が Web Player を更新すると、ここで使っている中の部品が見つからなくなることがある。
+    // 準備が終わって少し待ってから確かめ、見つからない機能をアプリに知らせる
+    setTimeout(checkHealth, 5000);
     pushState();
   })(0);
 })();

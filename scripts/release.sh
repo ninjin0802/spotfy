@@ -20,6 +20,8 @@ notes=$(awk -v v="$version" '$0 ~ "^## " { if (found) exit; found = ($2 == v); n
 [[ -n "$notes" ]] || { echo "CHANGELOG.md に「## $version」の節がありません" >&2; exit 1; }
 
 ./gradlew -q assembleRelease
+# 起動まわりをエミュレーターで確かめてから出す（急ぐときだけ SKIP_SMOKE=1）
+if [[ "${SKIP_SMOKE:-}" != 1 ]]; then scripts/smoke-test.sh || { echo "スモークテストに失敗したのでリリースを止めました" >&2; exit 1; }; fi
 mkdir -p build
 apk="build/spotfy-$version.apk"
 cp app/build/outputs/apk/release/app-release.apk "$apk"

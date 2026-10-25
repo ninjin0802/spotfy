@@ -31,6 +31,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".WebViewMissingActivity"
+            android:exported="false" />
+
         <receiver
             android:name=".MediaControls$Receiver"
             android:exported="false" />

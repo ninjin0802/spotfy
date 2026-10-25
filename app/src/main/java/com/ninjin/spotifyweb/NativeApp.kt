@@ -784,11 +784,17 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 160.dp)) {
             when (page) {
                 null -> {
+                    val missing by bridge.missing.collectAsState()
+                    // Spotify の更新で使えなくなった機能があれば、いちばん上で知らせる（押すとログを送れる）
+                    if (missing.isNotEmpty()) SettingRow(
+                        "⚠ 一部の機能が使えません",
+                        missing.joinToString("・") + "\nSpotify 側の更新が原因かもしれません。押すとデバッグログを共有できます",
+                    ) { host.shareDebugLog() }
                     SettingRow("アカウント", user?.name ?: "") { page = "account" }
                     SettingRow("コンテンツと表示", "テーマカラー・背景") { page = "look" }
                     SettingRow("再生", "バックグラウンド再生・広告抑制・クロスフェード") { page = "playback" }
                     SettingRow("メディアの音質", "Wi-Fi・モバイルデータ通信でのストリーミング") { page = "quality" }
-                    SettingRow("デバッグログを共有", "直近の広告検出・スキップ・ミュート記録") { host.shareDebugLog() }
+                    SettingRow("デバッグログを共有", "直近の広告の検出・ミュート・早送りなどの記録") { host.shareDebugLog() }
                     SettingRow("このアプリについて", "Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません") {}
                 }
                 "account" -> {
