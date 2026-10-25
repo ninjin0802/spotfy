@@ -128,6 +128,25 @@
     seek: function (a) { return Promise.resolve(service('PlayerAPI').seekTo(a.ms)).then(function () { return true; }); },
     shuffle: function (a) { return Promise.resolve(service('PlayerAPI').setShuffle(!!a.on)).then(function () { return true; }); },
     repeat: function (a) { return Promise.resolve(service('PlayerAPI').setRepeat(a.mode | 0)).then(function () { return true; }); },
+    // お気に入りの曲に追加／削除
+    like: function (a) {
+      var lib = service('LibraryAPI');
+      return Promise.resolve(a.on ? lib.add({ uris: [a.uri] }) : lib.remove({ uris: [a.uri] })).then(function () {
+        if (a.uri === likedFor) { liked = !!a.on; lastKey = ''; pushState(); }
+        return true;
+      });
+    },
+    // ストリーミングの音質（auto / low / normal / high / very_high）
+    quality: function (a) {
+      var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
+      if (!st || typeof st.setMediaPlaybackQuality !== 'function') return false;
+      return Promise.resolve(st.setMediaPlaybackQuality({ audio: a.level })).then(function (ok) { return ok !== false; }, function () { return false; });
+    },
+    bitrate: function () {
+      var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
+      if (!st || !st._playerPromise) return 0;
+      return st._playerPromise.then(function (p) { return p && p._currentContent && p._currentContent._bitrate || 0; }, function () { return 0; });
+    },
     user: function () {
       var u = service('UserAPI');
       return Promise.resolve(u && u.getUser()).then(function (x) { return x ? { name: x.displayName || x.username || '', image: x.avatarUrl || (x.images && x.images[0] && x.images[0].url) || '' } : null; });
@@ -141,18 +160,29 @@
     if (!st || !st.item) return { has: false };
     var it = st.item, md = it.metadata || {};
     var img = md.image_xlarge_url || md.image_large_url || md.image_url || (it.images && it.images[0] && it.images[0].url) || '';
+    if (it.uri !== likedFor) checkLiked(it.uri);
+    var ctx = st.context || {};
     return {
-      has: true, uri: it.uri, title: it.name || md.title || '', artist: (it.artists || []).map(function (a) { return a.name; }).join(', ') || md.artist_name || '',
+      has: true, uri: it.uri, liked: likedFor === it.uri ? liked : false,
+      contextName: ctx.metadata && ctx.metadata.context_description || '', contextUri: ctx.uri || '', title: it.name || md.title || '', artist: (it.artists || []).map(function (a) { return a.name; }).join(', ') || md.artist_name || '',
       album: it.album && it.album.name || md.album_title || '', image: img, playing: !st.isPaused, buffering: !!st.isBuffering,
       // 位置は「いま」の値にして渡す（Web Player は最後に変化した時点の値と時刻を持っている）
       pos: (st.positionAsOfTimestamp || 0) + (!st.isPaused && st.timestamp ? Math.max(0, Date.now() - st.timestamp) : 0), dur: st.duration || it.duration && it.duration.milliseconds || 0,
       shuffle: !!st.shuffle, repeat: st.repeat || 0, context: st.context && st.context.uri || ''
     };
   }
+  // 再生中の曲がお気に入りかどうか（曲が変わったときに一度だけ調べる）
+  var likedFor = '', liked = false;
+  function checkLiked(uri) {
+    likedFor = uri; liked = false;
+    var lib = service('LibraryAPI');
+    if (!lib) return;
+    Promise.resolve(lib.contains(uri)).then(function (x) { if (likedFor === uri) { liked = !!(x && x[0]); lastKey = ''; pushState(); } }, function () {});
+  }
   var lastKey = '';
   function pushState() {
     var s = snapshot();
-    var key = JSON.stringify([s.uri, s.playing, s.shuffle, s.repeat, s.buffering, Math.round(s.pos / 5000)]);
+    var key = JSON.stringify([s.uri, s.liked, s.playing, s.shuffle, s.repeat, s.buffering, Math.round(s.pos / 5000)]);
     if (key === lastKey) return;
     lastKey = key;
     send({ type: 'bstate', value: s });

@@ -2,22 +2,34 @@ package com.ninjin.spotifyweb
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -26,10 +38,14 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,30 +61,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.graphics.vector.ImageVector.Builder
-import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val Bg = Color(0xFF121212)
 private val Card2 = Color(0xFF2A2A2A)
 private val Sub = Color(0xFFB3B3B3)
 private val Accent = Color(0xFF1ED760)
 
-/** 24x24 のパス 1 本からアイコンを作る */
-private fun icon(d: String): ImageVector = Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+/** 24x24 の塗りのアイコン */
+private fun icon(d: String): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
     .addPath(PathParser().parsePathString(d).toNodes(), fill = SolidColor(Color.White)).build()
+
+/** 24x24 の線のアイコン（公式アプリと同じ細い線） */
+private fun line(d: String, w: Float = 1.8f): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+    .addPath(PathParser().parsePathString(d).toNodes(), stroke = SolidColor(Color.White), strokeLineWidth = w, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round).build()
 
 private object Icons {
     val home = icon("M12.5 3.25a.5.5 0 0 0-1 0L3 10.4V21h6.5v-6h5v6H21V10.4z")
@@ -78,9 +105,17 @@ private object Icons {
     val pause = icon("M6 4h4v16H6zm8 0h4v16h-4z")
     val next = icon("M5 4.5v15l10-7.5zM17 4h2v16h-2z")
     val prev = icon("M19 4.5v15L9 12zM5 4h2v16H5z")
-    val down = icon("M12 15.6 4.7 8.3l1.4-1.4 5.9 5.9 5.9-5.9 1.4 1.4z")
-    val shuffle = icon("M17 4l3 3-3 3V8h-2.2l-8 8H3v-2h3l8-8h3zM3 6h3.8l2.6 2.6-1.4 1.4L6 8H3zm12.6 7.4 1.4-1.4 1 1H17v-2l3 3-3 3v-2h-2.2z")
-    val repeat = icon("M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z")
+    val down = line("M5 9l7 7 7-7", 2f)
+    val more = icon("M12 6.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm0 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm0 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z")
+    val shuffle = line("M3 7h3.5c2 0 3 1 4.2 2.7l2.6 4.6C14.5 16 15.5 17 17.5 17H21M17.5 14l3 3-3 3M3 17h3.5c1.2 0 2-.4 2.7-1.1M13 8.1C13.7 7.4 14.5 7 15.7 7H21M17.5 4l3 3-3 3")
+    val repeat = line("M4 12V9.5A3.5 3.5 0 0 1 7.5 6H19M16 3l3 3-3 3M20 12v2.5a3.5 3.5 0 0 1-3.5 3.5H5M8 21l-3-3 3-3")
+    val add = line("M12 7.5v9M7.5 12h9M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", 1.6f)
+    val check = icon("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.3 14.2-4-4 1.4-1.4 2.6 2.6 5.6-5.6 1.4 1.4z")
+    val device = line("M4 15V6a1 1 0 0 1 1-1h12M2 19h11M16 9h5v11h-5zM18.5 17.5h0", 1.6f)
+    val share = line("M12 3v12M7.5 7.5 12 3l4.5 4.5M5 12v7.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V12", 1.6f)
+    val queue = line("M4 6h16M4 12h10M4 18h10M17 14v7l4-3.5z", 1.6f)
+    val back = line("M15 5l-7 7 7 7", 2f)
+    val gear = line("M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8 21h-4l-.3-2.4a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.3L4.6 10l2-3.4 1.9.7a7 7 0 0 1 2-1.2L10.8 3h4l.3 2.1a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.3z", 1.6f)
 }
 
 private enum class Tab(val label: String, val icon: ImageVector) {
@@ -89,32 +124,73 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 
 /** アプリの画面（Compose）。データと再生は [bridge] 経由で裏の Web Player に任せる */
 @Composable
-fun NativeApp(bridge: Bridge) {
+fun NativeApp(bridge: Bridge, host: AppHost) {
     var tab by remember { mutableStateOf(Tab.Home) }
     var playerOpen by remember { mutableStateOf(false) }
+    var drawerOpen by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
     val player by bridge.player.collectAsState()
+    val ready by bridge.ready.collectAsState()
+    var user by remember { mutableStateOf(bridge.cachedUser()) }
     val scope = rememberCoroutineScope()
+    LaunchedEffect(ready) { if (ready) runCatching { bridge.user() }.getOrNull()?.let { user = it } }
+    val tint = rememberArtColor(player.image)
 
     BackHandler(enabled = playerOpen) { playerOpen = false }
-    BackHandler(enabled = !playerOpen && tab != Tab.Home) { tab = Tab.Home }
+    BackHandler(enabled = settingsOpen && !playerOpen) { settingsOpen = false }
+    BackHandler(enabled = drawerOpen) { drawerOpen = false }
+    BackHandler(enabled = !playerOpen && !settingsOpen && !drawerOpen && tab != Tab.Home) { tab = Tab.Home }
 
     Box(Modifier.fillMaxSize().background(Bg)) {
         when (tab) {
-            Tab.Home -> HomeScreen(bridge, onPlay = { scope.launch { runCatching { bridge.play(it.uri) } } })
+            Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = { scope.launch { runCatching { bridge.play(it.uri) } } })
             Tab.Search -> Placeholder("検索はこれから作ります")
             Tab.Library -> Placeholder("ライブラリはこれから作ります")
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-            if (player.has) MiniPlayer(player, onOpen = { playerOpen = true }, onToggle = { scope.launch { runCatching { bridge.toggle() } } })
+            if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true })
             TabBar(tab) { tab = it }
+        }
+        AnimatedVisibility(settingsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
+            SettingsScreen(bridge, host, user, onBack = { settingsOpen = false })
+        }
+        // サイドメニュー（公式アプリと同じく、アイコンを押すと左から出る）
+        AnimatedVisibility(drawerOpen, enter = fadeIn(), exit = fadeOut()) {
+            Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(remember { MutableInteractionSource() }, null) { drawerOpen = false })
+        }
+        AnimatedVisibility(drawerOpen, enter = slideInHorizontally { -it }, exit = slideOutHorizontally { -it }) {
+            Drawer(user, onSettings = { drawerOpen = false; settingsOpen = true })
         }
         AnimatedVisibility(
             visible = playerOpen && player.has,
-            enter = slideInVertically { it }, exit = slideOutVertically { it },
+            enter = slideInVertically(tween(280)) { it }, exit = slideOutVertically(tween(240)) { it },
         ) {
-            FullPlayer(bridge, player, onClose = { playerOpen = false })
+            FullPlayer(bridge, host, player, tint, onClose = { playerOpen = false })
         }
     }
+}
+
+/** ジャケットの色（公式アプリと同じく、くすんだ濃い色）。曲が変わるとなめらかに変わる */
+@Composable
+private fun rememberArtColor(url: String): Color {
+    val ctx = LocalContext.current
+    var c by remember { mutableStateOf(Color(0xFF3A3A3A)) }
+    LaunchedEffect(url) {
+        if (url.isEmpty()) return@LaunchedEffect
+        val bmp = withContext(Dispatchers.IO) {
+            val r = ctx.imageLoader.execute(ImageRequest.Builder(ctx).data(url).size(64).allowHardware(false).build())
+            (r as? SuccessResult)?.drawable?.let { (it as? android.graphics.drawable.BitmapDrawable)?.bitmap }
+        } ?: return@LaunchedEffect
+        val p = withContext(Dispatchers.Default) { Palette.from(bmp).generate() }
+        val sw = p.darkVibrantSwatch ?: p.vibrantSwatch ?: p.darkMutedSwatch ?: p.dominantSwatch ?: return@LaunchedEffect
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(sw.rgb, hsv)
+        hsv[2] = hsv[2].coerceAtMost(0.42f)
+        hsv[1] = hsv[1].coerceAtMost(0.75f)
+        c = Color(android.graphics.Color.HSVToColor(hsv))
+    }
+    val anim by animateColorAsState(c, tween(500), label = "art")
+    return anim
 }
 
 @Composable
@@ -123,23 +199,38 @@ private fun Placeholder(text: String) {
 }
 
 @Composable
-private fun HomeScreen(bridge: Bridge, onPlay: (Card) -> Unit) {
-    var feed by remember { mutableStateOf<HomeFeed?>(null) }
+private fun Avatar(user: Bridge.User?, size: Int, onClick: (() -> Unit)? = null) {
+    val m = Modifier.size(size.dp).clip(CircleShape).background(Color(0xFFE8A87C)).let { if (onClick != null) it.clickable(onClick = onClick) else it }
+    Box(m, contentAlignment = Alignment.Center) {
+        if (user?.image?.isNotEmpty() == true) AsyncImage(user.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        else Text(user?.name?.take(1) ?: "", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = (size / 2.2).sp)
+    }
+}
+
+@Composable
+private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onPlay: (Card) -> Unit) {
+    // 起動直後は前回のホームをすぐ出し、Web Player の準備ができたら新しい内容に差し替える
+    var feed by remember { mutableStateOf(bridge.cachedHome()) }
     var error by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        runCatching { bridge.home() }.onSuccess { feed = it }.onFailure { error = it.message }
+    LaunchedEffect(ready) {
+        if (ready) runCatching { bridge.home() }.onSuccess { feed = it }.onFailure { if (feed == null) error = it.message }
     }
     val f = feed
     if (f == null) {
         Placeholder(if (error != null) "読み込めませんでした" else "読み込み中…")
         return
     }
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 160.dp),
-    ) {
-        item { Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).height(8.dp)) }
-        item { Chips() }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 170.dp)) {
+        item {
+            Row(
+                Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Avatar(user, 32, onAvatar)
+                Spacer(Modifier.width(8.dp))
+                Chips()
+            }
+        }
         if (f.shortcuts.isNotEmpty()) item { Shortcuts(f.shortcuts, onPlay) }
         items(f.shelves) { s -> ShelfRow(s, onPlay) }
     }
@@ -147,7 +238,7 @@ private fun HomeScreen(bridge: Bridge, onPlay: (Card) -> Unit) {
 
 @Composable
 private fun Chips() {
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf("すべて", "音楽", "ポッドキャスト").forEachIndexed { i, t ->
             Text(
                 t, color = if (i == 0) Color.Black else Color.White, fontSize = 14.sp,
@@ -195,10 +286,7 @@ private fun ShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
                         Modifier.size(150.dp).clip(if (c.round) CircleShape else RoundedCornerShape(4.dp)).background(Card2),
                         contentScale = ContentScale.Crop,
                     )
-                    Text(
-                        c.title, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+                    Text(c.title, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                     if (c.subtitle.isNotEmpty()) Text(c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp)
                 }
             }
@@ -207,31 +295,35 @@ private fun ShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
 }
 
 @Composable
-private fun MiniPlayer(p: PlayerState, onOpen: () -> Unit, onToggle: () -> Unit) {
-    var now by remember { mutableLongStateOf(p.positionNow()) }
-    LaunchedEffect(p) { while (true) { now = p.positionNow(); delay(500) } }
-    Column(
-        Modifier.padding(horizontal = 8.dp).fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(Color(0xFF3A3A3A)).clickable(onClick = onOpen),
-    ) {
-        Row(Modifier.height(56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(p.image, null, Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
-            Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                Text(p.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(p.artist, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            IconButton(if (p.playing) Icons.pause else Icons.play, 40, onToggle)
-        }
-        val frac = if (p.dur > 0) (now.toFloat() / p.dur).coerceIn(0f, 1f) else 0f
-        Box(Modifier.padding(horizontal = 8.dp).fillMaxWidth().height(2.dp).background(Color(0x55FFFFFF))) {
-            Box(Modifier.fillMaxWidth(frac).height(2.dp).background(Color.White))
-        }
+private fun Ico(icon: ImageVector, size: Int, tint: Color = Color.White, box: Int = 40, onClick: () -> Unit) {
+    Box(Modifier.size(box.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Image(rememberVectorPainter(icon), null, Modifier.size(size.dp), colorFilter = ColorFilter.tint(tint))
     }
 }
 
+/** 公式アプリと同じミニプレーヤー：ジャケットの色、曲名（長いと流れる）／アーティスト、デバイス・追加・再生、下に細い進み具合 */
 @Composable
-private fun IconButton(icon: ImageVector, size: Int, onClick: () -> Unit, tint: Color = Color.White) {
-    Box(Modifier.size(size.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Image(rememberVectorPainter(icon), null, Modifier.size((size * 0.6f).dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint))
+private fun MiniPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onOpen: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var now by remember { mutableLongStateOf(p.positionNow()) }
+    LaunchedEffect(p) { while (true) { now = p.positionNow(); delay(500) } }
+    Column(
+        Modifier.padding(horizontal = 8.dp).fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(tint).clickable(onClick = onOpen),
+    ) {
+        Row(Modifier.height(56.dp).padding(start = 8.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(p.image, null, Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
+            Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                Text(p.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee())
+                Text(p.artist, color = Color(0xCCFFFFFF), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Ico(Icons.device, 22) { host.outputSwitch() }
+            Ico(if (p.liked) Icons.check else Icons.add, 24, if (p.liked) Accent else Color.White) { scope.launch { runCatching { bridge.like(p.uri, !p.liked) } } }
+            Ico(if (p.playing) Icons.pause else Icons.play, 24) { scope.launch { runCatching { bridge.toggle() } } }
+        }
+        val frac = if (p.dur > 0) (now.toFloat() / p.dur).coerceIn(0f, 1f) else 0f
+        Box(Modifier.padding(horizontal = 8.dp).fillMaxWidth().height(2.dp).clip(CircleShape).background(Color(0x44FFFFFF))) {
+            Box(Modifier.fillMaxWidth(frac).fillMaxHeight().background(Color.White))
+        }
     }
 }
 
@@ -239,17 +331,17 @@ private fun IconButton(icon: ImageVector, size: Int, onClick: () -> Unit, tint: 
 private fun TabBar(tab: Tab, onSelect: (Tab) -> Unit) {
     Row(
         Modifier.fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color(0x00121212), Color(0xEE121212), Color(0xFF121212))))
-            .windowInsetsPadding(WindowInsets.navigationBars).padding(top = 10.dp, bottom = 6.dp),
+            .background(Brush.verticalGradient(listOf(Color(0x00121212), Color(0xE6121212), Color(0xFF121212))))
+            .windowInsetsPadding(WindowInsets.navigationBars).padding(top = 12.dp, bottom = 4.dp),
     ) {
         Tab.entries.forEach { t ->
             val on = t == tab
             Column(
-                Modifier.weight(1f).clickable { onSelect(t) },
+                Modifier.weight(1f).clickable(remember { MutableInteractionSource() }, null) { onSelect(t) },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Image(rememberVectorPainter(t.icon), null, Modifier.size(24.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (on) Color.White else Sub))
-                Text(t.label, color = if (on) Color.White else Sub, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+                Image(rememberVectorPainter(t.icon), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(if (on) Color.White else Sub))
+                Text(t.label, color = if (on) Color.White else Sub, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))
             }
         }
     }
@@ -257,49 +349,210 @@ private fun TabBar(tab: Tab, onSelect: (Tab) -> Unit) {
 
 private fun mmss(ms: Long): String { val s = ms / 1000; return "%d:%02d".format(s / 60, s % 60) }
 
+/** 公式アプリと同じ全画面プレーヤー */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun FullPlayer(bridge: Bridge, p: PlayerState, onClose: () -> Unit) {
+private fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     var now by remember { mutableLongStateOf(p.positionNow()) }
     var dragging by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(p) { while (true) { if (dragging == null) now = p.positionNow(); delay(250) } }
     Column(
-        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF4A4A4A), Bg)))
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint, tint.copy(alpha = 0.85f).compositeOver(Bg), Bg)))
+            .clickable(remember { MutableInteractionSource() }, null) {}
             .windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 24.dp),
     ) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(Icons.down, 40, onClose)
+        // 上：閉じる／「プレイリストから再生中」と名前／その他
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Ico(Icons.down, 26, onClick = onClose)
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(p.contextLabel, color = Color.White, fontSize = 11.sp, maxLines = 1)
+                if (p.contextName.isNotEmpty()) Text(p.contextName, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Ico(Icons.more, 22) {}
         }
         Spacer(Modifier.weight(1f))
-        AsyncImage(p.image, null, Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
-        Spacer(Modifier.height(28.dp))
-        Text(p.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(p.artist, color = Sub, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(12.dp))
+        AsyncImage(p.image, null, Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+        Spacer(Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(p.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee())
+                Text(p.artist, color = Color(0xCCFFFFFF), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Ico(if (p.liked) Icons.check else Icons.add, 28, if (p.liked) Accent else Color.White, 48) { scope.launch { runCatching { bridge.like(p.uri, !p.liked) } } }
+        }
+        Spacer(Modifier.height(10.dp))
         val dur = p.dur.coerceAtLeast(1)
         Slider(
             value = dragging ?: (now.toFloat() / dur).coerceIn(0f, 1f),
             onValueChange = { dragging = it },
             onValueChangeFinished = { val v = dragging ?: 0f; dragging = null; now = (v * dur).toLong(); scope.launch { runCatching { bridge.seek((v * dur).toLong()) } } },
-            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color(0x55FFFFFF)),
+            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color(0x4DFFFFFF)),
+            thumb = { Box(Modifier.size(12.dp).clip(CircleShape).background(Color.White)) },
+            track = { st ->
+                BoxWithConstraints(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color(0x4DFFFFFF))) {
+                    Box(Modifier.fillMaxHeight().width(maxWidth * st.value).background(Color.White))
+                }
+            },
+            modifier = Modifier.height(24.dp),
         )
         Row(Modifier.fillMaxWidth()) {
-            Text(mmss(((dragging ?: (now.toFloat() / dur)) * dur).toLong()), color = Sub, fontSize = 12.sp)
+            Text(mmss(((dragging ?: (now.toFloat() / dur)) * dur).toLong()), color = Color(0xB3FFFFFF), fontSize = 11.sp)
             Spacer(Modifier.weight(1f))
-            Text(mmss(p.dur), color = Sub, fontSize = 12.sp)
+            Text(mmss(p.dur), color = Color(0xB3FFFFFF), fontSize = 11.sp)
         }
-        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            IconButton(Icons.shuffle, 44, { scope.launch { runCatching { bridge.shuffle(!p.shuffle) } } }, if (p.shuffle) Accent else Color.White)
-            IconButton(Icons.prev, 52, { scope.launch { runCatching { bridge.prev() } } })
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Ico(Icons.shuffle, 26, if (p.shuffle) Accent else Color.White, 48) { scope.launch { runCatching { bridge.shuffle(!p.shuffle) } } }
+            Ico(Icons.prev, 34, box = 56) { scope.launch { runCatching { bridge.prev() } } }
             Box(
-                Modifier.size(68.dp).clip(CircleShape).background(Color.White).clickable { scope.launch { runCatching { bridge.toggle() } } },
+                Modifier.size(66.dp).clip(CircleShape).background(Color.White).clickable { scope.launch { runCatching { bridge.toggle() } } },
                 contentAlignment = Alignment.Center,
             ) {
-                Image(rememberVectorPainter(if (p.playing) Icons.pause else Icons.play), null, Modifier.size(30.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black))
+                Image(rememberVectorPainter(if (p.playing) Icons.pause else Icons.play), null, Modifier.size(28.dp), colorFilter = ColorFilter.tint(Color.Black))
             }
-            IconButton(Icons.next, 52, { scope.launch { runCatching { bridge.next() } } })
-            IconButton(Icons.repeat, 44, { scope.launch { runCatching { bridge.repeat((p.repeat + 1) % 3) } } }, if (p.repeat > 0) Accent else Color.White)
+            Ico(Icons.next, 34, box = 56) { scope.launch { runCatching { bridge.next() } } }
+            Box(contentAlignment = Alignment.Center) {
+                Ico(Icons.repeat, 26, if (p.repeat > 0) Accent else Color.White, 48) { scope.launch { runCatching { bridge.repeat((p.repeat + 1) % 3) } } }
+                if (p.repeat == 2) Text("1", color = Accent, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-1).dp))
+            }
         }
-        Spacer(Modifier.weight(1f))
+        // 下：デバイス／共有・キュー
+        Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Ico(Icons.device, 22) { host.outputSwitch() }
+            Spacer(Modifier.weight(1f))
+            Ico(Icons.share, 22) { host.share("https://open.spotify.com/track/" + p.uri.substringAfterLast(':'), p.title) }
+            Spacer(Modifier.width(8.dp))
+            Ico(Icons.queue, 22) {}
+        }
+    }
+}
+
+private fun Color.compositeOver(bg: Color): Color {
+    val a = alpha
+    return Color(red * a + bg.red * (1 - a), green * a + bg.green * (1 - a), blue * a + bg.blue * (1 - a))
+}
+
+@Composable
+private fun Drawer(user: Bridge.User?, onSettings: () -> Unit) {
+    Column(
+        Modifier.fillMaxHeight().width(300.dp).background(Color(0xFF1F1F1F))
+            .clickable(remember { MutableInteractionSource() }, null) {}
+            .windowInsetsPadding(WindowInsets.statusBars).padding(top = 16.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Avatar(user, 52)
+            Column(Modifier.padding(start = 12.dp)) {
+                Text(user?.name ?: "", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("プロフィールを表示", color = Sub, fontSize = 13.sp)
+            }
+        }
+        Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(Color(0xFF333333)))
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onSettings).padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(rememberVectorPainter(Icons.gear), null, Modifier.size(24.dp))
+            Text("設定とプライバシー", color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 16.dp))
+        }
+    }
+}
+
+private val QUALITIES = listOf(
+    Triple("auto", "自動", "通信状況に合わせて調整"),
+    Triple("low", "低音質", "通信量を抑える"),
+    Triple("normal", "標準", "通信量を少し抑える"),
+    Triple("high", "高音質", "AAC 128 kbps（無料プランの Web Player の上限）"),
+    Triple("very_high", "最高音質", "AAC 256 kbps（Spotify Premium のみ）"),
+)
+
+@Composable
+private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, onBack: () -> Unit) {
+    var page by remember { mutableStateOf<String?>(null) }
+    BackHandler(enabled = page != null) { page = null }
+    Column(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
+        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Ico(Icons.back, 24) { if (page != null) page = null else onBack() }
+            Text(
+                when (page) { "quality" -> "メディアの音質"; "playback" -> "再生"; "account" -> "アカウント"; else -> "設定" },
+                color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 160.dp)) {
+            when (page) {
+                null -> {
+                    SettingRow("アカウント", user?.name ?: "") { page = "account" }
+                    SettingRow("再生", "バックグラウンド再生") { page = "playback" }
+                    SettingRow("メディアの音質", "Wi-Fi・モバイルデータ通信でのストリーミング") { page = "quality" }
+                    SettingRow("このアプリについて", "Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません") {}
+                }
+                "account" -> {
+                    SettingRow("ユーザー名", user?.name ?: "") {}
+                    SettingRow("ログアウト", "このアプリからログアウトします") { host.logout() }
+                }
+                "playback" -> {
+                    var bg by remember { mutableStateOf(host.setting("background", "true") == "true") }
+                    SwitchRow("バックグラウンド再生", "アプリを閉じても再生を続ける", bg) { bg = it; host.setSetting("background", it.toString()) }
+                }
+                "quality" -> {
+                    var wifi by remember { mutableStateOf(host.quality(false)) }
+                    var cell by remember { mutableStateOf(host.quality(true)) }
+                    var rate by remember { mutableStateOf<Int?>(null) }
+                    LaunchedEffect(wifi, cell) { delay(300); rate = runCatching { bridge.bitrate() }.getOrNull() }
+                    Section("Wi-Fi でのストリーミング")
+                    QUALITIES.forEach { q -> RadioRow(q, wifi == q.first) { wifi = q.first; host.setSetting("quality", q.first) } }
+                    Section("モバイルデータ通信でのストリーミング")
+                    QUALITIES.forEach { q -> RadioRow(q, cell == q.first) { cell = q.first; host.setSetting("quality.cell", q.first) } }
+                    Section("いまの状態")
+                    SettingRow("接続", if (host.metered) "モバイルデータ通信" else "Wi-Fi") {}
+                    SettingRow("いま再生中の音質", rate?.let { if (it > 0) "AAC ${it / 1000} kbps" else "不明（このスマホで再生中の曲がありません）" } ?: "確認中…") {}
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Section(t: String) {
+    Text(t, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp))
+}
+
+@Composable
+private fun SettingRow(title: String, detail: String, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(title, color = Color.White, fontSize = 16.sp)
+        if (detail.isNotEmpty()) Text(detail, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, detail: String, on: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable { onChange(!on) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontSize = 16.sp)
+            Text(detail, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        Switch(on, onChange, colors = SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = Color.White))
+    }
+}
+
+@Composable
+private fun RadioRow(q: Triple<String, String, String>, selected: Boolean, onClick: () -> Unit) {
+    val premium = q.first == "very_high"
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = !premium, onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(q.second, color = if (premium) Color(0x66FFFFFF) else if (selected) Accent else Color.White, fontSize = 16.sp)
+            Text(q.third, color = if (premium) Color(0x55B3B3B3) else Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        Box(
+            Modifier.size(22.dp).clip(CircleShape).background(if (selected) Accent else Color.Transparent)
+                .let { if (!selected) it.background(Color.Transparent) else it },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) Box(Modifier.size(9.dp).clip(CircleShape).background(Bg))
+            else Box(Modifier.size(22.dp).clip(CircleShape).background(Color(0xFF7C7C7C)).padding(2.dp)) { Box(Modifier.fillMaxSize().clip(CircleShape).background(Bg)) }
+        }
     }
 }

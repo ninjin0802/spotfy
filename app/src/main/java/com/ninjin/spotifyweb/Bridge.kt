@@ -30,8 +30,21 @@ data class PlayerState(
     val dur: Long = 0,
     val shuffle: Boolean = false,
     val repeat: Int = 0,
+    val liked: Boolean = false,
+    val contextName: String = "",
+    val contextUri: String = "",
     val receivedAt: Long = 0,
 ) {
+    /** 「プレイリストから再生中」などの見出し */
+    val contextLabel: String get() = when {
+        contextUri.startsWith("spotify:album:") -> "アルバムから再生中"
+        contextUri.startsWith("spotify:artist:") -> "アーティストから再生中"
+        contextUri.contains(":collection") -> "お気に入りの曲から再生中"
+        contextUri.startsWith("spotify:show:") -> "ポッドキャストから再生中"
+        contextUri.isNotEmpty() -> "プレイリストから再生中"
+        else -> "再生中"
+    }
+
     fun positionNow(): Long =
         if (!playing) pos else (pos + (SystemClock.elapsedRealtime() - receivedAt)).coerceAtMost(dur.coerceAtLeast(pos))
 }
@@ -40,7 +53,7 @@ data class PlayerState(
  * 裏で動く Web Player（assets/bridge.js）とのやりとり。
  * データの取得と再生の操作は Web Player 自身の仕組み（ログイン情報・DRM を含む）にそのまま任せる。
  */
-class Bridge(private val web: WebView) {
+class Bridge(private val web: WebView, private val cache: android.content.SharedPreferences) {
     private val nextId = AtomicInteger(1)
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<Any?>>()
 
@@ -84,8 +97,16 @@ class Bridge(private val web: WebView) {
         _ready.value = false
     }
 
+    /** 前回のホーム（起動直後、Web Player の準備ができるまでの間に表示する。曲名や画像の URL だけで、音声は保存しない） */
+    fun cachedHome(): HomeFeed? = cache.getString("home", null)?.let { runCatching { parseHome(JSONObject(it)) }.getOrNull() }
+
     suspend fun home(): HomeFeed {
         val o = call("home") as JSONObject
+        cache.edit().putString("home", o.toString()).apply()
+        return parseHome(o)
+    }
+
+    private fun parseHome(o: JSONObject): HomeFeed {
         return HomeFeed(
             greeting = o.optString("greeting"),
             shortcuts = cards(o.optJSONArray("shortcuts")),
@@ -105,6 +126,20 @@ class Bridge(private val web: WebView) {
     suspend fun seek(ms: Long) = call("seek", JSONObject().put("ms", ms))
     suspend fun shuffle(on: Boolean) = call("shuffle", JSONObject().put("on", on))
     suspend fun repeat(mode: Int) = call("repeat", JSONObject().put("mode", mode))
+    suspend fun like(uri: String, on: Boolean) = call("like", JSONObject().put("uri", uri).put("on", on))
+    suspend fun quality(level: String) = call("quality", JSONObject().put("level", level)) == true
+    suspend fun bitrate(): Int = (call("bitrate") as? Number)?.toInt() ?: 0
+
+    data class User(val name: String, val image: String)
+
+    /** ログイン中のユーザー（名前とアイコン）。前回の値も覚えておく */
+    fun cachedUser(): User? = cache.getString("user", null)?.let { runCatching { JSONObject(it) }.getOrNull() }?.let { User(it.optString("name"), it.optString("image")) }
+
+    suspend fun user(): User? {
+        val o = call("user") as? JSONObject ?: return null
+        cache.edit().putString("user", o.toString()).apply()
+        return User(o.optString("name"), o.optString("image"))
+    }
 
     private fun cards(a: JSONArray?): List<Card> = if (a == null) emptyList() else (0 until a.length()).mapNotNull { i ->
         val c = a.optJSONObject(i) ?: return@mapNotNull null
@@ -122,6 +157,9 @@ class Bridge(private val web: WebView) {
         dur = o.optLong("dur"),
         shuffle = o.optBoolean("shuffle"),
         repeat = o.optInt("repeat"),
+        liked = o.optBoolean("liked"),
+        contextName = o.optString("contextName"),
+        contextUri = o.optString("contextUri"),
         receivedAt = SystemClock.elapsedRealtime(),
     )
 }

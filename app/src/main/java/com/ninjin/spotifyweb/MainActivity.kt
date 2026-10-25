@@ -56,11 +56,11 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(0xFF121212.toInt())
             setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         }
-        bridge = Bridge(webView)
+        bridge = Bridge(webView, getSharedPreferences("cache", MODE_PRIVATE))
         // アプリの画面（Compose）は Web Player の上に重ねる。Web Player は裏で再生とデータ取得だけを受け持つ
         composeView = ComposeView(this).apply {
             visibility = View.GONE
-            setContent { NativeApp(bridge) }
+            setContent { NativeApp(bridge, host) }
         }
         val root = FrameLayout(this).apply {
             setBackgroundColor(0xFF121212.toInt())
@@ -70,8 +70,9 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             bridge.ready.collect { ready ->
                 // ログインが切れていたら、アプリの画面は出さずにログインページへ
-                if (ready && !isLoggedIn()) { bridge.reset(); webView.loadUrl(LOGIN_URL); return@collect }
-                composeView.visibility = if (ready) View.VISIBLE else View.GONE
+                if (ready && !isLoggedIn()) { bridge.reset(); webView.loadUrl(LOGIN_URL); updateSurface(); return@collect }
+                if (ready) applyQuality()
+                updateSurface()
             }
         }
         setContentView(root)
@@ -148,6 +149,7 @@ class MainActivity : ComponentActivity() {
                 return true
             }
 
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) = updateSurface(url)
             override fun onPageCommitVisible(view: WebView, url: String?) = injectMobileUi(view)
             override fun onPageFinished(view: WebView, url: String?) = injectMobileUi(view)
         }
@@ -298,10 +300,50 @@ class MainActivity : ComponentActivity() {
     private val connectivity by lazy { getSystemService(android.net.ConnectivityManager::class.java) }
     private fun isMetered() = connectivity.isActiveNetworkMetered
 
+    private var lastMetered: Boolean? = null
     private fun pushMetered() {
-        val url = webView.url ?: return
-        if (!isSpotifyUrl(Uri.parse(url))) return
-        webView.evaluateJavascript("window.__mSetMetered && __mSetMetered(${isMetered()})", null)
+        val m = isMetered()
+        if (m == lastMetered) return
+        lastMetered = m
+        applyQuality()
+    }
+
+    /** 通信（Wi-Fi／モバイル）に合わせた音質を Web Player に指定する */
+    private fun applyQuality() {
+        if (!bridge.ready.value) return
+        val level = host.quality(isMetered())
+        lifecycleScope.launch { runCatching { bridge.quality(level) } }
+    }
+
+    /** ログイン済みで open.spotify.com を開いているときだけアプリの画面を出す（ログインページは Web のまま見せる） */
+    private fun updateSurface(url: String? = webView.url) {
+        val onSpotify = url == null || isSpotifyUrl(Uri.parse(url))
+        composeView.visibility = if (isLoggedIn() && onSpotify) View.VISIBLE else View.GONE
+    }
+
+    /** アプリの画面から使う、端末側の機能と設定 */
+    private val host = object : AppHost {
+        override fun setting(name: String, fallback: String) = settings.getString(name, fallback) ?: fallback
+        override fun setSetting(name: String, value: String) {
+            settings.edit().putString(name, value).apply()
+            if (name.startsWith("quality")) applyQuality()
+            if (name == "orientation") applyOrientation()
+        }
+        override fun quality(cellular: Boolean): String {
+            val wifi = settings.getString("quality", "auto") ?: "auto"
+            return if (cellular) settings.getString("quality.cell", wifi) ?: wifi else wifi
+        }
+        override val metered get() = isMetered()
+        override fun share(url: String, title: String) {
+            if (!url.startsWith("https://open.spotify.com/")) return
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
+            runCatching { startActivity(Intent.createChooser(send, title.ifEmpty { null })) }
+        }
+        override fun outputSwitch() = showOutputSwitcher()
+        override fun logout() {
+            // Cookie を消して最初からログインページへ
+            CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush(); webView.post { bridge.reset(); webView.loadUrl(LOGIN_URL); updateSurface(LOGIN_URL) } }
+        }
     }
 
     private val networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
