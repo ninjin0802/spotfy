@@ -614,6 +614,28 @@
         .filter(function (d) { return !d.hidden; });
       return { self: st.self || '', active: c.active_device_id || st.self || '', list: list };
     },
+    // 「あなたへのおすすめ新着」：フォロー中のアーティスト・番組の新着（type は '' / 'music' / 'podcast'）
+    whatsNew: function (a) {
+      var types = a.type === 'music' ? ['ALBUM'] : a.type === 'podcast' ? ['EPISODE'] : ['ALBUM', 'EPISODE'];
+      return gql('queryWhatsNewFeed', { offset: 0, limit: 50, onlyUnPlayedItems: false, includedContentTypes: types }).then(function (w) {
+        return (((w.data || {}).whatsNewFeedItems || {}).items || []).map(function (x) { return card(x.content || x); }).filter(function (c) { return c && c.uri; });
+      });
+    },
+    // 「最近」：最近再生したアルバム・プレイリスト・アーティスト（新しい順、再生した時刻つき）
+    recents: function () {
+      var u = service('UserAPI');
+      return Promise.resolve(u && u.getUser()).then(function (me) {
+        var id = me && (me.username || me.id);
+        if (!id) throw new Error('no user');
+        return fetch('https://spclient.wg.spotify.com/recently-played/v3/user/' + encodeURIComponent(id) + '/recently-played?format=json&limit=50&filter=default,collection-new-episodes', { headers: apiHeaders() });
+      }).then(function (r) {
+        if (!r.ok) throw new Error('recently-played ' + r.status);
+        return r.json();
+      }).then(function (j) {
+        return (j.playContexts || []).filter(function (c) { return /^spotify:(album|playlist|artist|user:[^:]+:collection)/.test(c.uri || ''); })
+          .map(function (c) { return { uri: c.uri, at: c.lastPlayedTime || 0 }; });
+      });
+    },
     transfer: function (a) {
       if (!window.__mConnect) throw new Error('not ready');
       return __mConnect.transfer(a.id).then(function (r) { return !!(r && (r.ok || r.status < 300)); });
