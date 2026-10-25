@@ -406,8 +406,9 @@ class MainActivity : ComponentActivity() {
         }
         override fun logout() {
             // Cookie を消して最初からログインページへ
-            // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ）も消し、画面を作り直す
+            // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ、デバッグログ）も消し、画面を作り直す
             getSharedPreferences("cache", MODE_PRIVATE).edit().clear().apply()
+            synchronized(this@MainActivity) { settings.edit().remove("debug.log").apply() }
             android.webkit.WebStorage.getInstance().deleteAllData()
             CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush(); webView.post { recreate() } }
         }
