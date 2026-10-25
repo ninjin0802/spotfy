@@ -4,6 +4,7 @@
 (function () {
   if (window.__mb) return;
   var send = function (m) { if (window.__native && __native.send) __native.send(m); };
+  var pageDebug = function (event, detail) { send({ type: 'debug', event: event, detail: detail || '' }); };
 
   // ---- Web Player の Platform（サービスの登録簿と GraphQL ローダー）を React の木から探す ----
   var plat = null, reg = null;
@@ -53,12 +54,14 @@
           if (typeof manager.enable === 'function') Object.defineProperty(manager, 'enable', { value: function () { return false; }, configurable: true, writable: true });
           if ('enabled' in manager) manager.enabled = false;
           Object.defineProperty(manager, '__nativeAdBlockState', { value: saved, configurable: true });
+          pageDebug('ad.manager.disabled');
         } else if (saved) {
           if (saved.descriptor) Object.defineProperty(manager, 'enable', saved.descriptor);
           else delete manager.enable;
           if (typeof saved.enable === 'function') saved.enable.call(manager);
           else if ('enabled' in manager) manager.enabled = saved.enabled;
           delete manager.__nativeAdBlockState;
+          pageDebug('ad.manager.enabled');
         }
       } catch (e) {}
     });
@@ -72,44 +75,135 @@
       item.provider === 'ad' || !!item.advertiser || md.is_advertisement === true ||
       md.is_advertisement === 'true' || !!md.ad_id);
   }
-  var mutedAdUri = '', mutedAdVolume = 1, skippedAdUri = '';
+  var mutedAdUri = '', mutedAdVolume = 1, mutedAdElements = [], adMuteAppliedAt = 0, adMuteTimedOut = false, lastAdLogUri = '';
+  var adBreakActive = false;
+  var adSkipUri = '', adSkipAttempts = 0, adSkipTimer = 0, adSkipPending = false;
+  function resetAdSkip() {
+    if (adSkipTimer) clearTimeout(adSkipTimer);
+    adSkipTimer = 0;
+    adSkipUri = '';
+    adSkipAttempts = 0;
+    adSkipPending = false;
+  }
+  function scheduleAdSkipRetry(p, uri) {
+    if (adSkipAttempts >= 3 || adSkipTimer) return;
+    adSkipTimer = setTimeout(function () {
+      adSkipTimer = 0;
+      if (!adBlockingEnabled() || !adBreakActive) return;
+      var current = service('PlayerAPI'), now = current && current.getState();
+      if (now && isAd(now.item)) {
+        trySkipAd(current || p, uri);
+      } else resetAdSkip();
+    }, 700 * adSkipAttempts);
+  }
+  function trySkipAd(p, uri) {
+    if (!adSkipUri) adSkipUri = uri;
+    // 返事を待たずに次を送ると同じ広告に何回も送ってしまうので、1 回ずつ待つ
+    if (adSkipAttempts >= 3 || adSkipTimer || adSkipPending) return;
+    var attempt = ++adSkipAttempts;
+    adSkipPending = true;
+    pageDebug('ad.skip.request', String(attempt));
+    try {
+      Promise.resolve(p.skipToNext()).then(function () {
+        adSkipPending = false;
+        pageDebug('ad.skip.accepted', String(attempt));
+      }).catch(function (error) {
+        adSkipPending = false;
+        var message = String(error && (error.message || error.name) || '').toLowerCase();
+        var reason = /restrict|disallow|not allowed|forbidden/.test(message) ? 'restricted'
+          : /timeout|network|fetch|offline|tempor/.test(message) ? 'transient' : 'unknown';
+        pageDebug('ad.skip.rejected', 'attempt=' + attempt + ' reason=' + reason);
+        // 無料プランの制限で断られたら、この広告の間は何回送っても通らない
+        if (reason === 'restricted') { adSkipAttempts = 3; return; }
+        if ( !adBreakActive || adSkipAttempts >= 3 || !adBlockingEnabled()) return;
+        scheduleAdSkipRetry(p, uri);
+      });
+    } catch (e) {
+      adSkipPending = false;
+      if (adBreakActive) scheduleAdSkipRetry(p, uri);
+    }
+  }
+  function restoreMutedElements(restore) {
+    var elements = mutedAdElements.slice();
+    mutedAdElements = [];
+    elements.forEach(function (el) {
+      try { el.muted = false; el.volume = restore; } catch (e) {}
+    });
+    return elements.length;
+  }
   function restoreAdVolume() {
     if (!mutedAdUri) return;
     var restore = mutedAdVolume;
     mutedAdUri = '';
-    audioEl().then(function (el) { if (el && !mutedAdUri) el.volume = restore; });
+    adMuteAppliedAt = 0;
+    var count = restoreMutedElements(restore);
+    if (count) pageDebug('ad.mute.restored', 'elements=' + count + ' volume=' + restore);
+    else audioEl().then(function (el) {
+      if (!el || mutedAdUri) return pageDebug('ad.mute.restore_missing');
+      el.muted = false;
+      el.volume = restore;
+      pageDebug('ad.mute.restored', 'fallback volume=' + el.volume);
+    });
   }
   function handleAdPlayback() {
     syncAdManagers();
     if (!adBlockingEnabled()) {
+      if (lastAdLogUri) pageDebug('ad.state.blocking_off');
+      lastAdLogUri = '';
       restoreAdVolume();
-      skippedAdUri = '';
+      adMuteTimedOut = false;
+      adBreakActive = false;
+      resetAdSkip();
       return;
     }
     var p = service('PlayerAPI');
     var state = p && p.getState();
     var item = state && state.item;
     if (!isAd(item)) {
+      if (lastAdLogUri) pageDebug('ad.state.ended');
+      lastAdLogUri = '';
       restoreAdVolume();
-      skippedAdUri = '';
+      adMuteTimedOut = false;
+      adBreakActive = false;
+      resetAdSkip();
       return;
     }
     var uri = item.uri || item.metadata && item.metadata.ad_id || 'advertisement';
-    if (uri !== mutedAdUri) {
-      mutedAdUri = uri;
+    if (!adBreakActive) {
+      adBreakActive = true;
+      resetAdSkip();
     }
-    audioEl().then(function (el) {
+    if (uri !== lastAdLogUri) pageDebug('ad.detected', 'type=' + (item.type || 'unknown') + ' id=' + (item.uri ? 'uri' : item.metadata && item.metadata.ad_id ? 'metadata' : 'fallback'));
+    lastAdLogUri = uri;
+    if (uri !== mutedAdUri && !adMuteTimedOut) {
+      mutedAdUri = uri;
+      if (!mutedAdElements.length) adMuteAppliedAt = 0;
+    }
+    if (!adMuteTimedOut) audioEl().then(function (el) {
       if (!el || mutedAdUri !== uri) return;
+      // Spotify sometimes leaves the ad as the current item after its audio break ended.
+      // Only start the failsafe after the media element really received the mute.
+      if (adMuteAppliedAt && Date.now() - adMuteAppliedAt >= 75000) {
+        adMuteTimedOut = true;
+        var restore = mutedAdVolume;
+        mutedAdUri = '';
+        adMuteAppliedAt = 0;
+        var restored = restoreMutedElements(restore);
+        if (!restored) { el.muted = false; el.volume = restore; restored = 1; }
+        pageDebug('ad.mute.failsafe', 'elements=' + restored + ' volume=' + restore);
+        return;
+      }
       if (el.volume > 0.001) mutedAdVolume = el.volume;
       el.muted = false;
+      if (mutedAdElements.indexOf(el) < 0) mutedAdElements.push(el);
       el.volume = 0.001;
+      if (!adMuteAppliedAt) {
+        adMuteAppliedAt = Date.now();
+        pageDebug('ad.mute.applied');
+      }
     });
     // 一部の広告はサーバー側キューから挿入され、広告 manager の停止だけでは外れない。
-    // 同じ広告状態の間に複数回送ると次の曲まで飛ばす恐れがあるため、一度だけ試す。
-    if (uri !== skippedAdUri) {
-      skippedAdUri = uri;
-      try { Promise.resolve(p.skipToNext()).catch(function () {}); } catch (e) {}
-    }
+    trySkipAd(p, uri);
   }
 
   // ---- GraphQL（Web Player 自身のローダーを使う。ログイン情報もそのまま使われる） ----

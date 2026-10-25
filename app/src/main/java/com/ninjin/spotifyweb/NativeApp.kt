@@ -754,6 +754,7 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
                     SettingRow("コンテンツと表示", "テーマカラー・背景") { page = "look" }
                     SettingRow("再生", "バックグラウンド再生・広告抑制・クロスフェード") { page = "playback" }
                     SettingRow("メディアの音質", "Wi-Fi・モバイルデータ通信でのストリーミング") { page = "quality" }
+                    SettingRow("デバッグログを共有", "直近の広告検出・スキップ・ミュート記録") { host.shareDebugLog() }
                     SettingRow("このアプリについて", "Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません") {}
                 }
                 "account" -> {

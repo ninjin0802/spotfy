@@ -11,5 +11,6 @@ interface AppHost {
     fun outputSwitch()
     /** このスマホの出力先（Bluetooth イヤホンなど。スピーカーなら空） */
     fun outputName(): String
+    fun shareDebugLog()
     fun logout()
 }

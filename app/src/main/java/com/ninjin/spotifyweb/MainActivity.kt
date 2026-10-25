@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        dumpDebugLogIfAsked(intent)
 
         applyOrientation()
         webView = AwakeWebView(this).apply {
@@ -156,6 +157,15 @@ class MainActivity : ComponentActivity() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
                 if (!nativeUi) return null
                 val host = request.url.host ?: return null
+                traceSpotifyRequest(host, request.url)
+                if (adPlaybackActive && settings.getString("adblock", "true") == "true" && adNetworkTraceCount < 40 &&
+                    (host.endsWith("spotify.com") || host.endsWith("spotifycdn.com") || host.endsWith("scdn.co") || host.endsWith("akamaized.net"))
+                ) {
+                    // Signed URL query strings and media bytes never leave the device.
+                    val firstPath = request.url.pathSegments.firstOrNull()?.take(48).orEmpty()
+                    recordDebug("ad.request", host + if (firstPath.isNotEmpty()) "/$firstPath" else "")
+                    adNetworkTraceCount++
+                }
                 val skip = host == "i.scdn.co" || host == "mosaic.scdn.co" || host == "image-cdn-ak.spotifycdn.com" || host == "image-cdn-fa.spotifycdn.com" ||
                     host == "pickasso.spotifycdn.com" || host == "canvaz.scdn.co" || host.endsWith("video.spotifycdn.com") || host == "seed-mix-image.spotifycdn.com"
                 return if (skip) android.webkit.WebResourceResponse("text/plain", "utf-8", 204, "No Content", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0))) else null
@@ -213,6 +223,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (dumpDebugLogIfAsked(intent)) return
         intent.data?.takeIf(::isSpotifyUrl)?.let { webView.loadUrl(it.toString()) }
     }
 
@@ -332,6 +343,30 @@ class MainActivity : ComponentActivity() {
 
     /** ログイン済みで open.spotify.com を開いているときだけアプリの画面を出す（ログインページは Web のまま見せる） */
     @Volatile private var nativeUi = false
+    @Volatile private var adPlaybackActive = false
+    @Volatile private var adNetworkTraceCount = 0
+    private val seenRequestPaths = java.util.Collections.synchronizedSet(HashSet<String>())
+    @Volatile private var adPathTraceCount = 0
+
+    /**
+     * 広告を決める API を探すため、spotify.com へのリクエストの形（ホスト＋パス先頭 3 段）を記録する。
+     * ID っぽい段は * に置き換え、クエリは残さない。同じ形は 1 回だけ、広告らしいパスは毎回（上限あり）。
+     */
+    private fun traceSpotifyRequest(host: String, url: Uri) {
+        if (!host.endsWith("spotify.com") || host == "open.spotify.com" && url.pathSegments.firstOrNull() != "api") return
+        val segs = url.pathSegments.take(3).map { seg ->
+            if (seg.length > 20 || seg.any { it.isDigit() } && seg.length > 8) "*" else seg.take(40)
+        }
+        val key = host + "/" + segs.joinToString("/")
+        val adLike = AD_PATH.containsMatchIn("/" + url.pathSegments.joinToString("/"))
+        val tag = if (adPlaybackActive) " [ad]" else ""
+        if (adLike && adPathTraceCount < 150) {
+            adPathTraceCount++
+            recordDebug("net.adpath", key + tag)
+        } else if (seenRequestPaths.size < 400 && seenRequestPaths.add(key)) {
+            recordDebug("net", key + tag)
+        }
+    }
 
     private fun updateSurface(url: String? = webView.url) {
         val onSpotify = url == null || isSpotifyUrl(Uri.parse(url))
@@ -361,6 +396,14 @@ class MainActivity : ComponentActivity() {
         }
         override fun outputSwitch() = showOutputSwitcher()
         override fun outputName() = currentOutputName()
+        override fun shareDebugLog() {
+            val report = "spotfy ${BuildConfig.VERSION_NAME} debug log\n" +
+                (settings.getString("debug.log", "")?.takeIf { it.isNotBlank() } ?: "No playback debug events recorded.")
+            val intent = Intent(Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT, "spotfy debug log")
+                .putExtra(Intent.EXTRA_TEXT, report)
+            runCatching { startActivity(Intent.createChooser(intent, "デバッグログを共有")) }
+        }
         override fun logout() {
             // Cookie を消して最初からログインページへ
             // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ）も消し、画面を作り直す
@@ -461,7 +504,14 @@ class MainActivity : ComponentActivity() {
                 val name = m.optString("name")
                 if (name !in setOf("orientation", "background", "adblock", "webdebug")) return
                 settings.edit().putString(name, m.optString("value")).apply()
+                if (name == "adblock") recordDebug("adblock.setting", m.optString("value"))
                 if (name == "orientation") applyOrientation()
+            }
+            "debug" -> {
+                val event = m.optString("event")
+                if (event == "ad.detected") { adPlaybackActive = true; adNetworkTraceCount = 0 }
+                if (event == "ad.state.ended" || event == "ad.state.blocking_off") { adPlaybackActive = false; adNetworkTraceCount = 0 }
+                recordDebug(event, m.optString("detail"))
             }
             "playing" -> setPlaying(m.optBoolean("value"))
             "outputSwitch" -> showOutputSwitcher()
@@ -497,6 +547,29 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** 広告処理の直近イベントを設定に保持し、あとから共有できるようにする。 */
+    /** adb から `am start --ez dumpDebugLog true` で起こされたら、保存済みのログ全体を logcat に流す */
+    private fun dumpDebugLogIfAsked(intent: Intent?): Boolean {
+        if (intent?.getBooleanExtra("dumpDebugLog", false) != true) return false
+        val log = settings.getString("debug.log", "").orEmpty()
+        android.util.Log.i(DEBUG_TAG, "---- dump begin (${log.lines().size} lines) ----")
+        log.lines().forEach { android.util.Log.i(DEBUG_TAG, it) }
+        android.util.Log.i(DEBUG_TAG, "---- dump end ----")
+        return true
+    }
+
+    @Synchronized private fun recordDebug(event: String, detail: String = "") {
+        val safeEvent = event.filter { it.isLetterOrDigit() || it in "._-" }.take(64).ifBlank { "unknown" }
+        val safeDetail = detail.replace(Regex("[\\r\\n\\t]"), " ").take(160)
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US)
+            .format(java.util.Date())
+        val previous = settings.getString("debug.log", "").orEmpty()
+        val line = "$stamp $safeEvent $safeDetail"
+        android.util.Log.i(DEBUG_TAG, line)
+        val lines = (previous.lines() + line).takeLast(800)
+        settings.edit().putString("debug.log", lines.joinToString("\n").takeLast(96_000)).apply()
     }
 
     /** 通知・ロック画面のメディアコントロールからの操作を Web Player に伝える */
@@ -558,6 +631,8 @@ class MainActivity : ComponentActivity() {
         private const val REQUEST_FILE = 42
         private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
         private val RELAY_URL = Regex("^https://([a-z0-9-]+\\.)*spotify\\.com/(connect-state|track-playback)/v1/[^#]*$")
+        private const val DEBUG_TAG = "spotfy-debug"
+        private val AD_PATH = Regex("/(ads?|ad-logic|adlogic|ad-?break|sponsor[a-z-]*|instream[a-z-]*|slots?)(/|$)", RegexOption.IGNORE_CASE)
         private val RELAY_METHODS = setOf("GET", "POST", "PUT", "DELETE")
         private val SKIPPED_HEADERS = setOf("host", "content-length", "cookie", "user-agent", "x-requested-with")
         private const val CHROME_MAJOR = "141"
