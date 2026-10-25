@@ -369,6 +369,8 @@
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); go(back); throw e;
       });
     },
+    // クロスフェード（秒。0 でオフ）
+    crossfade: function (a) { xfSec = a.sec | 0; xfWatch(); return true; },
     library: function () {
       var lib = service('LibraryAPI');
       return Promise.resolve(lib.getContents({ limit: 300, offset: 0 })).then(function (c) {
@@ -458,6 +460,32 @@
       return Promise.resolve(u && u.getUser()).then(function (x) { return x ? { name: x.displayName || x.username || '', image: x.avatarUrl || (x.images && x.images[0] && x.images[0].url) || '' } : null; });
     }
   };
+
+  // ---- クロスフェード ----
+  // Web Player は再生要素を 1 つしか持たないため 2 曲を重ねて鳴らせない。
+  // 代わりに、曲の終わりを指定秒数かけて小さくし、次の曲の始まりを同じ秒数かけて大きくする
+  var xfSec = 0, xfTimer = null, xfBase = null;
+  function audioEl() {
+    var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
+    if (!st || !st._playerPromise) return Promise.resolve(null);
+    return st._playerPromise.then(function (p) { return p && p._player instanceof HTMLMediaElement ? p._player : null; }, function () { return null; });
+  }
+  function xfWatch() {
+    if (xfTimer) return;
+    xfTimer = setInterval(function () {
+      if (!xfSec && xfBase == null) return;
+      audioEl().then(function (el) {
+        if (!el) return;
+        if (!xfSec || el.paused || !isFinite(el.duration) || el.duration < xfSec * 3) {
+          if (xfBase != null) { el.volume = xfBase; xfBase = null; }
+          return;
+        }
+        if (xfBase == null) xfBase = el.volume || 1;
+        var t = el.currentTime, rest = el.duration - t;
+        el.volume = Math.max(0, Math.min(1, xfBase * Math.min(1, t / xfSec, rest / xfSec)));
+      });
+    }, 100);
+  }
 
   // ---- 再生状態 ----
   function snapshot() {

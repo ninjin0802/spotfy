@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -354,7 +355,7 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
             }
         }
         item {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (filter.isNotEmpty()) Ico(Icons.close, 16, Color.White, 34) { filter = "" }
                 listOf("playlist" to "プレイリスト", "show" to "ポッドキャスト", "album" to "アルバム", "artist" to "アーティスト").forEach { (k, label) ->
                     if (filter.isEmpty() || filter == k) Text(

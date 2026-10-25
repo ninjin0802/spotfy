@@ -743,7 +743,7 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
                 null -> {
                     SettingRow("アカウント", user?.name ?: "") { page = "account" }
                     SettingRow("コンテンツと表示", "テーマカラー・背景") { page = "look" }
-                    SettingRow("再生", "バックグラウンド再生") { page = "playback" }
+                    SettingRow("再生", "バックグラウンド再生・クロスフェード") { page = "playback" }
                     SettingRow("メディアの音質", "Wi-Fi・モバイルデータ通信でのストリーミング") { page = "quality" }
                     SettingRow("このアプリについて", "Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません") {}
                 }
@@ -766,6 +766,22 @@ private fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, on
                 "playback" -> {
                     var bg by remember { mutableStateOf(host.setting("background", "true") == "true") }
                     SwitchRow("バックグラウンド再生", "アプリを閉じても再生を続ける", bg) { bg = it; host.setSetting("background", it.toString()) }
+                    // クロスフェード：公式アプリと同じく、オンにするとスライダーで 1〜12 秒を選ぶ
+                    var xf by remember { mutableStateOf(host.setting("crossfade", "0").toIntOrNull() ?: 0) }
+                    var xfLast by remember { mutableStateOf(if (xf > 0) xf else 5) }
+                    SwitchRow("クロスフェード", "曲と曲のあいだを指定した秒数でフェードさせる", xf > 0) { on ->
+                        xf = if (on) xfLast else 0; host.setSetting("crossfade", xf.toString())
+                    }
+                    if (xf > 0) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${xf} 秒", color = Color.White, fontSize = 14.sp, modifier = Modifier.width(48.dp))
+                        Slider(
+                            value = xf.toFloat(), valueRange = 1f..12f, steps = 10,
+                            onValueChange = { xf = it.toInt().coerceIn(1, 12); xfLast = xf },
+                            onValueChangeFinished = { host.setSetting("crossfade", xf.toString()) },
+                            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Accent, inactiveTrackColor = Color(0x4DFFFFFF)),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
                 "quality" -> {
                     var wifi by remember { mutableStateOf(host.quality(false)) }
