@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -13,7 +12,7 @@ val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (major, mino
 
 android {
     namespace = "com.ninjin.spotifyweb"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.ninjin.spotifyweb"
@@ -58,13 +57,13 @@ android {
 kotlin { jvmToolchain(17) }
 
 dependencies {
-    implementation("androidx.webkit:webkit:1.14.0")
+    implementation("androidx.webkit:webkit:1.18.0")
     // 画面は Jetpack Compose で描く（データと再生は裏の Web Player から）
-    implementation(platform("androidx.compose:compose-bom:2025.10.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.activity:activity-compose:1.13.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("androidx.palette:palette:1.0.0")
+    implementation("androidx.palette:palette:1.1.0")
 }
