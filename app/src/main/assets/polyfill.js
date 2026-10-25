@@ -87,29 +87,21 @@
     if (headers.authorization) connect.headers = headers;
     if (text && (m[3] || /cluster$/.test(m[2]))) { try { setCluster(JSON.parse(text)); } catch (e) {} }
   }
-  // Web Player と同じ認証ヘッダーで、このスマホからほかの機器への Connect 操作を送る
-  function command(method, kind, target, body) {
-    if (!connect.base || !connect.self || !connect.headers) return Promise.reject(new Error('not ready'));
-    var h = {};
-    ['authorization', 'client-token', 'spotify-app-version', 'app-platform', 'accept-language'].forEach(function (k) {
-      if (connect.headers[k]) h[k] = connect.headers[k];
-    });
-    h['content-type'] = 'application/json';
-    return window.fetch(connect.base + '/connect-state/v1/connect/' + kind + '/from/' + connect.self + '/to/' + target, {
-      method: method, headers: h, body: JSON.stringify(body)
-    });
-  }
   window.__mConnect = {
     get: function () { return { self: connect.self, cluster: connect.cluster }; },
     auth: function () { return connect.headers && connect.headers.authorization; },
     clientToken: function () { return connect.headers && connect.headers['client-token']; },
     onChange: function (f) { connect.listeners.push(f); },
     transfer: function (target) {
-      return command('POST', 'transfer', target, { transfer_options: { restore_paused: 'resume' } });
-    },
-    // 再生先の音量（0〜65535。Spotify Connect の値そのまま）
-    setVolume: function (target, volume) {
-      return command('PUT', 'volume', target, { volume: volume });
+      if (!connect.base || !connect.self || !connect.headers) return Promise.reject(new Error('not ready'));
+      var h = {};
+      ['authorization', 'client-token', 'spotify-app-version', 'app-platform', 'accept-language'].forEach(function (k) {
+        if (connect.headers[k]) h[k] = connect.headers[k];
+      });
+      h['content-type'] = 'application/json';
+      return window.fetch(connect.base + '/connect-state/v1/connect/transfer/from/' + connect.self + '/to/' + target, {
+        method: 'POST', headers: h, body: JSON.stringify({ transfer_options: { restore_paused: 'resume' } })
+      });
     }
   };
   // dealer の WebSocket から届くデバイス一覧の更新も拾う
