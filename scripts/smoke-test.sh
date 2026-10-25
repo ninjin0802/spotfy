@@ -4,7 +4,9 @@
 #  2. 同じ端末で通信できないとき：「Spotify に接続できません」が出て、つながると自動でログイン画面に戻る
 #  3. WebView が使えない端末（Android 8 の素のイメージ）：落ちずに WebView 更新の案内が出る
 # 使い方: scripts/smoke-test.sh [APK]   （省略時は app/build/outputs/apk/release/app-release.apk）
-# エミュレーターは SMOKE_AVD（既定 keyboard-test）と SMOKE_AVD_OLD（既定 keyboard-test-api26）を使う。
+# エミュレーターは SMOKE_AVD（既定 keyboard-test）と SMOKE_AVD_OLD（既定 keyboard-test-api26）を起動して使う。
+# CI のように起動済みのエミュレーターを使うときは SMOKE_SERIAL（例 emulator-5554）と
+# SMOKE_CASES（modern＝1・2 / old＝3 / 省略で両方）を指定する。
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -14,13 +16,14 @@ avd_old=${SMOKE_AVD_OLD:-keyboard-test-api26}
 emulator=${ANDROID_HOME:-$HOME/Android/Sdk}/emulator/emulator
 pkg=com.ninjin.spotifyweb
 port=5584
-serial=emulator-$port
+serial=${SMOKE_SERIAL:-emulator-$port}
+cases=${SMOKE_CASES:-modern old}
 failures=0
 
 [[ -f "$apk" ]] || { echo "APK がありません: $apk" >&2; exit 1; }
 
 boot() {
-  "$emulator" -avd "$1" -port $port -no-window -no-audio -no-snapshot -no-boot-anim >/dev/null 2>&1 &
+  [[ -z "${SMOKE_SERIAL:-}" ]] && "$emulator" -avd "$1" -port $port -no-window -no-audio -no-snapshot -no-boot-anim >/dev/null 2>&1 &
   adb -s $serial wait-for-device
   for _ in $(seq 120); do
     [[ "$(adb -s $serial shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]] && break
@@ -32,7 +35,11 @@ boot() {
   adb -s $serial logcat -c
 }
 
-shutdown() { adb -s $serial emu kill >/dev/null 2>&1; sleep 5; }
+shutdown() {
+  # 起動済みのエミュレーターを借りているときは止めず、次のために後片付けだけする
+  if [[ -n "${SMOKE_SERIAL:-}" ]]; then adb -s $serial uninstall $pkg >/dev/null 2>&1; return; fi
+  adb -s $serial emu kill >/dev/null 2>&1; sleep 5
+}
 
 launch() {
   adb -s $serial shell am force-stop $pkg
@@ -67,6 +74,7 @@ check() {
   fi
 }
 
+if [[ " $cases " == *" modern "* ]]; then
 echo "== $avd"
 boot "$avd"
 launch
@@ -78,12 +86,15 @@ check "通信できないときの案内" "Spotify に接続できません" 60
 adb -s $serial shell cmd connectivity airplane-mode disable
 check "つながったら自動でログイン画面" 'text="Continue"' 90
 shutdown
+fi
 
+if [[ " $cases " == *" old "* ]]; then
 echo "== $avd_old"
 boot "$avd_old"
 launch
 check "WebView が使えない端末で案内" "Android System WebView" 60
 shutdown
+fi
 
 if (( failures )); then echo "失敗: $failures 件"; exit 1; fi
 echo "すべて成功"

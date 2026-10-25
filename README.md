@@ -100,10 +100,19 @@ keyPassword=...
 
 1. `VERSION` を上げる（不具合の修正はパッチ、機能追加はマイナー）
 2. `CHANGELOG.md` の先頭に `## <版>` の節を書く
-3. コミットして `scripts/release.sh` を実行する
-   - 署名付きでビルドし、`v<版>` のタグを付けて main・作業ブランチ・タグを push、GitHub Releases に APK とその節の内容を上げます
-   - 同じ版のタグがある・コミットしていない変更がある・main から分かれている・CHANGELOG に節がない、のどれかなら止まります
+3. 作業ブランチで PR を作り、CI が通ったら main にマージする
+4. main の最新で `scripts/release.sh` を実行する
+   - 署名付きでビルドし、`v<版>` のタグを付けて push、GitHub Releases に APK とその節の内容を上げます
+   - 同じ版のタグがある・コミットしていない変更がある・今のコミットが main の最新でない・CHANGELOG に節がない、のどれかなら止まります
    - タグを付ける前に `scripts/smoke-test.sh` をエミュレーターで実行し、失敗したら止まります（急ぐときだけ `SKIP_SMOKE=1`）
+
+### CI
+
+GitHub Actions（`.github/workflows/ci.yml`）が、PR と main への push のたびに次を行います。main へは PR で入れ、CI が通ったものだけマージします。
+
+- `bridge.js`・`polyfill.js`・スクリプトの構文チェック
+- リリース設定でのビルド（CI には署名鍵が無いのでデバッグ鍵で署名）
+- エミュレーターでのスモークテスト（Android 15 と Android 8 の 2 つ）
 
 ### スモークテスト
 
