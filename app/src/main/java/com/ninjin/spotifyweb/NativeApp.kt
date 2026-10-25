@@ -84,20 +84,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Bg = Color(0xFF121212)
-private val Card2 = Color(0xFF2A2A2A)
-private val Sub = Color(0xFFB3B3B3)
-private val Accent = Color(0xFF1ED760)
+internal val Bg = Color(0xFF121212)
+internal val Card2 = Color(0xFF2A2A2A)
+internal val Sub = Color(0xFFB3B3B3)
+internal val Accent = Color(0xFF1ED760)
 
 /** 24x24 の塗りのアイコン */
-private fun icon(d: String): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+internal fun icon(d: String): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
     .addPath(PathParser().parsePathString(d).toNodes(), fill = SolidColor(Color.White)).build()
 
 /** 24x24 の線のアイコン（公式アプリと同じ細い線） */
-private fun line(d: String, w: Float = 1.8f): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+internal fun line(d: String, w: Float = 1.8f): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
     .addPath(PathParser().parsePathString(d).toNodes(), stroke = SolidColor(Color.White), strokeLineWidth = w, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round).build()
 
-private object Icons {
+internal object Icons {
     val home = icon("M12.5 3.25a.5.5 0 0 0-1 0L3 10.4V21h6.5v-6h5v6H21V10.4z")
     val search = icon("M10.5 3a7.5 7.5 0 0 1 5.96 12.06l4.24 4.24-1.4 1.4-4.24-4.24A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z")
     val library = icon("M4 3h2v18H4zM9 3h2v18H9zm4.6.6 1.9-.6 5.6 17.4-1.9.6z")
@@ -115,6 +115,7 @@ private object Icons {
     val share = line("M12 3v12M7.5 7.5 12 3l4.5 4.5M5 12v7.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V12", 1.6f)
     val queue = line("M4 6h16M4 12h10M4 18h10M17 14v7l4-3.5z", 1.6f)
     val back = line("M15 5l-7 7 7 7", 2f)
+    val close = line("M6 6l12 12M18 6 6 18", 2f)
     val gear = line("M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8 21h-4l-.3-2.4a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.3L4.6 10l2-3.4 1.9.7a7 7 0 0 1 2-1.2L10.8 3h4l.3 2.1a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.3z", 1.6f)
 }
 
@@ -139,17 +140,32 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     BackHandler(enabled = playerOpen) { playerOpen = false }
     BackHandler(enabled = settingsOpen && !playerOpen) { settingsOpen = false }
     BackHandler(enabled = drawerOpen) { drawerOpen = false }
-    BackHandler(enabled = !playerOpen && !settingsOpen && !drawerOpen && tab != Tab.Home) { tab = Tab.Home }
+    val stacks = remember { Tab.entries.associateWith { androidx.compose.runtime.mutableStateListOf<String>() } }
+    BackHandler(enabled = !playerOpen && !settingsOpen && !drawerOpen && stacks[tab]!!.isNotEmpty()) { stacks[tab]!!.removeAt(stacks[tab]!!.lastIndex) }
+    BackHandler(enabled = !playerOpen && !settingsOpen && !drawerOpen && stacks[tab]!!.isEmpty() && tab != Tab.Home) { tab = Tab.Home }
 
     Box(Modifier.fillMaxSize().background(Bg)) {
-        when (tab) {
-            Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = { scope.launch { runCatching { bridge.play(it.uri) } } })
-            Tab.Search -> Placeholder("検索はこれから作ります")
-            Tab.Library -> Placeholder("ライブラリはこれから作ります")
+        // カードを押したら：アルバム・プレイリスト・アーティストはページを開き、曲は再生する
+        val open: (Card) -> Unit = { c ->
+            if (isPage(c.uri)) stacks[tab]!!.add(c.uri) else scope.launch { runCatching { bridge.play(c.uri) } }
+        }
+        val stack = stacks[tab]!!
+        // タブごとに開いたページを覚えておく（タブを切り替えて戻っても、そのまま）
+        Box(Modifier.fillMaxSize()) {
+            when (tab) {
+                Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open)
+                Tab.Search -> SearchScreen(bridge, onOpen = open)
+                Tab.Library -> LibraryScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
+            }
+            stack.lastOrNull()?.let { uri ->
+                androidx.compose.runtime.key(uri, stack.size) {
+                    PageScreen(bridge, uri, player, onBack = { stack.removeAt(stack.lastIndex) }, onOpen = open)
+                }
+            }
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true })
-            TabBar(tab) { tab = it }
+            TabBar(tab) { if (it == tab) stacks[it]!!.clear() else tab = it }
         }
         AnimatedVisibility(settingsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             SettingsScreen(bridge, host, user, onBack = { settingsOpen = false })
@@ -171,6 +187,9 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
 }
 
 /** ジャケットの色（公式アプリと同じく、くすんだ濃い色）。曲が変わるとなめらかに変わる */
+@Composable
+internal fun rememberArtColorPublic(url: String): Color = rememberArtColor(url)
+
 @Composable
 private fun rememberArtColor(url: String): Color {
     val ctx = LocalContext.current
@@ -194,12 +213,12 @@ private fun rememberArtColor(url: String): Color {
 }
 
 @Composable
-private fun Placeholder(text: String) {
+internal fun Placeholder(text: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text, color = Sub, fontSize = 15.sp) }
 }
 
 @Composable
-private fun Avatar(user: Bridge.User?, size: Int, onClick: (() -> Unit)? = null) {
+internal fun Avatar(user: Bridge.User?, size: Int, onClick: (() -> Unit)? = null) {
     val m = Modifier.size(size.dp).clip(CircleShape).background(Color(0xFFE8A87C)).let { if (onClick != null) it.clickable(onClick = onClick) else it }
     Box(m, contentAlignment = Alignment.Center) {
         if (user?.image?.isNotEmpty() == true) AsyncImage(user.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -272,7 +291,7 @@ private fun Shortcuts(items: List<Card>, onPlay: (Card) -> Unit) {
 }
 
 @Composable
-private fun ShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
+internal fun ShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
     Column(Modifier.padding(top = 20.dp)) {
         if (s.title.isNotEmpty()) Text(
             s.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold,
@@ -295,7 +314,7 @@ private fun ShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
 }
 
 @Composable
-private fun Ico(icon: ImageVector, size: Int, tint: Color = Color.White, box: Int = 40, onClick: () -> Unit) {
+internal fun Ico(icon: ImageVector, size: Int, tint: Color = Color.White, box: Int = 40, onClick: () -> Unit) {
     Box(Modifier.size(box.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Image(rememberVectorPainter(icon), null, Modifier.size(size.dp), colorFilter = ColorFilter.tint(tint))
     }
@@ -347,7 +366,7 @@ private fun TabBar(tab: Tab, onSelect: (Tab) -> Unit) {
     }
 }
 
-private fun mmss(ms: Long): String { val s = ms / 1000; return "%d:%02d".format(s / 60, s % 60) }
+internal fun mmss(ms: Long): String { val s = ms / 1000; return "%d:%02d".format(s / 60, s % 60) }
 
 /** 公式アプリと同じ全画面プレーヤー */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)

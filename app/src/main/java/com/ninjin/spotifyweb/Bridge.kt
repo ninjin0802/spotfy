@@ -16,6 +16,15 @@ data class Card(val uri: String, val title: String, val subtitle: String, val im
 
 data class Shelf(val title: String, val items: List<Card>)
 
+data class Track(val uri: String, val title: String, val artist: String, val image: String, val dur: Long)
+
+/** アルバム・プレイリスト・アーティストのページ */
+data class Page(
+    val kind: String, val uri: String, val title: String, val subtitle: String, val image: String,
+    val round: Boolean, val header: Boolean, val description: String, val artist: String, val artistUri: String,
+    val saved: Boolean, val tracks: List<Track>, val shelves: List<Shelf>,
+)
+
 data class HomeFeed(val greeting: String, val shortcuts: List<Card>, val shelves: List<Shelf>)
 
 /** 再生状態。位置は [at]（Web Player の時刻）時点の値なので、表示時に経過分を足す */
@@ -129,6 +138,32 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     suspend fun like(uri: String, on: Boolean) = call("like", JSONObject().put("uri", uri).put("on", on))
     suspend fun quality(level: String) = call("quality", JSONObject().put("level", level)) == true
     suspend fun bitrate(): Int = (call("bitrate") as? Number)?.toInt() ?: 0
+
+    /** URI に合わせてページを読む（お気に入りの曲はライブラリから） */
+    suspend fun page(uri: String): Page {
+        if (uri.contains(":collection")) {
+            val a = call("liked") as JSONArray
+            return Page("playlist", uri, "お気に入りの曲", "${a.length()}曲", "", false, false, "", "", "", true, tracks(a), emptyList())
+        }
+        val method = when (uri.split(':').getOrNull(1)) { "album" -> "album"; "artist" -> "artist"; else -> "playlist" }
+        val o = call(method, JSONObject().put("uri", uri)) as JSONObject
+        return Page(
+            o.optString("kind"), o.optString("uri"), o.optString("title"), o.optString("subtitle"), o.optString("image"),
+            o.optBoolean("round"), o.optBoolean("header"), o.optString("description"), o.optString("artist"), o.optString("artistUri"),
+            o.optBoolean("saved"), tracks(o.optJSONArray("tracks")),
+            (o.optJSONArray("shelves") ?: JSONArray()).let { a -> (0 until a.length()).map { i -> a.getJSONObject(i).let { Shelf(it.optString("title"), cards(it.optJSONArray("items"))) } } },
+        )
+    }
+
+    suspend fun search(q: String): List<Card> = cards(call("search", JSONObject().put("q", q)) as? JSONArray)
+    suspend fun library(): List<Card> = cards(call("library") as? JSONArray).also { cache.edit().putString("library", JSONArray(it.map { c -> JSONObject().put("uri", c.uri).put("title", c.title).put("subtitle", c.subtitle).put("image", c.image).put("round", c.round) }).toString()).apply() }
+    fun cachedLibrary(): List<Card> = cache.getString("library", null)?.let { runCatching { cards(JSONArray(it)) }.getOrNull() } ?: emptyList()
+    suspend fun follow(uri: String, on: Boolean) = call("follow", JSONObject().put("uri", uri).put("on", on))
+
+    private fun tracks(a: JSONArray?): List<Track> = if (a == null) emptyList() else (0 until a.length()).mapNotNull { i ->
+        val t = a.optJSONObject(i) ?: return@mapNotNull null
+        Track(t.optString("uri"), t.optString("title"), t.optString("artist"), t.optString("image"), t.optLong("dur"))
+    }
 
     data class User(val name: String, val image: String)
 

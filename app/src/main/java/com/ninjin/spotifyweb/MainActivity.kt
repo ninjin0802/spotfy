@@ -183,7 +183,7 @@ class MainActivity : ComponentActivity() {
         // アプリの画面で戻れないときは、Web のページを戻るか、アプリを裏に回す
         onBackPressedDispatcher.addCallback(this) { handleBack() }
 
-        if (savedInstanceState != null) {
+        if (savedInstanceState != null && isLoggedIn()) {
             webView.restoreState(savedInstanceState)
         } else {
             // ログインしていなければ、最初から Spotify のログインページを開く
@@ -342,7 +342,10 @@ class MainActivity : ComponentActivity() {
         override fun outputSwitch() = showOutputSwitcher()
         override fun logout() {
             // Cookie を消して最初からログインページへ
-            CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush(); webView.post { bridge.reset(); webView.loadUrl(LOGIN_URL); updateSurface(LOGIN_URL) } }
+            // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ）も消し、画面を作り直す
+            getSharedPreferences("cache", MODE_PRIVATE).edit().clear().apply()
+            android.webkit.WebStorage.getInstance().deleteAllData()
+            CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush(); webView.post { recreate() } }
         }
     }
 

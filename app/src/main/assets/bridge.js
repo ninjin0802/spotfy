@@ -35,7 +35,11 @@
 
   // ---- GraphQL（Web Player 自身のローダーを使う。ログイン情報もそのまま使われる） ----
   var GQL = {
-    home: '5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1'
+    home: '5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1',
+    getAlbum: '0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f',
+    fetchPlaylist: '21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf',
+    queryArtistOverview: '9f8134ef565e78621f1e1793555bd6633c5ac144ae0f89604ed3ae3f80b3c8e6',
+    searchTopResultsList: 'dd78eaff943eba629ed70ee25517b9cea0dcaa41193e2592ae2727660b21892c'
   };
   function gql(name, vars) {
     return platform().getGraphQLLoader()({ name: name, operation: 'query', sha256Hash: GQL[name], value: null }, vars);
@@ -115,6 +119,95 @@
       });
     },
     state: function () { return snapshot(); },
+    // ---- 詳細ページ：{ kind, uri, title, subtitle, image, round, description, tracks[], shelves[] } ----
+    album: function (a) {
+      return gql('getAlbum', { uri: a.uri, locale: '', offset: 0, limit: 300 }).then(function (r) {
+        var d = r.data.albumUnion;
+        var year = d.date && d.date.isoString ? d.date.isoString.slice(0, 4) : '';
+        var kind = d.type === 'SINGLE' ? 'シングル' : d.type === 'EP' ? 'EP' : d.type === 'COMPILATION' ? 'コンピレーション' : 'アルバム';
+        return {
+          kind: 'album', uri: d.uri, title: d.name, image: pickImg(d.coverArt), artist: names(d.artists),
+          artistUri: d.artists && d.artists.items[0] && d.artists.items[0].uri || '',
+          subtitle: kind + (year ? ' • ' + year : ''), saved: !!d.saved,
+          tracks: (d.tracksV2.items || []).map(function (x) { var t = x.track; return { uri: t.uri, title: t.name, artist: names(t.artists), image: '', dur: t.duration && t.duration.totalMilliseconds || 0 }; }),
+          shelves: d.moreAlbumsByArtist ? [{ title: names(d.artists) + 'のその他の作品', items: ((d.moreAlbumsByArtist.items[0] || {}).discography || { popularReleasesAlbums: { items: [] } }).popularReleasesAlbums.items.map(card).filter(Boolean) }] : []
+        };
+      });
+    },
+    playlist: function (a) {
+      return gql('fetchPlaylist', { uri: a.uri, offset: 0, limit: 200, enableWatchFeedEntrypoint: false }).then(function (r) {
+        var d = r.data.playlistV2;
+        var owner = d.ownerV2 && d.ownerV2.data && d.ownerV2.data.name || '';
+        return {
+          kind: 'playlist', uri: d.uri, title: d.name, image: pickImg(d.images), description: strip(d.description),
+          artist: owner, subtitle: (d.followers ? d.followers.toLocaleString() + '件の保存 • ' : '') + (d.content.totalCount || 0) + '曲',
+          tracks: (d.content.items || []).map(function (x) {
+            var t = x.itemV2 && x.itemV2.data;
+            if (!t || !t.uri) return null;
+            return { uri: t.uri, title: t.name, artist: names(t.artists), image: pickImg(t.albumOfTrack && t.albumOfTrack.coverArt), dur: t.trackDuration && t.trackDuration.totalMilliseconds || 0 };
+          }).filter(Boolean),
+          shelves: []
+        };
+      });
+    },
+    artist: function (a) {
+      return gql('queryArtistOverview', { uri: a.uri, locale: '', includePrerelease: false }).then(function (r) {
+        var d = r.data.artistUnion, disc = d.discography || {};
+        var header = d.headerImage && d.headerImage.data ? pickImg(d.headerImage.data) : '';
+        var shelves = [];
+        function add(title, list) { var items = (list || []).map(function (x) { return card(x.releases ? x.releases.items[0] : x); }).filter(Boolean); if (items.length) shelves.push({ title: title, items: items }); }
+        add('人気リリース', disc.popularReleasesAlbums && disc.popularReleasesAlbums.items);
+        add('アルバム', disc.albums && disc.albums.items);
+        add('シングルと EP', disc.singles && disc.singles.items);
+        add('ファンの間で人気', d.relatedContent && d.relatedContent.relatedArtists && d.relatedContent.relatedArtists.items);
+        var ml = d.stats && d.stats.monthlyListeners || 0;
+        return {
+          kind: 'artist', uri: d.uri, title: d.profile && d.profile.name, image: header || pickImg(d.visuals), round: !header, header: !!header,
+          subtitle: ml ? (ml >= 10000 ? (Math.round(ml / 1000) / 10) + '万' : ml.toLocaleString()) + '人の月間リスナー' : '', saved: !!d.saved,
+          tracks: ((disc.topTracks && disc.topTracks.items) || []).slice(0, 10).map(function (x) { var t = x.track; return { uri: t.uri, title: t.name, artist: names(t.artists), image: pickImg(t.albumOfTrack && t.albumOfTrack.coverArt), dur: t.duration && t.duration.totalMilliseconds || 0 }; }),
+          shelves: shelves
+        };
+      });
+    },
+    search: function (a) {
+      return gql('searchTopResultsList', { query: a.q, limit: 30, offset: 0, numberOfTopResults: 30, includeArtistHasConcertsField: false, includeAudiobooks: true, includeAuthors: true, includePreReleases: true, includeAlbumPreReleases: false, includeEpisodeContentRatingsV2: true, sectionFilters: ['GENERIC'] }).then(function (r) {
+        var items = (((r.data || {}).searchV2 || {}).topResultsV2 || {}).itemsV2 || [];
+        return items.map(function (x) {
+          var w = x.item, d = w && w.data;
+          if (!d) return null;
+          var c = card(w);
+          if (!c) return null;
+          if (d.__typename === 'Track') { c.subtitle = '曲 • ' + names(d.artists); c.kind = 'track'; }
+          else if (d.__typename === 'Album') { c.subtitle = (d.type === 'SINGLE' ? 'シングル' : 'アルバム') + ' • ' + names(d.artists); }
+          else if (d.__typename === 'Playlist') c.subtitle = 'プレイリスト';
+          return c;
+        }).filter(Boolean);
+      });
+    },
+    library: function () {
+      var lib = service('LibraryAPI');
+      return Promise.resolve(lib.getContents({ limit: 300, offset: 0 })).then(function (c) {
+        return (c.items || []).map(function (x) {
+          var img = x.images && x.images.slice().sort(function (p, q) { return (p.width || 300) - (q.width || 300); }).find(function (i) { return (i.width || 300) >= 150; });
+          var kind = x.type === 'artist' ? 'アーティスト' : x.type === 'album' ? 'アルバム' : x.type === 'show' ? 'ポッドキャスト' : x.type === 'folder' ? 'フォルダ' : 'プレイリスト';
+          var by = x.owner && x.owner.name || (x.artists && x.artists.map(function (z) { return z.name; }).join(', ')) || '';
+          if (x.type === 'liked-songs' || /:collection$/.test(x.uri)) { kind = 'プレイリスト'; }
+          return { uri: x.uri, title: x.name, subtitle: kind + (by ? ' • ' + by : ''), image: img && img.url || (x.images && x.images[0] && x.images[0].url) || '', round: x.type === 'artist', pinned: !!x.pinned };
+        });
+      });
+    },
+    liked: function () {
+      var lib = service('LibraryAPI');
+      return Promise.resolve(lib.getTracks({ limit: 500, offset: 0 })).then(function (c) {
+        return (c.items || []).map(function (t) {
+          return { uri: t.uri, title: t.name, artist: (t.artists || []).map(function (z) { return z.name; }).join(', '), image: (t.album && t.album.images && (t.album.images[1] || t.album.images[0]) || {}).url || '', dur: t.duration && t.duration.milliseconds || 0 };
+        });
+      });
+    },
+    follow: function (a) {
+      var lib = service('LibraryAPI');
+      return Promise.resolve(a.on ? lib.add({ uris: [a.uri] }) : lib.remove({ uris: [a.uri] })).then(function () { return true; });
+    },
     play: function (a) {
       var p = service('PlayerAPI');
       var opts = a.track ? { skipTo: { uri: a.track } } : {};
