@@ -90,7 +90,7 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
             web.evaluateJavascript("window.__mb && __mb.call($id, ${JSONObject.quote(method)}, $args)", null)
         }
         return try {
-            withTimeout(20_000) { done.await() }
+            withTimeout(40_000) { done.await() }
         } finally {
             pending.remove(id)
         }
@@ -248,6 +248,15 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     suspend fun createPlaylist(name: String) = (call("createPlaylist", JSONObject().put("name", name)) as? String ?: "").also { libraryVersion.intValue++ }
     suspend fun createFolder(name: String) = call("createFolder", JSONObject().put("name", name)).also { libraryVersion.intValue++ }
     suspend fun pause() = call("pause")
+
+    /** 名前（null なら変えない）と写真（JPEG、null なら変えない）を保存 */
+    suspend fun editProfile(name: String?, jpeg: ByteArray?) = call(
+        "editProfile",
+        JSONObject().apply {
+            if (name != null) put("name", name)
+            if (jpeg != null) put("image", android.util.Base64.encodeToString(jpeg, android.util.Base64.NO_WRAP))
+        },
+    ) == true
 
     data class User(val name: String, val image: String)
 

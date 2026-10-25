@@ -188,7 +188,8 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             TabBar(tab) { if (it == tab) stacks[it]!!.clear() else tab = it }
         }
         AnimatedVisibility(profileOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
-            ProfileScreen(bridge, user, onBack = { profileOpen = false }, onOpen = { c -> profileOpen = false; open(c) })
+            ProfileScreen(bridge, user, onBack = { profileOpen = false }, onOpen = { c -> profileOpen = false; open(c) },
+                onEdited = { scope.launch { runCatching { bridge.user() }.getOrNull()?.let { user = it } } })
         }
         AnimatedVisibility(settingsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             SettingsScreen(bridge, host, user, onBack = { settingsOpen = false })

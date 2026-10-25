@@ -279,9 +279,12 @@ private fun CreateRow(icon: androidx.compose.ui.graphics.vector.ImageVector, tit
 
 /** プロフィール：アイコン・名前・フォロワー、公開プレイリスト、最近聴いたアーティスト */
 @Composable
-fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen: (Card) -> Unit) {
+fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen: (Card) -> Unit, onEdited: () -> Unit = {}) {
     var p by remember { mutableStateOf<Bridge.Profile?>(null) }
-    LaunchedEffect(Unit) { p = runCatching { bridge.profile() }.getOrNull() }
+    var reload by remember { mutableStateOf(0) }
+    var editing by remember { mutableStateOf(false) }
+    LaunchedEffect(reload) { p = runCatching { bridge.profile() }.getOrNull() ?: p }
+    if (editing) EditProfileSheet(bridge, p?.name ?: user?.name ?: "", p?.image ?: user?.image ?: "", onDone = { reload++; onEdited() }) { editing = false }
     val tint = rememberArtColorPublic(p?.image ?: user?.image ?: "")
     LazyColumn(
         Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {},
@@ -297,6 +300,10 @@ fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen
                         p?.let { Text("${it.followers}人のフォロワー • ${it.following}人をフォロー中", color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp)) }
                     }
                 }
+                Text(
+                    "編集", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp).clip(CircleShape).background(Color(0x33FFFFFF)).clickable { editing = true }.padding(horizontal = 16.dp, vertical = 7.dp),
+                )
             }
         }
         p?.let { pr ->
@@ -321,4 +328,54 @@ private fun ProfileRow(c: Card, onClick: () -> Unit) {
             Text(c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1)
         }
     }
+}
+
+
+/** プロフィールを編集（公式アプリと同じ：写真をタップして変更、名前を入力して保存） */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditProfileSheet(bridge: Bridge, name0: String, image0: String, onDone: () -> Unit, onDismiss: () -> Unit) {
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    var name by remember { mutableStateOf(name0) }
+    var picked by remember { mutableStateOf<android.net.Uri?>(null) }
+    var saving by remember { mutableStateOf(false) }
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { u -> if (u != null) picked = u }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424), dragHandle = { Grip() }) {
+        Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("プロフィールを編集", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(8.dp))
+            Box(Modifier.padding(16.dp).size(150.dp).clip(CircleShape).background(Card2).clickable { pick.launch("image/*") }, contentAlignment = Alignment.Center) {
+                AsyncImage(picked ?: image0, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+            Text("写真を変更", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { pick.launch("image/*") }.padding(8.dp))
+            Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("名前", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(72.dp))
+                BasicTextField(name, { name = it.take(30) }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 16.sp), cursorBrush = SolidColor(Accent),
+                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).background(Color(0xFF3A3A3A)).padding(horizontal = 12.dp, vertical = 10.dp))
+            }
+            Text(
+                if (saving) "保存中…" else "保存", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clip(CircleShape).background(Color.White).clickable(enabled = !saving && name.isNotBlank()) {
+                    saving = true
+                    scope.launch {
+                        val jpeg = picked?.let { u -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { toJpeg(ctx, u) }.getOrNull() } }
+                        val ok = runCatching { bridge.editProfile(name.trim().takeIf { it != name0 }, jpeg) }.getOrDefault(false)
+                        saving = false
+                        Toast.makeText(ctx, if (ok) "プロフィールを更新しました" else "保存できませんでした", Toast.LENGTH_SHORT).show()
+                        if (ok) { onDone(); state.hide(); onDismiss() }
+                    }
+                }.padding(horizontal = 36.dp, vertical = 12.dp),
+            )
+        }
+    }
+}
+
+/** 選んだ写真を 640px 以下の正方形の JPEG にする（端末には保存しない） */
+private fun toJpeg(ctx: android.content.Context, u: android.net.Uri): ByteArray {
+    val src = ctx.contentResolver.openInputStream(u)!!.use { android.graphics.BitmapFactory.decodeStream(it) }
+    val side = minOf(src.width, src.height)
+    val sq = android.graphics.Bitmap.createBitmap(src, (src.width - side) / 2, (src.height - side) / 2, side, side)
+    val out = android.graphics.Bitmap.createScaledBitmap(sq, minOf(640, side), minOf(640, side), true)
+    return java.io.ByteArrayOutputStream().also { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
 }

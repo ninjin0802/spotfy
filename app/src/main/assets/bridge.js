@@ -329,6 +329,46 @@
     unqueue: function (a) { return Promise.resolve(service('PlayerAPI').removeFromQueue([{ uri: a.uri, uid: a.uid }])).then(function () { return true; }); },
     createPlaylist: function (a) { return Promise.resolve(service('RootlistAPI').createPlaylist(a.name, { before: 'start' })).then(function (uri) { return uri || ''; }); },
     createFolder: function (a) { return Promise.resolve(service('RootlistAPI').createFolder(a.name, { before: 'start' })).then(function () { return true; }); },
+    // プロフィールの名前と写真を変える（Web Player 自身の編集画面を裏で操作する。写真は JPEG の base64）
+    editProfile: function (a) {
+      var w = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+      var back = location.pathname;
+      function go(path) { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate', { state: {} })); }
+      function find(sel, n) { return new Promise(function (res, rej) { (function t(k) { var e = document.querySelector(sel); if (e) return res(e); if (k > (n || 50)) return rej(new Error('not found ' + sel)); setTimeout(function () { t(k + 1); }, 100); })(0); }); }
+      return Promise.resolve(service('UserAPI').getUser()).then(function (me) {
+        go('/user/' + me.username);
+        return find('main [data-testid="edit-image-button"]', 80);
+      }).then(function (btn) {
+        btn.click();
+        return find('[data-testid="user-edit-name-input"]');
+      }).then(function (input) {
+        var form = input.closest('form');
+        if (a.name != null) {
+          var set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+          set.call(input, a.name);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        var step = Promise.resolve();
+        if (a.image) {
+          var bin = atob(a.image), bytes = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          var file = new File([bytes], 'profile.jpg', { type: 'image/jpeg' });
+          var fi = form.querySelector('input[type="file"]');
+          var dt = new DataTransfer(); dt.items.add(file);
+          fi.files = dt.files;
+          fi.dispatchEvent(new Event('change', { bubbles: true }));
+          step = w(1500);
+        }
+        return step.then(function () {
+          var save = [].find.call(form.querySelectorAll('button[type="submit"]'), function (b) { return /保存|Save/.test(b.textContent); });
+          if (!save) throw new Error('no save');
+          save.click();
+          return w(2500);
+        });
+      }).then(function () { go(back); return true; }, function (e) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); go(back); throw e;
+      });
+    },
     library: function () {
       var lib = service('LibraryAPI');
       return Promise.resolve(lib.getContents({ limit: 300, offset: 0 })).then(function (c) {
