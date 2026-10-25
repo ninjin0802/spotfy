@@ -7,8 +7,11 @@
 [![Release](https://img.shields.io/github/v/release/ninjin0802/spotfy?label=release&color=1ed760)](https://github.com/ninjin0802/spotfy/releases/latest)
 ![Android](https://img.shields.io/badge/Android-8.0%2B-3ddc84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7f52ff?logo=kotlin&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 [**⬇ 最新の APK をダウンロード**](https://github.com/ninjin0802/spotfy/releases/latest)
+
+**日本語** | [English](README.en.md)
 
 </div>
 
@@ -95,6 +98,10 @@ keyPassword=...
 | Android Gradle Plugin | 8.13 |
 | Kotlin | 2.2 |
 | 依存ライブラリ | `androidx.webkit`、Jetpack Compose、Coil、Palette |
+
+## ライセンス
+
+[MIT](LICENSE)
 
 ## 免責事項
 
