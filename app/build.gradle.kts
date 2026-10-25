@@ -14,8 +14,8 @@ android {
         applicationId = "com.ninjin.spotifyweb"
         minSdk = 26
         targetSdk = 36
-        versionCode = 113
-        versionName = "2.0.0-alpha14"
+        versionCode = 200
+        versionName = "2.0.0"
     }
     buildFeatures { buildConfig = true; compose = true }
     // 署名鍵の情報はリポジトリの外（~/.config/spotfy/keystore.properties）に置く
