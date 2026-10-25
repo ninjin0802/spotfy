@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# リリース：VERSION の版でビルドし、タグを付けて main とタグを push、GitHub Releases に APK を上げる。
-# 使い方: scripts/release.sh   （前もって VERSION を上げ、CHANGELOG.md に「## <版>」の節を書いてコミットしておく）
+# リリース：VERSION の版でビルドし、タグを付けて push、GitHub Releases に APK を上げる。
+# 使い方: scripts/release.sh
+#   前もって VERSION を上げ、CHANGELOG.md に「## <版>」の節を書き、PR で main に入れておく（CI が通ったものだけ main に入る）。
+#   main に入ったコミットからだけリリースできる。
 # GitHub の操作は GH_TOKEN（ninjin0802 のトークン）で行う。
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -13,7 +15,7 @@ repo="ninjin0802/spotfy"
 [[ -z "$(git status --porcelain)" ]] || { echo "コミットしていない変更があります" >&2; exit 1; }
 git fetch -q origin main --tags
 if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then echo "$tag はもうあります。VERSION を上げてください" >&2; exit 1; fi
-git merge-base --is-ancestor origin/main HEAD || { echo "origin/main から分かれています。先に main を取り込んでください" >&2; exit 1; }
+[[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || { echo "今のコミットが origin/main と違います。PR を main にマージしてから、main の最新でリリースしてください" >&2; exit 1; }
 
 # CHANGELOG の「## 2.0.9」から次の「## 」までをリリースノートにする
 notes=$(awk -v v="$version" '$0 ~ "^## " { if (found) exit; found = ($2 == v); next } found' CHANGELOG.md | sed '/./,$!d')
@@ -27,6 +29,6 @@ apk="build/spotfy-$version.apk"
 cp app/build/outputs/apk/release/app-release.apk "$apk"
 
 git tag -a "$tag" -m "$tag"
-git push origin HEAD:main "$(git rev-parse --abbrev-ref HEAD)" "$tag"
+git push origin "$tag"
 gh release create "$tag" "$apk" -R "$repo" --title "$tag" --notes "$notes"
 echo "リリースしました: https://github.com/$repo/releases/tag/$tag"

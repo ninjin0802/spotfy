@@ -44,7 +44,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // CI には署名鍵が無いので、テスト用にデバッグ鍵で署名する（配布用の APK は手元の release.sh で作る）
             signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug").takeIf { System.getenv("CI") == "true" }
         }
     }
     compileOptions {

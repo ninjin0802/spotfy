@@ -1,0 +1,72 @@
+# main への push と PR で、ビルドとエミュレーターでのスモークテストを行う
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: bridge.js / polyfill.js の構文チェック
+        run: |
+          node --check app/src/main/assets/bridge.js
+          node --check app/src/main/assets/polyfill.js
+      - name: スクリプトの構文チェック
+        run: bash -n scripts/*.sh
+      - name: ビルド（リリース設定、CI ではデバッグ鍵で署名）
+        run: ./gradlew assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app/build/outputs/apk/release/app-release.apk
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Android 15（新しい WebView）
+            api: 35
+            target: google_apis
+            cases: modern
+          - name: Android 8（WebView なし）
+            api: 26
+            target: default
+            cases: old
+    name: smoke (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+      - name: KVM を使えるようにする
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect
+          script: SMOKE_SERIAL=emulator-5554 SMOKE_CASES=${{ matrix.cases }} scripts/smoke-test.sh app-release.apk
