@@ -184,7 +184,7 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
                 // このスマホ（いま出している先：スピーカー／イヤホン）
                 DeviceRow(
                     if (out.isNotEmpty()) DevIcons.headphones else DevIcons.phone, "このスマホ",
-                    when { busy == d.self -> "接続中…"; d.active == d.self -> "再生中" + (if (out.isNotEmpty()) " • $out" else ""); else -> "Spotify Web Player" },
+                    when { busy == d.self -> "接続中…"; d.active == d.self -> "再生中" + (if (out.isNotEmpty()) " • $out" else ""); else -> "このスマホで再生" },
                     d.active == d.self,
                 ) {
                     if (d.active == d.self) close() else { busy = d.self; scope.launch { val ok = runCatching { bridge.transfer(d.self) }.getOrDefault(false); busy = null; if (ok) close() else failed = d.self } }

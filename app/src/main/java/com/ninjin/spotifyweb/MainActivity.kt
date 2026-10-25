@@ -271,6 +271,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var bridge: Bridge
     private lateinit var composeView: ComposeView
 
+    /** ほかの機器から見たこのスマホの名前（設定の「端末名」、なければ機種名） */
+    private fun deviceName(): String =
+        runCatching { android.provider.Settings.Global.getString(contentResolver, android.provider.Settings.Global.DEVICE_NAME) }.getOrNull()
+            ?.takeIf { it.isNotBlank() } ?: Build.MODEL
+
     /** Spotify のログイン Cookie（sp_dc）があるか */
     private fun isLoggedIn(): Boolean =
         CookieManager.getInstance().getCookie(HOME_URL)?.split(';')?.any { it.trim().startsWith("sp_dc=") } == true
@@ -445,7 +450,8 @@ class MainActivity : ComponentActivity() {
                     "values",
                     JSONObject().put("orientation", settings.getString("orientation", "portrait"))
                         .put("background", settings.getString("background", "true"))
-                        .put("webdebug", settings.getString("webdebug", "false")),
+                        .put("webdebug", settings.getString("webdebug", "false"))
+                        .put("deviceName", deviceName()),
                 ).toString()
             )
             "setting" -> {

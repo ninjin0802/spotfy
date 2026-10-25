@@ -131,6 +131,11 @@
     new Headers((init && init.headers) || undefined).forEach(function (v, k) { headers.set(k, v); });
     var bodyReady = body == null && req && method !== 'GET' && method !== 'HEAD' ? req.text() : Promise.resolve(body);
     return bodyReady.then(function (b) {
+      // ほかの機器から見たこのスマホの名前を「Web Player (Chrome)」ではなく端末名に、種類もスマホにする
+      if (typeof b === 'string' && b.indexOf('Web Player') >= 0) {
+        var dn = (window.__native && __native.getSetting('deviceName', '')) || '';
+        if (dn) b = b.replace(/"name"\s*:\s*"Web Player[^"]*"/g, '"name":' + JSON.stringify(dn));
+      }
       return new Promise(function (resolve, reject) {
         var id = ++seq;
         pending[id] = { resolve: resolve, reject: reject };
