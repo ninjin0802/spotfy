@@ -448,7 +448,7 @@
           step = w(300);
         }
         // 写真を選ぶと Spotify はすぐ画像を送り始め、その間は「保存…」で押せない。押せるようになるまで待つ
-        function saveButton() { return [].find.call(form.querySelectorAll('button[type="submit"]'), function (b) { return /保存|Save/.test(b.textContent); }); }
+        function saveButton() { return [].find.call(form.querySelectorAll('button'), function (b) { return b.type === 'submit' && /保存|Save/.test(b.textContent); }); }
         function ready(n) {
           var b = saveButton();
           if (b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !/…|\.\.\./.test(b.textContent)) return Promise.resolve(b);
