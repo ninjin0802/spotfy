@@ -47,7 +47,8 @@ import kotlinx.coroutines.launch
 
 /** 「⋮」で開くメニューの対象 */
 sealed interface MenuTarget {
-    data class OfTrack(val track: Track) : MenuTarget
+    /** liked：分かっていればお気に入りかどうか（お気に入りの曲のページなら true） */
+    data class OfTrack(val track: Track, val liked: Boolean? = null) : MenuTarget
     data class OfPage(val uri: String, val title: String, val subtitle: String, val image: String, val artistUri: String, val artist: String) : MenuTarget
 }
 
@@ -77,19 +78,30 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
             when (target) {
                 is MenuTarget.OfTrack -> {
                     val t = target.track
-                    var info by remember(t.uri) { mutableStateOf<Bridge.TrackInfo?>(null) }
-                    LaunchedEffect(t.uri) { info = runCatching { bridge.trackInfo(t.uri) }.getOrNull() }
+                    // 項目は最初から全部出しておく（あとから増えるとシートの高さが変わってガタつくため）。
+                    // アルバム・アーティスト・お気に入りかどうかは裏で調べ、押されたらその結果を待って動く
+                    val info = remember(t.uri) { kotlinx.coroutines.CompletableDeferred<Bridge.TrackInfo?>() }
+                    var liked by remember(t.uri) { mutableStateOf(target.liked) }
+                    LaunchedEffect(t.uri) {
+                        val i2 = runCatching { bridge.trackInfo(t.uri) }.getOrNull()
+                        if (i2 != null) liked = i2.liked
+                        info.complete(i2)
+                    }
                     Header(t.image, t.title, t.artist, false)
                     Item(MenuIcons.share, "シェア") { close { host.share("https://open.spotify.com/track/" + t.uri.substringAfterLast(':'), t.title) } }
-                    val liked = info?.liked == true
-                    LikedItem(if (liked) "お気に入りの曲から削除" else "お気に入りの曲に追加") {
-                        close { scope.launch { runCatching { bridge.like(t.uri, !liked) }.onSuccess { toast(if (liked) "お気に入りの曲から削除しました" else "お気に入りの曲に追加しました") } } }
+                    LikedItem(if (liked == true) "お気に入りの曲から削除" else "お気に入りの曲に追加") {
+                        val was = liked == true
+                        close { scope.launch { runCatching { bridge.like(t.uri, !was) }.onSuccess { toast(if (was) "お気に入りの曲から削除しました" else "お気に入りの曲に追加しました") } } }
                     }
                     Item(MenuIcons.queue, "[次に再生] に追加") {
                         close { scope.launch { runCatching { bridge.addToQueue(t.uri) }.onSuccess { toast("[次に再生] に追加しました") } } }
                     }
-                    info?.takeIf { it.album.isNotEmpty() }?.let { i -> Item(MenuIcons.album, "アルバムに移動") { close { onOpen(Card(i.album, i.albumName, "", "", false)) } } }
-                    info?.takeIf { it.artist.isNotEmpty() }?.let { i -> Item(MenuIcons.artist, "アーティストに移動") { close { onOpen(Card(i.artist, i.artistName, "", "", true)) } } }
+                    Item(MenuIcons.album, "アルバムに移動") {
+                        scope.launch { info.await()?.takeIf { it.album.isNotEmpty() }?.let { i2 -> close { onOpen(Card(i2.album, i2.albumName, "", "", false)) } } ?: toast("アルバムが見つかりませんでした") }
+                    }
+                    Item(MenuIcons.artist, "アーティストに移動") {
+                        scope.launch { info.await()?.takeIf { it.artist.isNotEmpty() }?.let { i2 -> close { onOpen(Card(i2.artist, i2.artistName, "", "", true)) } } ?: toast("アーティストが見つかりませんでした") }
+                    }
                 }
                 is MenuTarget.OfPage -> {
                     var inLib by remember(target.uri) { mutableStateOf<Boolean?>(null) }

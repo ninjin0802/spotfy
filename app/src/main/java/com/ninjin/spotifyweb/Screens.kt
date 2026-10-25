@@ -140,7 +140,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                 }
             }
             itemsIndexed(p.tracks, key = { i, t -> "$i${t.uri}" }) { i, t ->
-                TrackRow(t, if (p.kind == "artist") (i + 1).toString() else null, playing.uri == t.uri, onMore = { onMenu(MenuTarget.OfTrack(t)) }) {
+                TrackRow(t, if (p.kind == "artist") (i + 1).toString() else null, playing.uri == t.uri, onMore = { onMenu(MenuTarget.OfTrack(t, if (p.uri.contains(":collection")) true else null)) }) {
                     scope.launch { runCatching { if (p.kind == "artist") bridge.play(t.uri) else bridge.play(p.uri, t.uri) } }
                 }
             }
