@@ -1,0 +1,9 @@
+<resources>
+    <!-- 起動時の画面（スプラッシュ）も黒にして、白く光らないようにする -->
+    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowSplashScreenBackground">#121212</item>
+    </style>
+</resources>

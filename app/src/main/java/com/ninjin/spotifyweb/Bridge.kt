@@ -108,7 +108,10 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
             }
             "bstate" -> {
                 val v = m.optJSONObject("value") ?: JSONObject()
-                _player.value = parseState(v)
+                // 起動直後の Web Player はまだ曲を読み込んでおらず「曲なし」と言ってくる。
+                // そのたびにミニプレーヤーを消すと、出て→消えて→また出るので、前の曲を一時停止のまま出しておく
+                if (!v.optBoolean("has") && _player.value.has) _player.value = _player.value.copy(playing = false)
+                else _player.value = parseState(v)
                 // 次の起動ですぐミニプレーヤーを出せるよう、曲名と画像だけ覚えておく（一時停止の状態で出す）
                 if (v.optBoolean("has")) cache.edit().putString("player", v.put("playing", false).toString()).apply()
             }
