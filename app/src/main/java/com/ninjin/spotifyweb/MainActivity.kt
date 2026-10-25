@@ -24,19 +24,14 @@ import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.webkit.CookieManager
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 import androidx.webkit.JavaScriptReplyProxy
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.webkit.UserAgentMetadata
-import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 
@@ -100,41 +95,7 @@ class MainActivity : ComponentActivity() {
             insets
         }
 
-        with(webView.settings) {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            mediaPlaybackRequiresUserGesture = false
-            cacheMode = WebSettings.LOAD_DEFAULT
-            // モバイル UA だとアプリのダウンロード案内に飛ばされるため、デスクトップ Chrome を名乗る
-            userAgentString = DESKTOP_UA
-        }
-        // UA 文字列だけでなく Client Hints (navigator.userAgentData / Sec-CH-UA) も
-        // デスクトップ Windows を名乗らないと、Web Player が再生デバイスとして動作しない
-        // WebView が付ける X-Requested-With ヘッダーでアプリ内ブラウザだと判定されないようにする
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
-            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(webView.settings, emptySet())
-        }
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
-            WebSettingsCompat.setUserAgentMetadata(
-                webView.settings,
-                UserAgentMetadata.Builder()
-                    .setBrandVersionList(
-                        listOf(
-                            UserAgentMetadata.BrandVersion.Builder().setBrand("Google Chrome")
-                                .setMajorVersion(CHROME_MAJOR).setFullVersion("$CHROME_MAJOR.0.0.0").build(),
-                            UserAgentMetadata.BrandVersion.Builder().setBrand("Chromium")
-                                .setMajorVersion(CHROME_MAJOR).setFullVersion("$CHROME_MAJOR.0.0.0").build(),
-                        )
-                    )
-                    .setFullVersion("$CHROME_MAJOR.0.0.0")
-                    .setPlatform("Windows")
-                    .setPlatformVersion("15.0.0")
-                    .setArchitecture("x86")
-                    .setModel("")
-                    .setMobile(false)
-                    .build()
-            )
-        }
+        SpotifyWebView.configure(webView)
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.addWebMessageListener(webView, "AndroidBridge", setOf(SPOTIFY_ORIGIN)) { _, message, sourceOrigin, isMainFrame, reply ->
                 if (isMainFrame && sourceOrigin.toString() == SPOTIFY_ORIGIN) message.data?.let { onPageMessage(it, reply) }
@@ -164,7 +125,7 @@ class MainActivity : ComponentActivity() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
                 if (!nativeUi) return null
                 val host = request.url.host ?: return null
-                traceSpotifyRequest(host, request.url)
+                debug.traceRequest(host, request.url)
                 val skip = host == "i.scdn.co" || host == "mosaic.scdn.co" || host == "image-cdn-ak.spotifycdn.com" || host == "image-cdn-fa.spotifycdn.com" ||
                     host == "pickasso.spotifycdn.com" || host == "canvaz.scdn.co" || host.endsWith("video.spotifycdn.com") || host == "seed-mix-image.spotifycdn.com"
                 return if (skip) android.webkit.WebResourceResponse("text/plain", "utf-8", 204, "No Content", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0))) else null
@@ -262,41 +223,6 @@ class MainActivity : ComponentActivity() {
     private fun isSpotifyUrl(uri: Uri) = uri.scheme == "https" && uri.host == "open.spotify.com"
 
 
-    private fun isRelayable(url: String, method: String): Boolean {
-        if (method !in RELAY_METHODS || !RELAY_URL.matches(url)) return false
-        val parsed = runCatching { URL(url) }.getOrNull() ?: return false
-        return parsed.protocol == "https" && parsed.userInfo == null &&
-            (parsed.host == "spotify.com" || parsed.host.endsWith(".spotify.com"))
-    }
-
-    private fun sendRelayed(url: String, method: String, headers: JSONObject, body: String?): Triple<Int, String?, String> {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = method
-            // リダイレクト先に Cookie を渡さない
-            conn.instanceFollowRedirects = false
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 30_000
-            headers.keys().forEach { key ->
-                if (key.lowercase() !in SKIPPED_HEADERS) conn.setRequestProperty(key, headers.getString(key))
-            }
-            conn.setRequestProperty("User-Agent", DESKTOP_UA)
-            conn.setRequestProperty("Origin", "https://open.spotify.com")
-            conn.setRequestProperty("Referer", "https://open.spotify.com/")
-            CookieManager.getInstance().getCookie(url)?.let { conn.setRequestProperty("Cookie", it) }
-            if (body != null) {
-                conn.doOutput = true
-                conn.outputStream.use { it.write(body.toByteArray()) }
-            }
-            val status = conn.responseCode
-            val stream = if (status >= 400) conn.errorStream else conn.inputStream
-            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            return Triple(status, conn.contentType, text)
-        } finally {
-            conn.disconnect()
-        }
-    }
-
     private fun finishRelay(reply: JavaScriptReplyProxy, id: Int, status: Int, type: String?, text: String) = runOnUiThread {
         reply.postMessage(
             JSONObject().put("type", "relay").put("id", id).put("status", status)
@@ -370,31 +296,6 @@ class MainActivity : ComponentActivity() {
 
     /** ログイン済みで open.spotify.com を開いているときだけアプリの画面を出す（ログインページは Web のまま見せる） */
     @Volatile private var nativeUi = false
-    @Volatile private var adPlaybackActive = false
-    private val seenRequestPaths = java.util.Collections.synchronizedSet(HashSet<String>())
-    @Volatile private var adPathTraceCount = 0
-
-    /**
-     * 広告を決める API を探すため、spotify.com へのリクエストの形（ホスト＋パス先頭 3 段）を記録する。
-     * ID っぽい段は * に置き換え、クエリは残さない。同じ形は 1 回だけ、広告らしいパスは毎回（上限あり）。
-     */
-    private fun traceSpotifyRequest(host: String, url: Uri) {
-        if (!host.endsWith("spotify.com") || host == "open.spotify.com" && url.pathSegments.firstOrNull() != "api") return
-        if (adPathTraceCount >= 150 && seenRequestPaths.size >= 400) return
-        val segs = url.pathSegments.take(3).map { seg ->
-            if (seg.length > 20 || seg.any { it.isDigit() } && seg.length > 8) "*" else seg.take(40)
-        }
-        val key = host + "/" + segs.joinToString("/")
-        val adLike = AD_PATH.containsMatchIn(url.path.orEmpty())
-        val tag = if (adPlaybackActive) " [ad]" else ""
-        if (adLike && adPathTraceCount < 150) {
-            adPathTraceCount++
-            recordDebug("net.adpath", key + tag)
-        } else if (seenRequestPaths.size < 400 && seenRequestPaths.add(key)) {
-            recordDebug("net", key + tag)
-        }
-    }
-
     private fun updateSurface(url: String? = webView.url) {
         val onSpotify = url == null || isSpotifyUrl(Uri.parse(url))
         nativeUi = isLoggedIn() && onSpotify
@@ -423,14 +324,14 @@ class MainActivity : ComponentActivity() {
         override fun outputSwitch() = showOutputSwitcher()
         override fun outputName() = currentOutputName()
         override fun shareDebugLog() {
-            val log = debugLog().joinToString("\n").ifBlank { "No playback debug events recorded." }
+            val log = debug.lines().joinToString("\n").ifBlank { "No playback debug events recorded." }
             shareText("spotfy ${BuildConfig.VERSION_NAME} debug log\n$log", "デバッグログを共有", subject = "spotfy debug log")
         }
         override fun logout() {
             // Cookie を消して最初からログインページへ
             // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ、デバッグログ）も消し、画面を作り直す
             getSharedPreferences("cache", MODE_PRIVATE).edit().clear().apply()
-            clearDebugLog()
+            debug.clear()
             android.webkit.WebStorage.getInstance().deleteAllData()
             CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush(); webView.post { recreate() } }
         }
@@ -535,8 +436,8 @@ class MainActivity : ComponentActivity() {
             "bhealth" -> recordDebug("bridge.health", bridge.missing.value.joinToString(", ").ifEmpty { "ok" })
             "debug" -> {
                 val event = m.optString("event")
-                if (event == "ad.detected") adPlaybackActive = true
-                if (event == "ad.state.ended" || event == "ad.state.blocking_off") adPlaybackActive = false
+                if (event == "ad.detected") debug.adPlaying = true
+                if (event == "ad.state.ended" || event == "ad.state.blocking_off") debug.adPlaying = false
                 recordDebug(event, m.optString("detail"))
             }
             "playing" -> setPlaying(m.optBoolean("value"))
@@ -556,13 +457,13 @@ class MainActivity : ComponentActivity() {
                 val id = m.optInt("id")
                 val url = m.optString("url")
                 val method = m.optString("method")
-                if (!isRelayable(url, method)) return finishRelay(reply, id, 0, null, "")
+                if (!ConnectRelay.isRelayable(url, method)) return finishRelay(reply, id, 0, null, "")
                 val headers = m.optJSONObject("headers") ?: JSONObject()
                 val body = if (m.isNull("body")) null else m.optString("body")
                 // Connect 操作を X-Requested-With を付けずに端末から直接送る
                 relayExecutor.execute {
                     val (status, type, text) = try {
-                        sendRelayed(url, method, headers, body)
+                        ConnectRelay.send(url, method, headers, body)
                     } catch (e: Exception) {
                         Triple(0, null, "")
                     }
@@ -575,42 +476,12 @@ class MainActivity : ComponentActivity() {
     /** adb から `am start --ez dumpDebugLog true` で起こされたら、保存済みのログ全体を logcat に流す */
     private fun dumpDebugLogIfAsked(intent: Intent?): Boolean {
         if (intent?.getBooleanExtra("dumpDebugLog", false) != true) return false
-        val lines = debugLog()
-        android.util.Log.i(DEBUG_TAG, "---- dump begin (${lines.size} lines) ----")
-        lines.forEach { android.util.Log.i(DEBUG_TAG, it) }
-        android.util.Log.i(DEBUG_TAG, "---- dump end ----")
+        debug.dumpToLogcat()
         return true
     }
 
-    /**
-     * 広告処理などの直近イベント。1 行ごとに設定を書き直すと重いので、手元に溜めて少し後にまとめて保存し、
-     * あとから共有・adb で取り出せるようにする。
-     */
-    private val debugLines by lazy {
-        ArrayDeque(settings.getString("debug.log", "").orEmpty().lines().filter { it.isNotBlank() }.takeLast(DEBUG_LINES))
-    }
-    private val saveDebugLog = Runnable { synchronized(debugLines) { settings.edit().putString("debug.log", debugLines.joinToString("\n")).apply() } }
-
-    private fun debugLog(): List<String> = synchronized(debugLines) { debugLines.toList() }
-
-    private fun clearDebugLog() {
-        synchronized(debugLines) { debugLines.clear() }
-        stopHandler.removeCallbacks(saveDebugLog)
-        settings.edit().remove("debug.log").apply()
-    }
-
-    private fun recordDebug(event: String, detail: String = "") {
-        val safeEvent = event.filter { it.isLetterOrDigit() || it in "._-" }.take(64).ifBlank { "unknown" }
-        val safeDetail = detail.replace('\r', ' ').replace('\n', ' ').replace('\t', ' ').take(160)
-        val line = "${DEBUG_STAMP.format(java.time.LocalDateTime.now())} $safeEvent $safeDetail"
-        android.util.Log.i(DEBUG_TAG, line)
-        synchronized(debugLines) {
-            debugLines.addLast(line)
-            while (debugLines.size > DEBUG_LINES) debugLines.removeFirst()
-        }
-        stopHandler.removeCallbacks(saveDebugLog)
-        stopHandler.postDelayed(saveDebugLog, 3_000)
-    }
+    private val debug by lazy { DebugLog(settings) }
+    private fun recordDebug(event: String, detail: String = "") = debug.record(event, detail)
 
     private fun shareText(text: String, chooserTitle: String?, subject: String? = null) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
@@ -651,8 +522,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        stopHandler.removeCallbacks(saveDebugLog)
-        saveDebugLog.run()
+        debug.flush()
         // バックグラウンド再生をオフにしている場合は裏に回ったら一時停止する
         if (!backgroundPlayback) pausePlayback()
     }
@@ -680,17 +550,6 @@ class MainActivity : ComponentActivity() {
         private const val LOGIN_URL = "https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F"
         private const val REQUEST_FILE = 42
         private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
-        private val RELAY_URL = Regex("^https://([a-z0-9-]+\\.)*spotify\\.com/(connect-state|track-playback)/v1/[^#]*$")
-        private const val DEBUG_TAG = "spotfy-debug"
-        private const val DEBUG_LINES = 800
-        private val DEBUG_STAMP = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
         private const val BG = 0xFF121212.toInt()
-        private val AD_PATH = Regex("/(ads?|ad-logic|adlogic|ad-?break|sponsor[a-z-]*|instream[a-z-]*|slots?)(/|$)", RegexOption.IGNORE_CASE)
-        private val RELAY_METHODS = setOf("GET", "POST", "PUT", "DELETE")
-        private val SKIPPED_HEADERS = setOf("host", "content-length", "cookie", "user-agent", "x-requested-with")
-        private const val CHROME_MAJOR = "141"
-        private const val DESKTOP_UA =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
-                "Chrome/$CHROME_MAJOR.0.0.0 Safari/537.36"
     }
 }
