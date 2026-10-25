@@ -393,14 +393,25 @@ class MainActivity : Activity() {
         }
     }
 
+    // 曲の切り替わりで一瞬「停止」になってもサービスを止めない（止めると裏では起動し直せず、そこで再生が止まる）
+    private val stopHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val stopService = Runnable {
+        serviceRunning = false
+        PlaybackService.stop(this)
+    }
+
     private fun setPlaying(playing: Boolean) {
-        if (playing == serviceRunning) return
-        serviceRunning = playing
-        if (playing && backgroundPlayback) {
+        PlaybackService.hold(this, playing)
+        if (playing) {
+            stopHandler.removeCallbacks(stopService)
+            if (serviceRunning || !backgroundPlayback) return
+            serviceRunning = true
             // バックグラウンドからは起動できない（再生中に裏へ回った場合は既に起動済み）
             if (!PlaybackService.start(this)) serviceRunning = false
-        } else {
-            PlaybackService.stop(this)
+        } else if (serviceRunning) {
+            // 一時停止してから 10 分たったらサービスを止める
+            stopHandler.removeCallbacks(stopService)
+            stopHandler.postDelayed(stopService, 10 * 60 * 1000L)
         }
     }
 

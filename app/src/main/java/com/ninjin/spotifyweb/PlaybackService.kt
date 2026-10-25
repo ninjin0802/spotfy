@@ -8,7 +8,9 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.wifi.WifiManager
 import android.os.IBinder
+import android.os.PowerManager
 
 /** WebView の再生をバックグラウンドで継続させるためのフォアグラウンドサービス */
 class PlaybackService : Service() {
@@ -44,6 +46,7 @@ class PlaybackService : Service() {
         MediaControls.instance?.post()
         foregrounded = false
         stopRequested = false
+        hold(this, false)
         super.onDestroy()
     }
 
@@ -54,6 +57,30 @@ class PlaybackService : Service() {
         fun start(context: Context): Boolean {
             stopRequested = false
             return runCatching { context.startForegroundService(Intent(context, PlaybackService::class.java)) }.isSuccess
+        }
+
+        private var wakeLock: PowerManager.WakeLock? = null
+        private var wifiLock: WifiManager.WifiLock? = null
+
+        /**
+         * 再生中は CPU と Wi-Fi を眠らせない（画面を消すと通信が細って、曲の途中で止まるのを防ぐ）。
+         * 一時停止したら離す
+         */
+        @Synchronized
+        fun hold(context: Context, playing: Boolean) {
+            val app = context.applicationContext
+            if (playing) {
+                if (wakeLock == null) wakeLock = app.getSystemService(PowerManager::class.java)
+                    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "spotfy:playback").apply { setReferenceCounted(false) }
+                if (wifiLock == null) wifiLock = app.getSystemService(WifiManager::class.java)
+                    .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "spotfy:playback").apply { setReferenceCounted(false) }
+                // 念のため長くても 3 時間で自動的に離す（次の曲で取り直す）
+                wakeLock?.acquire(3 * 60 * 60 * 1000L)
+                wifiLock?.acquire()
+            } else {
+                wakeLock?.takeIf { it.isHeld }?.release()
+                wifiLock?.takeIf { it.isHeld }?.release()
+            }
         }
 
         /** startForeground() 前に stopService() すると落ちるため、その場合は起動後に止める */
