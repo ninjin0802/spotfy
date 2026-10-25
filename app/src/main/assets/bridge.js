@@ -76,128 +76,73 @@
       md.is_advertisement === 'true' || !!md.ad_id);
   }
   var mutedAdUri = '', mutedAdVolume = 1, mutedAdElements = [], adMuteAppliedAt = 0, adMuteTimedOut = false, lastAdLogUri = '';
-  var adBreakActive = false, AD_RATE = 16, adSpeedLoggedUri = '';
-  var adSkipUri = '', adSkipAttempts = 0, adSkipTimer = 0, adSkipPending = false;
-  function resetAdSkip() {
-    if (adSkipTimer) clearTimeout(adSkipTimer);
-    adSkipTimer = 0;
-    adSkipUri = '';
-    adSkipAttempts = 0;
-    adSkipPending = false;
-  }
-  function scheduleAdSkipRetry(p, uri) {
-    if (adSkipAttempts >= 3 || adSkipTimer) return;
-    adSkipTimer = setTimeout(function () {
-      adSkipTimer = 0;
-      if (!adBlockingEnabled() || !adBreakActive) return;
-      var current = service('PlayerAPI'), now = current && current.getState();
-      if (now && isAd(now.item)) {
-        trySkipAd(current || p, uri);
-      } else resetAdSkip();
-    }, 700 * adSkipAttempts);
-  }
-  function trySkipAd(p, uri) {
-    if (!adSkipUri) adSkipUri = uri;
-    // 返事を待たずに次を送ると同じ広告に何回も送ってしまうので、1 回ずつ待つ
-    if (adSkipAttempts >= 3 || adSkipTimer || adSkipPending) return;
-    var attempt = ++adSkipAttempts;
-    adSkipPending = true;
-    pageDebug('ad.skip.request', String(attempt));
+  var adBreakActive = false, AD_RATE = 16, adSpeedLoggedUri = '', adSkipTried = false;
+  // 一部の広告はサーバー側キューから挿入され、広告 manager の停止だけでは外れないのでスキップも送る。
+  // 無料プランでは大抵 restricted で断られるので、広告ブレイクにつき 1 回だけ
+  function trySkipAd(p) {
+    if (adSkipTried) return;
+    adSkipTried = true;
+    pageDebug('ad.skip.request');
     try {
       Promise.resolve(p.skipToNext()).then(function () {
-        adSkipPending = false;
-        pageDebug('ad.skip.accepted', String(attempt));
+        pageDebug('ad.skip.accepted');
       }).catch(function (error) {
-        adSkipPending = false;
         var message = String(error && (error.message || error.name) || '').toLowerCase();
-        var reason = /restrict|disallow|not allowed|forbidden/.test(message) ? 'restricted'
-          : /timeout|network|fetch|offline|tempor/.test(message) ? 'transient' : 'unknown';
-        pageDebug('ad.skip.rejected', 'attempt=' + attempt + ' reason=' + reason);
-        // 無料プランの制限で断られたら、この広告の間は何回送っても通らない
-        if (reason === 'restricted') { adSkipAttempts = 3; return; }
-        if ( !adBreakActive || adSkipAttempts >= 3 || !adBlockingEnabled()) return;
-        scheduleAdSkipRetry(p, uri);
+        pageDebug('ad.skip.rejected', /restrict|disallow|not allowed|forbidden/.test(message) ? 'restricted' : 'unknown');
       });
-    } catch (e) {
-      adSkipPending = false;
-      if (adBreakActive) scheduleAdSkipRetry(p, uri);
-    }
+    } catch (e) {}
   }
-  function restoreMutedElements(restore) {
-    var elements = mutedAdElements.slice();
-    mutedAdElements = [];
-    elements.forEach(function (el) {
-      try { el.muted = false; el.volume = restore; el.playbackRate = 1; } catch (e) {}
-    });
-    return elements.length;
+  function unmuteEl(el, volume) {
+    try { el.muted = false; el.volume = volume; el.playbackRate = 1; } catch (e) {}
   }
   // 広告のあとで Web Player が音量を小さいまま付け直すことがあるので、しばらく見張って戻す。
   // クロスフェード中は曲の始まりがわざと小さいので、そのときは見張らない
   var adVolumeGuardTimer = 0;
   function guardVolumeAfterAd(restore) {
     if (adVolumeGuardTimer) clearInterval(adVolumeGuardTimer);
-    var started = Date.now(), checked = false;
+    var started = Date.now();
     adVolumeGuardTimer = setInterval(function () {
       if (Date.now() - started > 15000 || mutedAdUri) { clearInterval(adVolumeGuardTimer); adVolumeGuardTimer = 0; return; }
+      if (xfSec) return;
       audioEl().then(function (el) {
-        if (!el || mutedAdUri) return;
-        if (!checked && Date.now() - started > 3000) {
-          checked = true;
-          pageDebug('ad.volume.check', 'volume=' + el.volume + ' muted=' + el.muted + ' xf=' + xfSec + ' xfBase=' + xfBase);
-        }
-        if (xfSec) return;
-        if (el.muted || el.volume < restore * 0.5) {
-          pageDebug('ad.volume.fixed', 'volume=' + el.volume + ' muted=' + el.muted + ' -> ' + restore);
-          el.muted = false;
-          el.volume = restore;
-        }
+        if (!el || mutedAdUri || !(el.muted || el.volume < restore * 0.5)) return;
+        pageDebug('ad.volume.fixed', 'volume=' + el.volume + ' muted=' + el.muted + ' -> ' + restore);
+        unmuteEl(el, restore);
       });
     }, 500);
   }
-  function restoreAdVolume() {
+  function restoreAdVolume(event) {
     if (!mutedAdUri) return;
-    var restore = mutedAdVolume;
+    var restore = mutedAdVolume, elements = mutedAdElements;
     guardVolumeAfterAd(restore);
     mutedAdUri = '';
+    mutedAdElements = [];
     adMuteAppliedAt = 0;
-    var count = restoreMutedElements(restore);
-    if (count) pageDebug('ad.mute.restored', 'elements=' + count + ' volume=' + restore);
+    elements.forEach(function (el) { unmuteEl(el, restore); });
+    if (elements.length) pageDebug(event, 'elements=' + elements.length + ' volume=' + restore);
     else audioEl().then(function (el) {
       if (!el || mutedAdUri) return pageDebug('ad.mute.restore_missing');
-      el.muted = false;
-      el.volume = restore;
-      el.playbackRate = 1;
-      pageDebug('ad.mute.restored', 'fallback volume=' + el.volume);
+      unmuteEl(el, restore);
+      pageDebug(event, 'fallback volume=' + restore);
     });
+  }
+  function endAdBreak(event) {
+    if (lastAdLogUri) pageDebug(event);
+    lastAdLogUri = '';
+    restoreAdVolume('ad.mute.restored');
+    adMuteTimedOut = false;
+    adBreakActive = false;
+    adSkipTried = false;
   }
   function handleAdPlayback() {
     syncAdManagers();
-    if (!adBlockingEnabled()) {
-      if (lastAdLogUri) pageDebug('ad.state.blocking_off');
-      lastAdLogUri = '';
-      restoreAdVolume();
-      adMuteTimedOut = false;
-      adBreakActive = false;
-      resetAdSkip();
-      return;
-    }
+    if (!adBlockingEnabled()) return endAdBreak('ad.state.blocking_off');
     var p = service('PlayerAPI');
     var state = p && p.getState();
     var item = state && state.item;
-    if (!isAd(item)) {
-      if (lastAdLogUri) pageDebug('ad.state.ended');
-      lastAdLogUri = '';
-      restoreAdVolume();
-      adMuteTimedOut = false;
-      adBreakActive = false;
-      resetAdSkip();
-      return;
-    }
+    if (!isAd(item)) return endAdBreak('ad.state.ended');
     var uri = item.uri || item.metadata && item.metadata.ad_id || 'advertisement';
-    if (!adBreakActive) {
-      adBreakActive = true;
-      resetAdSkip();
-    }
+    adBreakActive = true;
     if (uri !== lastAdLogUri) pageDebug('ad.detected', 'type=' + (item.type || 'unknown') + ' id=' + (item.uri ? 'uri' : item.metadata && item.metadata.ad_id ? 'metadata' : 'fallback'));
     lastAdLogUri = uri;
     if (uri !== mutedAdUri && !adMuteTimedOut) {
@@ -210,13 +155,8 @@
       // Only start the failsafe after the media element really received the mute.
       if (adMuteAppliedAt && Date.now() - adMuteAppliedAt >= 75000) {
         adMuteTimedOut = true;
-        var restore = mutedAdVolume;
-        mutedAdUri = '';
-        adMuteAppliedAt = 0;
-        var restored = restoreMutedElements(restore);
-        if (!restored) { el.muted = false; el.volume = restore; el.playbackRate = 1; restored = 1; }
-        pageDebug('ad.mute.failsafe', 'elements=' + restored + ' volume=' + restore);
-        return;
+        if (mutedAdElements.indexOf(el) < 0) mutedAdElements.push(el);
+        return restoreAdVolume('ad.mute.failsafe');
       }
       if (el.volume > 0.001) mutedAdVolume = el.volume;
       el.muted = false;
@@ -236,8 +176,7 @@
         pageDebug('ad.mute.applied');
       }
     });
-    // 一部の広告はサーバー側キューから挿入され、広告 manager の停止だけでは外れない。
-    trySkipAd(p, uri);
+    trySkipAd(p);
   }
 
   // ---- GraphQL（Web Player 自身のローダーを使う。ログイン情報もそのまま使われる） ----
@@ -726,9 +665,9 @@
     xfTimer = setInterval(function () {
       if (!xfSec && xfBase == null) return;
       // 広告のミュート中に音量を拾うと、広告後の曲がミュートの音量のままになる
-      if (mutedAdUri || adBreakActive) return;
+      if (adBreakActive) return;
       audioEl().then(function (el) {
-        if (!el || mutedAdUri) return;
+        if (!el || adBreakActive) return;
         if (!xfSec || el.paused || !isFinite(el.duration) || el.duration < xfSec * 3) {
           if (xfBase != null) { el.volume = xfBase; xfBase = null; }
           return;

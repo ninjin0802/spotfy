@@ -3,6 +3,7 @@ package com.ninjin.spotifyweb
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -59,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -281,6 +283,37 @@ internal fun Placeholder(text: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text, color = Sub, fontSize = 15.sp) }
 }
 
+/** 画面いっぱいの読み込み中 */
+@Composable
+internal fun Loading() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingDots() }
+}
+
+/** 読み込み中の印（公式アプリと同じ、3 つの点が順に大きく明るくなる） */
+@Composable
+internal fun LoadingDots() {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "dots")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { i ->
+            val p by t.animateFloat(
+                0f, 1f,
+                androidx.compose.animation.core.infiniteRepeatable(
+                    androidx.compose.animation.core.keyframes {
+                        durationMillis = 1200
+                        0f at 0; 1f at 300; 0f at 600; 0f at 1200
+                    },
+                    initialStartOffset = androidx.compose.animation.core.StartOffset(i * 160),
+                ),
+                label = "dot$i",
+            )
+            Box(
+                Modifier.size(10.dp).graphicsLayer { scaleX = 0.7f + 0.3f * p; scaleY = 0.7f + 0.3f * p; alpha = 0.35f + 0.65f * p }
+                    .clip(CircleShape).background(Color.White)
+            )
+        }
+    }
+}
+
 @Composable
 internal fun Avatar(user: Bridge.User?, size: Int, onClick: (() -> Unit)? = null) {
     val m = Modifier.size(size.dp).clip(CircleShape).background(Color(0xFFE8A87C)).let { if (onClick != null) it.clickable(onClick = onClick) else it }
@@ -302,13 +335,14 @@ private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAva
     var loading by remember { mutableStateOf(false) }
     LaunchedEffect(ready, facet) {
         // タブを切り替えたら一番上から。読み込むまでは前のタブの中身を出さない
-        listState.scrollToItem(0)
+        // 前回のホームが無い（初回ログイン直後）ときはリストがまだ画面に無く、scrollToItem が返ってこないので呼ばない
+        if (feed != null) listState.scrollToItem(0)
         feeds[facet]?.let { feed = it; loading = false } ?: run { if (facet.isNotEmpty()) loading = true }
         if (ready) runCatching { bridge.home(facet) }.onSuccess { feeds[facet] = it; feed = it; loading = false; if (it.chips.isNotEmpty()) chips = it.chips }.onFailure { loading = false; if (feed == null) error = it.message }
     }
     val f = feed
     if (f == null) {
-        Placeholder(if (error != null) "読み込めませんでした" else "読み込み中…")
+        if (error != null) Placeholder("読み込めませんでした") else Loading()
         return
     }
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 170.dp)) {
@@ -323,7 +357,7 @@ private fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAva
                 Chips(chips, facet) { facet = it }
             }
         }
-        if (loading) { item { Box(Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) { Text("読み込み中…", color = Sub, fontSize = 14.sp) } }; return@LazyColumn }
+        if (loading) { item { Box(Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) { LoadingDots() } }; return@LazyColumn }
         if (f.shortcuts.isNotEmpty()) item { Shortcuts(f.shortcuts, onPlay) }
         // フォロー中のページなど、見出しのない 1 件ずつのカードが並ぶときは「最新リリース」の見出し
         val podcastFollow = facet == "podcasts-following-chip"

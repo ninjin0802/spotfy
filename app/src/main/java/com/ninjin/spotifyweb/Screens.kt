@@ -76,7 +76,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
     Box(Modifier.fillMaxSize().background(Bg)) {
         val p = page
         if (p == null) {
-            Placeholder(if (failed) "読み込めませんでした" else "読み込み中…")
+            if (failed) Placeholder("読み込めませんでした") else Loading()
         } else LazyColumn(state = list, contentPadding = PaddingValues(bottom = 170.dp)) {
             if (p.kind == "genre") item {
                 val c = runCatching { Color(android.graphics.Color.parseColor(p.subtitle)) }.getOrDefault(Card2)

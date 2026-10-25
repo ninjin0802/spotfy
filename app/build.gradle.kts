@@ -6,6 +6,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// VERSION の「メジャー.マイナー.パッチ」から versionCode を作る（2.0.9 → 20009）。
+// 上げ忘れて同じ番号のまま配ると上書きインストールできないので、必ずここ経由で上げる
+val appVersion = rootProject.file("VERSION").readText().trim()
+val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
+
 android {
     namespace = "com.ninjin.spotifyweb"
     compileSdk = 36
@@ -14,8 +19,9 @@ android {
         applicationId = "com.ninjin.spotifyweb"
         minSdk = 26
         targetSdk = 36
-        versionCode = 208
-        versionName = "2.0.8"
+        // バージョンはルートの VERSION ファイルだけで管理する（versionCode はそこから計算）
+        versionName = appVersion
+        versionCode = appVersionCode
     }
     buildFeatures { buildConfig = true; compose = true }
     // 署名鍵の情報はリポジトリの外（~/.config/spotfy/keystore.properties）に置く

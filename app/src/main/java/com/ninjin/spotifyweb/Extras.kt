@@ -332,7 +332,7 @@ fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen
                 item { Text("最近聴いたアーティスト", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
                 items(pr.artists, key = { "a" + it.uri }) { c -> ProfileRow(c) { onOpen(c) } }
             }
-        } ?: item { Placeholder("読み込み中…") }
+        } ?: item { Loading() }
     }
     val id = p?.id
     if (listOf != null && id != null) FollowListScreen(bridge, id, listOf!!, onBack = { listOf = null }, onOpen = { c -> listOf = null; onOpen(c) })
@@ -361,7 +361,7 @@ private fun FollowListScreen(bridge: Bridge, id: String, followers: Boolean, onB
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 170.dp)) {
             val l = list
-            if (l == null) item { Placeholder("読み込み中…") }
+            if (l == null) item { Loading() }
             else if (l.isEmpty()) item { Text(if (followers) "まだフォロワーはいません" else "まだ誰もフォローしていません", color = Sub, fontSize = 14.sp, modifier = Modifier.padding(24.dp)) }
             else items(l, key = { it.uri }) { c ->
                 Row(Modifier.fillMaxWidth().clickable { onOpen(c) }.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
