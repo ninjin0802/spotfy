@@ -1295,11 +1295,12 @@
 
   // ---- 音質（Web Player の再生エンジンに直接指定する） ----
   var QUALITIES = [
+    // Web Player が配信するのは AAC（128 kbps／Premium は 256 kbps）だけで、公式アプリの Ogg 160 kbps はない
     ['auto', '自動', '通信状況に合わせて調整'],
-    ['low', '低音質', '約 24 kbps'],
-    ['normal', '標準', '約 96 kbps'],
-    ['high', '高音質', '約 160 kbps'],
-    ['very_high', '最高音質', '約 320 kbps（Spotify Premium のみ）']
+    ['low', '低音質', '通信量を抑える'],
+    ['normal', '標準', '通信量を少し抑える'],
+    ['high', '高音質', 'AAC 128 kbps（無料プランの Web Player の上限。Ogg 160 kbps 相当）'],
+    ['very_high', '最高音質', 'AAC 256 kbps（Spotify Premium のみ）']
   ];
   // Web Player の Platform（サービスの登録簿と GraphQL ローダーを持つ）を React の木から一度だけ探す
   var platformCache = null;
@@ -1663,7 +1664,7 @@
       sec('いまの状態', [row('接続', metered ? 'モバイルデータ通信' : 'Wi-Fi', null), info]);
       sec('ロスレス', [row('ロスレス（FLAC）', 'Spotify Premium の機能です。Web Player では選べません', null)]);
       currentBitrate().then(function (b) {
-        info.querySelector('small').textContent = b ? Math.round(b / 1000) + ' kbps' : '不明（再生中の曲がありません）';
+        info.querySelector('small').textContent = b ? 'AAC ' + Math.round(b / 1000) + ' kbps' : '不明（このスマホで再生中の曲がありません）';
       });
     } else if (id === 'app') {
       sec(null, [
