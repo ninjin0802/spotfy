@@ -299,7 +299,8 @@ private fun Chips(chips: List<Chip>, facet: String, onSelect: (String) -> Unit) 
                 val subOn = c.sub.any { it.id == facet }
                 Row(Modifier.clip(CircleShape).background(if (subOn) Accent else Card2)) {
                     ChipText(c.label, true) { onSelect(if (facet == c.id) "" else c.id) }
-                    c.sub.forEach { sc -> ChipText(sc.label, facet == sc.id) { onSelect(if (facet == sc.id) c.id else sc.id) } }
+                    // 「フォロー中」を選んだときは、そこだけ少し濃い緑（公式アプリと同じ）
+                    c.sub.forEach { sc -> ChipText(sc.label, facet == sc.id, Color(0xFF1BBD55)) { onSelect(if (facet == sc.id) c.id else sc.id) } }
                 }
             }
         }
@@ -307,10 +308,10 @@ private fun Chips(chips: List<Chip>, facet: String, onSelect: (String) -> Unit) 
 }
 
 @Composable
-private fun ChipText(t: String, on: Boolean, onClick: () -> Unit) {
+private fun ChipText(t: String, on: Boolean, onColor: Color = Accent, onClick: () -> Unit) {
     Text(
         t, color = if (on) Color.Black else Color.White, fontSize = 14.sp,
-        modifier = Modifier.clip(CircleShape).background(if (on) Accent else Card2).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 7.dp),
+        modifier = Modifier.clip(CircleShape).background(if (on) onColor else Card2).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 7.dp),
     )
 }
 
@@ -337,11 +338,15 @@ private fun Shortcuts(items: List<Card>, onPlay: (Card) -> Unit) {
     }
 }
 
+private object FeedIcons {
+    val mute = line("M3.5 9.5h3.5L12 5v14l-5-4.5H3.5zM15.5 9.5l4 5M19.5 9.5l-4 5", 1.6f)
+}
+
 /** 「〇日前」 */
 private fun ago(iso: String): String {
     val t = runCatching { java.time.LocalDate.parse(iso.take(10)) }.getOrNull() ?: return ""
     val d = java.time.temporal.ChronoUnit.DAYS.between(t, java.time.LocalDate.now())
-    return when { d <= 0 -> "今日"; d < 7 -> "${d}日前"; d < 30 -> "${d / 7}週間前"; d < 365 -> "${d / 30}か月前"; else -> "${d / 365}年前" }
+    return when { d <= 0 -> "今日"; d < 7 -> "$d 日前"; d < 30 -> "${d / 7}週間前"; d < 365 -> "${d / 30}か月前"; else -> "${d / 365}年前" }
 }
 
 /** フォロー中やポッドキャストの、1 件ずつの大きなカード（公式アプリと同じく、ジャケットの色・曲の一覧・プレビュー・追加・再生） */
@@ -353,34 +358,44 @@ private fun FeedCard(bridge: Bridge, s: Shelf, onPlay: (Card) -> Unit, onMenu: (
     var page by remember(c.uri) { mutableStateOf<Page?>(null) }
     var saved by remember(c.uri) { mutableStateOf(false) }
     LaunchedEffect(c.uri) { if (isAlbum) runCatching { bridge.page(c.uri) }.getOrNull()?.let { page = it; saved = it.saved } }
-    val bg = runCatching { Color(android.graphics.Color.parseColor(c.color)) }.getOrNull()?.let { it.copy(alpha = 1f) } ?: Card2
+    // ジャケットの濃い色をさらに少し暗くした色（公式アプリと同じ見え方）
+    val bg = runCatching { Color(android.graphics.Color.parseColor(c.color)) }.getOrNull()?.let { Color(it.red * 0.62f, it.green * 0.62f, it.blue * 0.62f) } ?: Card2
     Column(Modifier.padding(horizontal = 16.dp).padding(top = 16.dp)) {
         if (s.title.isNotEmpty()) Text(s.title, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(bg).clickable { onPlay(c) }.padding(14.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(bg).clickable { onPlay(c) }.padding(16.dp)) {
             Row {
-                AsyncImage(c.image, null, Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
-                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                AsyncImage(c.image, null, Modifier.size(88.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
+                Column(Modifier.weight(1f).padding(start = 16.dp, top = 4.dp)) {
                     Text(if (isAlbum) c.subtitle else c.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     val sub = if (isAlbum) c.title + (page?.date?.let { ago(it) }?.takeIf { it.isNotEmpty() }?.let { " • $it" } ?: "") else c.subtitle
-                    Text(sub, color = Color(0xCCFFFFFF), fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                    Text(sub, color = Color(0xB3FFFFFF), fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
                 }
                 Ico(Icons.more, 18, Color.White, 32) { onMenu(MenuTarget.OfPage(c.uri, c.title, c.subtitle, c.image, "", c.subtitle)) }
             }
             page?.tracks?.takeIf { it.isNotEmpty() }?.let { t ->
-                Text("${t.size}曲 • " + t.joinToString(" • ") { it.title }, color = Color(0xCCFFFFFF), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+                Text(
+                    androidx.compose.ui.text.buildAnnotatedString {
+                        pushStyle(androidx.compose.ui.text.SpanStyle(color = Color.White)); append("${t.size}曲"); pop()
+                        append(" • " + t.joinToString(" • ") { it.title })
+                    },
+                    color = Color(0xB3FFFFFF), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 20.dp),
+                )
             }
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                // 公式アプリと同じ、音を消したスピーカーのマーク付きの「プレビュー」（押すと再生）
                 Row(
-                    Modifier.clip(CircleShape).background(Color(0x33000000)).clickable { scope.launch { runCatching { bridge.play(c.uri) } } }.padding(horizontal = 14.dp, vertical = 8.dp),
+                    Modifier.clip(CircleShape).background(Color(0x22000000)).clickable { scope.launch { runCatching { bridge.play(c.uri) } } }.padding(start = 12.dp, end = 16.dp, top = 9.dp, bottom = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(if (!isAlbum) "エピソードのプレビュー" else if ((page?.tracks?.size ?: 1) <= 1 || c.kind == "single") "シングルをプレビュー" else "アルバムをプレビュー", color = Color.White, fontSize = 13.sp)
+                    Image(rememberVectorPainter(FeedIcons.mute), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color(0x66FFFFFF)))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (!isAlbum) "エピソードのプレビュー" else if ((page?.tracks?.size ?: 1) <= 1 || c.kind == "single") "シングルをプレビュー" else "アルバムをプレビュー", color = Color(0x80FFFFFF), fontSize = 14.sp)
                 }
                 Spacer(Modifier.weight(1f))
-                Ico(if (saved) Icons.check else Icons.add, 26, if (saved) Accent else Color.White, 40) { saved = !saved; scope.launch { runCatching { bridge.follow(c.uri, saved) } } }
-                Spacer(Modifier.width(8.dp))
-                Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White).clickable { scope.launch { runCatching { bridge.play(c.uri) } } }, contentAlignment = Alignment.Center) {
-                    Image(rememberVectorPainter(Icons.play), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Color.Black))
+                Ico(if (saved) Icons.check else Icons.add, 28, if (saved) Accent else Color.White, 44) { saved = !saved; scope.launch { runCatching { bridge.follow(c.uri, saved) } } }
+                Spacer(Modifier.width(12.dp))
+                Box(Modifier.size(42.dp).clip(CircleShape).background(Color.White).clickable { scope.launch { runCatching { bridge.play(c.uri) } } }, contentAlignment = Alignment.Center) {
+                    Image(rememberVectorPainter(Icons.play), null, Modifier.size(22.dp), colorFilter = ColorFilter.tint(Color.Black))
                 }
             }
         }
