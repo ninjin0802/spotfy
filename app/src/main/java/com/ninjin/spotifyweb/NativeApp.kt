@@ -150,7 +150,12 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     var profileOpen by remember { mutableStateOf(false) }
     var confirmSwitch by remember { mutableStateOf(false) }
     BackHandler(enabled = profileOpen && !playerOpen) { profileOpen = false }
-    val player by bridge.player.collectAsState()
+    val rawPlayer by bridge.player.collectAsState()
+    // ほかの機器の名前は、2.5 秒続いたときだけ出す（起動直後に前の再生先が一瞬見えるのを防ぐ）
+    val shownDevice by androidx.compose.runtime.produceState("" to "", rawPlayer.device) {
+        if (rawPlayer.device.isEmpty()) value = "" to "" else { delay(2500); value = rawPlayer.device to rawPlayer.deviceType }
+    }
+    val player = rawPlayer.copy(device = shownDevice.first, deviceType = shownDevice.second)
     val ready by bridge.ready.collectAsState()
     var user by remember { mutableStateOf(bridge.cachedUser()) }
     val scope = rememberCoroutineScope()

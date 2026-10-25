@@ -466,6 +466,8 @@
     if (!st || !st.item) return { has: false };
     var it = st.item, md = it.metadata || {};
     var img = md.image_xlarge_url || md.image_large_url || md.image_url || (it.images && it.images[0] && it.images[0].url) || '';
+    // ほかの機器で再生中は spotify:image:… の形で来るので、画像の URL に直す
+    if (img.indexOf('spotify:image:') === 0) img = 'https://i.scdn.co/image/' + img.slice(14);
     if (it.uri !== likedFor) checkLiked(it.uri);
     var ctx = st.context || {};
     // ほかの機器で再生中なら、その名前（このスマホなら空）
