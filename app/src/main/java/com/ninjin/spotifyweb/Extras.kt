@@ -128,7 +128,8 @@ private fun DragList(items: List<Bridge.QItem>, edit: Boolean, onDragging: (Bool
     var startIndex by remember { mutableStateOf(-1) }
     val rowPx = with(androidx.compose.ui.platform.LocalDensity.current) { 60.dp.toPx() }
     Column {
-        list.forEachIndexed { idx, it ->
+        // 行ごとに key を付ける（並びが変わっても、つかんでいる行の指の動きが途切れないように）
+        list.forEach { it -> androidx.compose.runtime.key(it.uid + it.uri) {
             val key = it.uid + it.uri
             val dragging = key == dragKey
             Box(
@@ -157,7 +158,7 @@ private fun DragList(items: List<Bridge.QItem>, edit: Boolean, onDragging: (Bool
                     )
                 })
             }
-        }
+        } }
     }
 }
 

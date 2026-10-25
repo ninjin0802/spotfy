@@ -150,6 +150,16 @@ class MainActivity : ComponentActivity() {
             }
 
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) = updateSurface(url)
+
+            // 裏の Web Player は画面に出さないので、画像・動画（ジャケット・Canvas など）は読み込ませない。
+            // 画面に出す画像はアプリ側で直接読み込む。これでページの読み込みと通信が軽くなる
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                if (!nativeUi) return null
+                val host = request.url.host ?: return null
+                val skip = host == "i.scdn.co" || host == "mosaic.scdn.co" || host == "image-cdn-ak.spotifycdn.com" || host == "image-cdn-fa.spotifycdn.com" ||
+                    host == "pickasso.spotifycdn.com" || host == "canvaz.scdn.co" || host.endsWith("video.spotifycdn.com") || host == "seed-mix-image.spotifycdn.com"
+                return if (skip) android.webkit.WebResourceResponse("text/plain", "utf-8", 204, "No Content", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0))) else null
+            }
             override fun onPageCommitVisible(view: WebView, url: String?) = injectMobileUi(view)
             override fun onPageFinished(view: WebView, url: String?) = injectMobileUi(view)
         }
@@ -316,9 +326,12 @@ class MainActivity : ComponentActivity() {
     }
 
     /** ログイン済みで open.spotify.com を開いているときだけアプリの画面を出す（ログインページは Web のまま見せる） */
+    @Volatile private var nativeUi = false
+
     private fun updateSurface(url: String? = webView.url) {
         val onSpotify = url == null || isSpotifyUrl(Uri.parse(url))
-        composeView.visibility = if (isLoggedIn() && onSpotify) View.VISIBLE else View.GONE
+        nativeUi = isLoggedIn() && onSpotify
+        composeView.visibility = if (nativeUi) View.VISIBLE else View.GONE
     }
 
     /** アプリの画面から使う、端末側の機能と設定 */

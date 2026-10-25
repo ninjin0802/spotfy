@@ -64,9 +64,9 @@ internal fun isPage(uri: String) = uri.split(':').getOrNull(1) in setOf("album",
 /** アルバム・プレイリスト・アーティスト・お気に入りの曲のページ */
 @Composable
 internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBack: () -> Unit, onOpen: (Card) -> Unit, onMenu: (MenuTarget) -> Unit) {
-    var page by remember(uri) { mutableStateOf<Page?>(null) }
+    var page by remember(uri) { mutableStateOf(bridge.cachedPage(uri)) }
     var failed by remember(uri) { mutableStateOf(false) }
-    var saved by remember(uri) { mutableStateOf(false) }
+    var saved by remember(uri) { mutableStateOf(page?.saved ?: false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(uri) { runCatching { bridge.page(uri) }.onSuccess { page = it; saved = it.saved }.onFailure { failed = true } }
     val tint = rememberArtColorPublic(page?.image ?: "")

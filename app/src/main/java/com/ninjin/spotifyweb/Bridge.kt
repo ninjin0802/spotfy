@@ -78,7 +78,9 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     /** ライブラリの中身が変わったら増える（ライブラリの画面が読み直す） */
     val libraryVersion = androidx.compose.runtime.mutableIntStateOf(0)
 
-    private val _player = MutableStateFlow(PlayerState())
+    private val _player = MutableStateFlow(
+        cache.getString("player", null)?.let { runCatching { parseState(JSONObject(it)) }.getOrNull() } ?: PlayerState()
+    )
     val player: StateFlow<PlayerState> = _player
 
     /** bridge.js のメソッドを呼ぶ。結果は JSON（JSONObject / JSONArray / 値） */
@@ -104,7 +106,12 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
                 val d = pending[m.optInt("id")] ?: return true
                 if (m.optBoolean("ok")) d.complete(m.opt("value")) else d.completeExceptionally(RuntimeException(m.optString("error")))
             }
-            "bstate" -> _player.value = parseState(m.optJSONObject("value") ?: JSONObject())
+            "bstate" -> {
+                val v = m.optJSONObject("value") ?: JSONObject()
+                _player.value = parseState(v)
+                // 次の起動ですぐミニプレーヤーを出せるよう、曲名と画像だけ覚えておく（一時停止の状態で出す）
+                if (v.optBoolean("has")) cache.edit().putString("player", v.put("playing", false).toString()).apply()
+            }
             else -> return false
         }
         return true
@@ -156,7 +163,15 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
     suspend fun bitrate(): Int = (call("bitrate") as? Number)?.toInt() ?: 0
 
     /** URI に合わせてページを読む（お気に入りの曲はライブラリから） */
-    suspend fun page(uri: String): Page {
+    // 開いたページは覚えておき、もう一度開いたときはすぐ出す（裏で新しい内容に差し替える）
+    private val pages = object : LinkedHashMap<String, Page>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Page>?) = size > 40
+    }
+    fun cachedPage(uri: String): Page? = synchronized(pages) { pages[uri] }
+
+    suspend fun page(uri: String): Page = loadPage(uri).also { synchronized(pages) { pages[uri] = it } }
+
+    private suspend fun loadPage(uri: String): Page {
         if (uri.contains(":collection")) {
             val a = call("liked") as JSONArray
             return Page("playlist", uri, "お気に入りの曲", "${a.length()}曲", "", false, false, "", "", "", true, tracks(a), emptyList())
