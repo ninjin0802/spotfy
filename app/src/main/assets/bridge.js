@@ -124,6 +124,9 @@
     recentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     saveRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
     removeRecentSearches: 'ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0',
+    isFollowingUsers: 'c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596',
+    followUsers: 'c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596',
+    unfollowUsers: 'c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596',
     getTrack: 'fe16b8083eec2305854db612ca75589bcb71e009dc7a4d014f29bd534a4c01f5',
     searchTopResultsList: 'dd78eaff943eba629ed70ee25517b9cea0dcaa41193e2592ae2727660b21892c'
   };
@@ -377,22 +380,44 @@
         return { kind: 'genre', uri: a.uri, title: b.header && b.header.title && b.header.title.transformedLabel || '', image: '', subtitle: b.header && b.header.color && b.header.color.hex || '', tracks: [], shelves: shelves };
       });
     },
-    // プロフィール（公開プレイリスト・最近聴いたアーティスト・フォロワー）
-    profile: function () {
+    // プロフィール（公開プレイリスト・最近聴いたアーティスト・フォロワー）。id がなければ自分
+    profile: function (a) {
       var u = service('UserAPI');
       return Promise.resolve(u.getUser()).then(function (me) {
-        var h = apiHeaders();
-        return fetch('https://spclient.wg.spotify.com/user-profile-view/v3/profile/' + encodeURIComponent(me.username) + '?playlist_limit=20&artist_limit=10&episode_limit=10&market=from_token', { headers: h })
-          .then(function (r) { return r.ok ? r.json() : {}; })
-          .then(function (j) {
-            return {
-              name: j.name || me.displayName || '', image: j.image_url || (me.images && me.images[0] && me.images[0].url) || '',
-              followers: j.followers_count || 0, following: j.following_count || 0,
-              playlists: (j.public_playlists || []).map(function (p) { return { uri: p.uri, title: p.name, subtitle: (p.followers_count ? p.followers_count + '人のフォロワー' : 'プレイリスト'), image: p.image_url || '' }; }),
-              artists: (j.recently_played_artists || []).map(function (x) { return { uri: x.uri, title: x.name, subtitle: 'アーティスト', image: x.image_url || '', round: true }; })
-            };
-          });
+        var id = a.id || me.username, mine = id === me.username;
+        var base = 'https://spclient.wg.spotify.com/user-profile-view/v3/profile/' + encodeURIComponent(id);
+        var pr = fetch(base + '?playlist_limit=20&artist_limit=10&episode_limit=10&market=from_token', { headers: apiHeaders() }).then(function (r) { return r.ok ? r.json() : {}; });
+        var fol = mine ? Promise.resolve(false) : gql('isFollowingUsers', { uris: ['spotify:user:' + id] }).then(function (r) {
+          var d = r.data || {}, k = Object.keys(d)[0], v = d[k];
+          return !!(Array.isArray(v) ? (v[0] && (v[0].following !== undefined ? v[0].following : v[0])) : v && (v.following || (v.items && v.items[0] && v.items[0].following)));
+        }).catch(function () { return false; });
+        return Promise.all([pr, fol]).then(function (x) {
+          var j = x[0];
+          return {
+            id: id, mine: mine, following: x[1],
+            name: j.name || (mine ? me.displayName : '') || '', image: j.image_url || (mine && me.images && me.images[0] && me.images[0].url) || '',
+            followers: j.followers_count || 0, followingCount: j.following_count || 0,
+            playlists: (j.public_playlists || []).map(function (p) { return { uri: p.uri, title: p.name, subtitle: (p.followers_count ? p.followers_count + '人のフォロワー' : 'プレイリスト'), image: p.image_url || '' }; }),
+            artists: (j.recently_played_artists || []).map(function (x) { return { uri: x.uri, title: x.name, subtitle: 'アーティスト', image: x.image_url || '', round: true }; })
+          };
+        });
       });
+    },
+    // フォロワー／フォロー中の一覧（which: followers | following）
+    followList: function (a) {
+      return fetch('https://spclient.wg.spotify.com/user-profile-view/v3/profile/' + encodeURIComponent(a.id) + '/' + a.which + '?market=from_token', { headers: apiHeaders() })
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .then(function (j) {
+          return (j.profiles || []).map(function (p) {
+            var artist = /:artist:/.test(p.uri);
+            return { uri: p.uri, title: p.name, subtitle: (artist ? 'アーティスト' : 'プロフィール') + (p.followers_count ? ' • ' + p.followers_count.toLocaleString() + '人のフォロワー' : ''), image: p.image_url || '', round: true, pinned: !!p.is_following, kind: artist ? 'artist' : 'user' };
+          });
+        });
+    },
+    // ユーザーのフォロー（アーティストはライブラリ）
+    followUser: function (a) {
+      if (/:artist:/.test(a.uri)) { var lib = service('LibraryAPI'); return Promise.resolve(a.on ? lib.add({ uris: [a.uri] }) : lib.remove({ uris: [a.uri] })).then(function () { return true; }); }
+      return gql(a.on ? 'followUsers' : 'unfollowUsers', { uris: [a.uri] }, 'mutation').then(function () { return true; });
     },
     // キュー（再生中・次に再生・その後に続く曲）
     queueList: function () {

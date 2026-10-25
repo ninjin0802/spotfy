@@ -149,6 +149,8 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     var createOpen by remember { mutableStateOf(false) }
     var profileOpen by remember { mutableStateOf(false) }
     var confirmSwitch by remember { mutableStateOf(false) }
+    var otherUser by remember { mutableStateOf<String?>(null) }
+    BackHandler(enabled = otherUser != null && !playerOpen) { otherUser = null }
     BackHandler(enabled = profileOpen && !playerOpen) { profileOpen = false }
     val rawPlayer by bridge.player.collectAsState()
     // ほかの機器の名前は、2.5 秒続いたときだけ出す（起動直後に前の再生先が一瞬見えるのを防ぐ）
@@ -172,7 +174,9 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     Box(Modifier.fillMaxSize().background(Bg)) {
         // カードを押したら：アルバム・プレイリスト・アーティストはページを開き、曲は再生する
         val open: (Card) -> Unit = { c ->
-            if (isPage(c.uri)) stacks[tab]!!.add(c.uri) else scope.launch { runCatching { bridge.play(c.uri) } }
+            // ユーザーはプロフィールの画面で開く
+            if (c.uri.startsWith("spotify:user:") && !c.uri.contains(":playlist:")) { otherUser = c.uri.split(':')[2] }
+            else if (isPage(c.uri)) stacks[tab]!!.add(c.uri) else scope.launch { runCatching { bridge.play(c.uri) } }
         }
         val stack = stacks[tab]!!
         // タブごとに開いたページを覚えておく（タブを切り替えて戻っても、そのまま）
@@ -195,6 +199,11 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
         AnimatedVisibility(profileOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             ProfileScreen(bridge, user, onBack = { profileOpen = false }, onOpen = { c -> profileOpen = false; open(c) },
                 onEdited = { scope.launch { runCatching { bridge.user() }.getOrNull()?.let { user = it } } })
+        }
+        otherUser?.let { uid ->
+            androidx.compose.runtime.key(uid) {
+                ProfileScreen(bridge, user, onBack = { otherUser = null }, onOpen = { c -> otherUser = null; open(c) }, userId = uid)
+            }
         }
         AnimatedVisibility(settingsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             SettingsScreen(bridge, host, user, onBack = { settingsOpen = false })

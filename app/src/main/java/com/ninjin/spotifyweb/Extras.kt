@@ -278,15 +278,22 @@ private fun CreateRow(icon: androidx.compose.ui.graphics.vector.ImageVector, tit
     }
 }
 
-/** プロフィール：アイコン・名前・フォロワー、公開プレイリスト、最近聴いたアーティスト */
+/** プロフィール（自分・ほかのユーザー）：アイコン・名前・フォロワー／フォロー中（押すと一覧）、フォローボタン、公開プレイリスト、最近聴いたアーティスト */
 @Composable
-fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen: (Card) -> Unit, onEdited: () -> Unit = {}) {
-    var p by remember { mutableStateOf<Bridge.Profile?>(null) }
+fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen: (Card) -> Unit, onEdited: () -> Unit = {}, userId: String? = null) {
+    var p by remember(userId) { mutableStateOf<Bridge.Profile?>(null) }
     var reload by remember { mutableStateOf(0) }
     var editing by remember { mutableStateOf(false) }
-    LaunchedEffect(reload) { p = runCatching { bridge.profile() }.getOrNull() ?: p }
-    if (editing) EditProfileSheet(bridge, p?.name ?: user?.name ?: "", p?.image ?: user?.image ?: "", onDone = { reload++; onEdited() }) { editing = false }
-    val tint = rememberArtColorPublic(p?.image ?: user?.image ?: "")
+    var listOf by remember { mutableStateOf<Boolean?>(null) }   // true=フォロワー, false=フォロー中
+    var following by remember(userId) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(userId, reload) { runCatching { bridge.profile(userId) }.getOrNull()?.let { p = it; following = it.isFollowing } }
+    val mine = p?.mine ?: (userId == null)
+    val name = p?.name ?: if (mine) user?.name ?: "" else ""
+    val image = p?.image ?: if (mine) user?.image ?: "" else ""
+    if (editing) EditProfileSheet(bridge, name, image, onDone = { reload++; onEdited() }) { editing = false }
+    androidx.activity.compose.BackHandler(enabled = listOf != null) { listOf = null }
+    val tint = rememberArtColorPublic(image)
     LazyColumn(
         Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {},
         contentPadding = PaddingValues(bottom = 170.dp),
@@ -295,16 +302,25 @@ fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen
             Column(Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(tint, Bg))).windowInsetsPadding(WindowInsets.statusBars).padding(bottom = 16.dp)) {
                 Ico(Icons.back, 22, onClick = onBack)
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Avatar(Bridge.User(p?.name ?: user?.name ?: "", p?.image ?: user?.image ?: ""), 112)
+                    Avatar(Bridge.User(name, image), 112)
                     Column(Modifier.padding(start = 16.dp)) {
-                        Text(p?.name ?: user?.name ?: "", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        p?.let { Text("${it.followers}人のフォロワー • ${it.following}人をフォロー中", color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp)) }
+                        Text(name, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        p?.let { pr ->
+                            Row(Modifier.padding(top = 6.dp)) {
+                                Text("${pr.followers}人のフォロワー", color = Sub, fontSize = 13.sp, modifier = Modifier.clickable { listOf = true })
+                                Text(" • ", color = Sub, fontSize = 13.sp)
+                                Text("${pr.following}人をフォロー中", color = Sub, fontSize = 13.sp, modifier = Modifier.clickable { listOf = false })
+                            }
+                        }
                     }
                 }
-                Text(
+                if (mine) Text(
                     "編集", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp).clip(CircleShape).background(Color(0x33FFFFFF)).clickable { editing = true }.padding(horizontal = 16.dp, vertical = 7.dp),
-                )
+                ) else if (p != null) FollowButton(following, Modifier.padding(start = 16.dp, top = 8.dp)) {
+                    following = !following
+                    scope.launch { runCatching { bridge.followUser("spotify:user:" + p!!.id, following) } }
+                }
             }
         }
         p?.let { pr ->
@@ -317,6 +333,48 @@ fun ProfileScreen(bridge: Bridge, user: Bridge.User?, onBack: () -> Unit, onOpen
                 items(pr.artists, key = { "a" + it.uri }) { c -> ProfileRow(c) { onOpen(c) } }
             }
         } ?: item { Placeholder("読み込み中…") }
+    }
+    val id = p?.id
+    if (listOf != null && id != null) FollowListScreen(bridge, id, listOf!!, onBack = { listOf = null }, onOpen = { c -> listOf = null; onOpen(c) })
+}
+
+@Composable
+private fun FollowButton(on: Boolean, m: Modifier = Modifier, onClick: () -> Unit) {
+    Text(
+        if (on) "フォロー中" else "フォローする", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+        modifier = m.clip(CircleShape).background(if (on) Color(0x33FFFFFF) else Color.Transparent)
+            .then(if (on) Modifier else Modifier.background(Color(0x22FFFFFF))).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 7.dp),
+    )
+}
+
+/** フォロワー／フォロー中の一覧。右のボタンでフォローの切り替え */
+@Composable
+private fun FollowListScreen(bridge: Bridge, id: String, followers: Boolean, onBack: () -> Unit, onOpen: (Card) -> Unit) {
+    var list by remember(id, followers) { mutableStateOf<List<Card>?>(null) }
+    val state = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(id, followers) { list = runCatching { bridge.followList(id, followers) }.getOrDefault(emptyList()); list?.forEach { state[it.uri] = it.pinned } }
+    Column(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
+        Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+            Ico(Icons.back, 22, onClick = onBack)
+            Text(if (followers) "フォロワー" else "フォロー中", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
+        LazyColumn(contentPadding = PaddingValues(bottom = 170.dp)) {
+            val l = list
+            if (l == null) item { Placeholder("読み込み中…") }
+            else if (l.isEmpty()) item { Text(if (followers) "まだフォロワーはいません" else "まだ誰もフォローしていません", color = Sub, fontSize = 14.sp, modifier = Modifier.padding(24.dp)) }
+            else items(l, key = { it.uri }) { c ->
+                Row(Modifier.fillMaxWidth().clickable { onOpen(c) }.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(c.image, null, Modifier.size(56.dp).clip(CircleShape).background(Card2), contentScale = ContentScale.Crop)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(c.title, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1)
+                    }
+                    val on = state[c.uri] == true
+                    FollowButton(on) { state[c.uri] = !on; scope.launch { runCatching { bridge.followUser(c.uri, !on) } } }
+                }
+            }
+        }
     }
 }
 

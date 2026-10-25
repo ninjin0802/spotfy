@@ -242,12 +242,21 @@ class Bridge(private val web: WebView, private val cache: android.content.Shared
 
     suspend fun nextUp(): Track? = (call("nextUp") as? JSONObject)?.let { Track(it.optString("uri"), it.optString("title"), it.optString("artist"), it.optString("image"), 0) }
 
-    data class Profile(val name: String, val image: String, val followers: Int, val following: Int, val playlists: List<Card>, val artists: List<Card>)
+    data class Profile(
+        val id: String, val mine: Boolean, val isFollowing: Boolean, val name: String, val image: String,
+        val followers: Int, val following: Int, val playlists: List<Card>, val artists: List<Card>,
+    )
 
-    suspend fun profile(): Profile {
-        val o = call("profile") as JSONObject
-        return Profile(o.optString("name"), o.optString("image"), o.optInt("followers"), o.optInt("following"), cards(o.optJSONArray("playlists")), cards(o.optJSONArray("artists")))
+    /** id が null なら自分のプロフィール */
+    suspend fun profile(id: String? = null): Profile {
+        val o = call("profile", JSONObject().apply { if (id != null) put("id", id) }) as JSONObject
+        return Profile(
+            o.optString("id"), o.optBoolean("mine"), o.optBoolean("following"), o.optString("name"), o.optString("image"),
+            o.optInt("followers"), o.optInt("followingCount"), cards(o.optJSONArray("playlists")), cards(o.optJSONArray("artists")),
+        )
     }
+    suspend fun followList(id: String, followers: Boolean): List<Card> = cards(call("followList", JSONObject().put("id", id).put("which", if (followers) "followers" else "following")) as? JSONArray)
+    suspend fun followUser(uri: String, on: Boolean) = call("followUser", JSONObject().put("uri", uri).put("on", on)).also { libraryVersion.intValue++ }
 
     data class QItem(val uri: String, val uid: String, val title: String, val artist: String, val image: String)
     data class Queue(val current: QItem?, val queued: List<QItem>, val next: List<QItem>, val context: String)
