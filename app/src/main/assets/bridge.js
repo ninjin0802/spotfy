@@ -130,6 +130,17 @@
   function gql(name, vars, op) {
     return platform().getGraphQLLoader()({ name: name, operation: op || 'query', sha256Hash: GQL[name], value: null }, vars);
   }
+  // Spotify の API を直接呼ぶときの認証（Web Player 自身が持っているアクセストークンを使う）
+  function apiHeaders() {
+    var h = { accept: 'application/json', 'app-platform': 'WebPlayer' };
+    try {
+      var st = service('AuthorizationAPI').getState();
+      var tok = st && st.token && st.token.accessToken;
+      if (tok) h.authorization = 'Bearer ' + tok;
+    } catch (e) {}
+    if (!h.authorization && window.__mConnect && __mConnect.auth()) h.authorization = __mConnect.auth();
+    return h;
+  }
   function cookie(name) {
     var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
     return m ? decodeURIComponent(m[1]) : '';
@@ -320,8 +331,7 @@
     lyrics: function (a) {
       var id = a.uri.split(':')[2];
       var img = encodeURIComponent(a.image || '');
-      var h = { accept: 'application/json', 'app-platform': 'WebPlayer' };
-      if (window.__mConnect) { var au = __mConnect.auth(); if (au) h.authorization = au; var ct = __mConnect.clientToken(); if (ct) h['client-token'] = ct; }
+      var h = apiHeaders();
       return fetch('https://spclient.wg.spotify.com/color-lyrics/v2/track/' + id + '/image/' + img + '?format=json&vocalRemoval=false&market=from_token', { headers: h })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (j) {
@@ -371,8 +381,7 @@
     profile: function () {
       var u = service('UserAPI');
       return Promise.resolve(u.getUser()).then(function (me) {
-        var h = { accept: 'application/json', 'app-platform': 'WebPlayer' };
-        if (window.__mConnect) { var au = __mConnect.auth(); if (au) h.authorization = au; var ct = __mConnect.clientToken(); if (ct) h['client-token'] = ct; }
+        var h = apiHeaders();
         return fetch('https://spclient.wg.spotify.com/user-profile-view/v3/profile/' + encodeURIComponent(me.username) + '?playlist_limit=20&artist_limit=10&episode_limit=10&market=from_token', { headers: h })
           .then(function (r) { return r.ok ? r.json() : {}; })
           .then(function (j) {
@@ -436,14 +445,23 @@
           var dt = new DataTransfer(); dt.items.add(file);
           fi.files = dt.files;
           fi.dispatchEvent(new Event('change', { bubbles: true }));
-          step = w(1500);
+          step = w(300);
         }
-        return step.then(function () {
-          var save = [].find.call(form.querySelectorAll('button[type="submit"]'), function (b) { return /保存|Save/.test(b.textContent); });
-          if (!save) throw new Error('no save');
-          save.click();
-          return w(2500);
-        });
+        // 写真を選ぶと Spotify はすぐ画像を送り始め、その間は「保存…」で押せない。押せるようになるまで待つ
+        function saveButton() { return [].find.call(form.querySelectorAll('button[type="submit"]'), function (b) { return /保存|Save/.test(b.textContent); }); }
+        function ready(n) {
+          var b = saveButton();
+          if (b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !/…|\.\.\./.test(b.textContent)) return Promise.resolve(b);
+          if (n > 200) return Promise.reject(new Error('save not ready'));
+          return w(100).then(function () { return ready(n + 1); });
+        }
+        // 保存が終わって編集画面が閉じるまで待つ
+        function closed(n) {
+          if (!document.contains(form)) return Promise.resolve(true);
+          if (n > 200) return Promise.reject(new Error('not saved'));
+          return w(100).then(function () { return closed(n + 1); });
+        }
+        return step.then(function () { return ready(0); }).then(function (b) { b.click(); return closed(0); }).then(function () { return w(500); });
       }).then(function () { go(back); return true; }, function (e) {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); go(back); throw e;
       });
