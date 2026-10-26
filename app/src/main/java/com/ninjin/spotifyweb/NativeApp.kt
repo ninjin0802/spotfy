@@ -154,13 +154,12 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
         }
         AnimatedVisibility(drawerOpen, enter = slideInHorizontally { -it }, exit = slideOutHorizontally { -it }) {
             Drawer(
-                user, player,
+                user,
                 onProfile = { drawerOpen = false; profileOpen = true },
                 onAddAccount = { drawerOpen = false; confirmSwitch = true },
                 onRecent = { drawerOpen = false; recentsOpen = true },
                 onNews = { drawerOpen = false; newsOpen = true },
                 onSettings = { drawerOpen = false; settingsOpen = true },
-                onInvite = { drawerOpen = false; host.share("https://open.spotify.com/", tr("Spotify に招待", "Invite to Spotify")) },
             )
         }
         AnimatedVisibility(
@@ -219,9 +218,9 @@ internal object DrawerIcons {
     val plus = line("M12 5v14M5 12h14", 2f)
 }
 
-/** サイドメニュー（公式アプリと同じ：アカウントのカード、最近・新着・設定、アクティビティと友達を招待） */
+/** サイドメニュー（公式アプリと同じ：アカウントのカード、最近・新着・設定） */
 @Composable
-internal fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Unit, onAddAccount: () -> Unit, onRecent: () -> Unit, onNews: () -> Unit, onSettings: () -> Unit, onInvite: () -> Unit) {
+internal fun Drawer(user: Bridge.User?, onProfile: () -> Unit, onAddAccount: () -> Unit, onRecent: () -> Unit, onNews: () -> Unit, onSettings: () -> Unit) {
     Column(
         Modifier.fillMaxHeight().width(310.dp).background(Color(0xFF1F1F1F))
             .clickable(remember { MutableInteractionSource() }, null) {}
@@ -246,22 +245,6 @@ internal fun Drawer(user: Bridge.User?, player: PlayerState, onProfile: () -> Un
         DrawerItem(DrawerIcons.history, tr("最近", "Recents"), onRecent)
         DrawerItem(DrawerIcons.news, tr("あなたへのおすすめ新着", "What's new"), onNews)
         DrawerItem(Icons.gear, tr("設定とプライバシー", "Settings and privacy"), onSettings)
-        // アクティビティ（自分のアイコンに再生中のジャケット）と友達を招待
-        Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Column(Modifier.clickable(onClick = onProfile), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(64.dp)) {
-                    Box(Modifier.size(64.dp).clip(CircleShape).background(Color(0xFF3E3E3E)).padding(3.dp)) { Avatar(user, 58) }
-                    if (player.image.isNotEmpty()) AsyncImage(player.image, null, Modifier.size(26.dp).align(Alignment.BottomEnd).clip(RoundedCornerShape(3.dp)), contentScale = ContentScale.Crop)
-                }
-                Text(tr("アクティビティ", "Activity"), color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-            }
-            Column(Modifier.clickable(onClick = onInvite), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(64.dp).clip(CircleShape).background(Color(0xFF3E3E3E)), contentAlignment = Alignment.Center) {
-                    Image(rememberVectorPainter(DrawerIcons.plus), null, Modifier.size(26.dp), colorFilter = ColorFilter.tint(Color.White))
-                }
-                Text(tr("友達を招待", "Invite friends"), color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-            }
-        }
     }
 }
 
