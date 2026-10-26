@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        AppLanguage.apply(this)
         applyOrientation()
         webView = AwakeWebView(this).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -207,6 +208,11 @@ class MainActivity : ComponentActivity() {
         if (requestCode != REQUEST_FILE) return
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
         fileCallback = null
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        AppLanguage.apply(this)
     }
 
     override fun onNewIntent(intent: Intent) {

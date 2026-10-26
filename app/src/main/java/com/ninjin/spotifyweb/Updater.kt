@@ -39,6 +39,8 @@ class Updater(private val context: Context, private val log: (String, String) ->
     val state: StateFlow<State> = _state
     private val prefs = context.getSharedPreferences("update", Context.MODE_PRIVATE)
     private val apk get() = File(context.cacheDir, "updates/spotfy.apk")
+    // ダウンロードは画面を閉じても続ける
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /** 起動時の確認。6 時間に 1 回まで（手動の確認は [check] を直接呼ぶ） */
     suspend fun checkIfDue() {
@@ -59,7 +61,7 @@ class Updater(private val context: Context, private val log: (String, String) ->
                     else -> State.Available(r)
                 }
             },
-            onFailure = { log("update.check.failed", it.message ?: it.javaClass.simpleName); if (manual) State.Failed(tr("確認できませんでした", "Couldn't check for updates")) else State.Idle },
+            onFailure = { log("update.check.failed", it.reason); if (manual) State.Failed(tr("確認できませんでした", "Couldn't check for updates")) else State.Idle },
         )
     }
 
@@ -67,9 +69,6 @@ class Updater(private val context: Context, private val log: (String, String) ->
         prefs.edit().putString("skipped", release.version).apply()
         _state.value = State.Idle
     }
-
-    // ダウンロードは画面を閉じても続ける
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     fun download(release: Release) {
         if (_state.value is State.Downloading) return
@@ -84,16 +83,16 @@ class Updater(private val context: Context, private val log: (String, String) ->
                 val part = File(apk.path + ".part")
                 val conn = open(release.apkUrl)
                 val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.size
+                var lastShown = 0f
                 conn.inputStream.use { input ->
                     part.outputStream().use { out ->
                         val buf = ByteArray(64 * 1024)
                         var done = 0L
-                        var lastShown = 0f
                         while (true) {
-                            val n = input.read(buf)
-                            if (n < 0) break
+                            val n = input.read(buf).takeIf { it >= 0 } ?: break
                             out.write(buf, 0, n)
                             done += n
+                            // 1% 進むごとに知らせる（毎回だと画面の描き直しが多すぎる）
                             val p = if (total > 0) done.toFloat() / total else 0f
                             if (p - lastShown >= 0.01f) { lastShown = p; _state.value = State.Downloading(release, p) }
                         }
@@ -103,8 +102,10 @@ class Updater(private val context: Context, private val log: (String, String) ->
                 if (!part.renameTo(apk)) error("rename failed")
             }
         }
-        ok.onFailure { log("update.download.failed", it.message ?: it.javaClass.simpleName) }
-        _state.value = if (ok.isSuccess) State.Ready(release).also { install() } else State.Failed(tr("ダウンロードに失敗しました", "Download failed"))
+        ok.onFailure { log("update.download.failed", it.reason) }
+        if (ok.isFailure) { _state.value = State.Failed(tr("ダウンロードに失敗しました", "Download failed")); return }
+        _state.value = State.Ready(release)
+        install()
     }
 
     /** インストーラーを開く。「この提供元のアプリを許可」がまだなら、先にその設定画面を開く */
@@ -125,7 +126,7 @@ class Updater(private val context: Context, private val log: (String, String) ->
     /** API で調べる。API は IP ごとに 1 時間 60 回までなので、断られたらリリースページの転送先から調べる */
     private suspend fun fetchLatest(): Release? = withContext(Dispatchers.IO) {
         runCatching { fromApi() }.getOrElse { e ->
-            log("update.api.failed", e.message ?: e.javaClass.simpleName)
+            log("update.api.failed", e.reason)
             fromReleasePage()
         }
     }
@@ -179,6 +180,8 @@ class Updater(private val context: Context, private val log: (String, String) ->
         }
         error("too many redirects")
     }
+
+    private val Throwable.reason get() = message ?: javaClass.simpleName
 
     companion object {
         const val REPO = "ninjin0802/spotfy"
