@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 
 /** テーマ（myspoti と同じく、アクセントカラー 5 色と真っ黒の背景を選べる） */
 object Theme {
-    val accents = listOf("green" to Color(0xFF1ED760), "blue" to Color(0xFF509BF5), "purple" to Color(0xFFAF7AF6), "pink" to Color(0xFFF573A0), "orange" to Color(0xFFFF9E3D))
+    val accents = listOf("green" to Color(0xFF1ED760), "blue" to Color(0xFF509BF5), "purple" to Color(0xFFAF7AF6), "pink" to Color(0xFFF573A0), "orange" to Color(0xFFFF9E3D), "red" to Color(0xFFF15E6C), "yellow" to Color(0xFFFFC864), "cyan" to Color(0xFF4CC9E0), "mint" to Color(0xFF7FE7C4))
     var accent by mutableStateOf(accents[0].second)
     var amoled by mutableStateOf(false)
     fun load(host: AppHost) {
