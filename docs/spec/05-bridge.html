@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5. ブリッジ | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html" class="on">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>5. ブリッジ</h1>
+<p class="lead">アプリ（Kotlin）とページ（JavaScript）の間の通信の仕組み、メッセージの形式、呼べるメソッド。</p>
+
+<h2>5.1 通信の経路</h2>
+<table>
+<tr><th>向き</th><th>手段</th><th>備考</th></tr>
+<tr><td>ページ → アプリ</td><td><code>AndroidBridge.postMessage(JSON)</code></td><td><code>addWebMessageListener</code> で open.spotify.com のメインフレームにだけ注入。送信元のオリジンとメインフレームかを確認する</td></tr>
+<tr><td>アプリ → ページ（返事）</td><td><code>JavaScriptReplyProxy.postMessage</code></td><td>設定（<code>settings</code>）と Connect の送り直しの結果（<code>relay</code>）</td></tr>
+<tr><td>アプリ → ページ（呼び出し）</td><td><code>evaluateJavascript("__mb.call(id, method, args)")</code></td><td>結果は <code>bres</code> で非同期に返る</td></tr>
+</table>
+
+<h2>5.2 ページから届くメッセージ</h2>
+<table>
+<tr><th>type</th><th>中身</th><th>受け取り先</th></tr>
+<tr><td>bready</td><td>Web Player の準備ができた</td><td>Bridge（<code>ready = true</code>）</td></tr>
+<tr><td>bres</td><td><code>id, ok, value | error</code></td><td>Bridge（待っている呼び出しを再開）</td></tr>
+<tr><td>bstate</td><td>再生状態（下の表）</td><td>Bridge（<code>player</code>）</td></tr>
+<tr><td>bhealth</td><td><code>missing</code>：使えない機能の名前の配列</td><td>Bridge（<code>missing</code>）・デバッグログ</td></tr>
+<tr><td>meta</td><td>曲名・アーティスト・アルバム・画像・再生中か・位置・長さ</td><td>MediaControls</td></tr>
+<tr><td>playing</td><td>再生中かどうか</td><td>PlaybackService の起動・停止</td></tr>
+<tr><td>debug</td><td><code>event, detail</code></td><td>DebugLog</td></tr>
+<tr><td>hello / setting</td><td>設定の取得・保存（向き・バックグラウンド・広告・webdebug）</td><td>MainActivity</td></tr>
+<tr><td>relay</td><td>Connect の通信の送り直しの依頼</td><td>ConnectRelay</td></tr>
+<tr><td>share / outputSwitch / hideKeyboard</td><td>共有シート・出力の切り替え・キーボードを閉じる</td><td>MainActivity</td></tr>
+</table>
+
+<h2>5.3 再生状態（bstate の value）</h2>
+<table>
+<tr><th>キー</th><th>型</th><th>意味</th></tr>
+<tr><td>has</td><td>boolean</td><td>再生中の項目があるか</td></tr>
+<tr><td>uri / title / artist / album / image</td><td>string</td><td>曲の情報（画像は https の URL に直す）</td></tr>
+<tr><td>artistUri / contextUri / contextName</td><td>string</td><td>アーティストと、再生元（プレイリストなど）</td></tr>
+<tr><td>playing / buffering</td><td>boolean</td><td>再生中・読み込み中</td></tr>
+<tr><td>pos / dur</td><td>number（ミリ秒）</td><td>送った時点の位置（経過時間を足した値）と長さ</td></tr>
+<tr><td>shuffle / repeat</td><td>boolean / 0〜2</td><td>シャッフル・リピート</td></tr>
+<tr><td>liked</td><td>boolean</td><td>お気に入りの曲か（曲が変わったときに一度だけ調べる）</td></tr>
+<tr><td>device / deviceType</td><td>string</td><td>ほかの機器で再生中ならその名前と種類（このスマホなら空）</td></tr>
+</table>
+<p>送るのは、曲・機器・お気に入り・再生中か・シャッフル・リピート・読み込み中・位置（5 秒単位）のどれかが変わったときだけです。</p>
+
+<h2>5.4 呼び出し（Bridge.call）</h2>
+<pre><code>suspend fun call(method: String, args: JSONObject = JSONObject()): Any?
+// 1. 連番の id を振り、結果を待つ CompletableDeferred を登録
+// 2. webView.evaluateJavascript("__mb.call(id, 'method', args)")
+// 3. bres が届いたら ok なら value を返し、だめなら例外
+// 4. 時間切れは bridge.timeout としてデバッグログに残す</code></pre>
+
+<h2>5.5 メソッド一覧</h2>
+<table>
+<tr><th>分類</th><th>メソッド</th><th>使っているもの</th></tr>
+<tr><td>ホーム・閲覧</td><td>home, browse, genre, whatsNew, recents</td><td>GraphQL（home・browseAll・browsePage・queryWhatsNewFeed）、spclient（recently-played）</td></tr>
+<tr><td>ページ</td><td>album, playlist, artist, about, profile, followList</td><td>GraphQL（getAlbum・fetchPlaylist・queryArtistOverview）、内部 API</td></tr>
+<tr><td>検索</td><td>search, recent, saveRecent, removeRecent</td><td>GraphQL（searchTopResultsList・recentSearches）</td></tr>
+<tr><td>ライブラリ</td><td>library, liked, inLibrary, like, follow, followUser, createPlaylist, createFolder, editProfile</td><td>LibraryAPI・RootlistAPI・GraphQL</td></tr>
+<tr><td>再生</td><td>play, toggle, pause, resume, next, prev, seek, shuffle, repeat, state</td><td>PlayerAPI</td></tr>
+<tr><td>キュー</td><td>queueList, queue, skipTo, reorder, unqueue, nextUp</td><td>PlayerAPI</td></tr>
+<tr><td>曲の情報</td><td>trackInfo, lyrics</td><td>GraphQL（getTrack）、歌詞の内部 API</td></tr>
+<tr><td>再生の設定</td><td>quality, bitrate, crossfade, gapless</td><td>PlayerSDK（harmony の streamer）</td></tr>
+<tr><td>機器</td><td>devices, transfer</td><td>Connect（<code>__mConnect</code>）</td></tr>
+<tr><td>ユーザー</td><td>user</td><td>AuthorizationAPI ほか</td></tr>
+</table>
+
+<h2>5.6 Web Player の部品の取り出し</h2>
+<p><code>platform()</code> は React のルートからたどって <code>getRegistry()</code> を持つ値を探します。<code>service(name)</code> はその登録簿から説明（<code>description</code>）が <code>name</code> の部品を取り出し、名前とキーの対応を覚えておきます（毎秒何十回も呼ぶため）。</p>
+<table>
+<tr><th>部品の名前</th><th>用途</th></tr>
+<tr><td>PlayerAPI</td><td>再生の操作・状態・キュー</td></tr>
+<tr><td>PlayerSDK</td><td>音声要素・音質・先読み（harmony の streamer）</td></tr>
+<tr><td>LibraryAPI / RootlistAPI</td><td>ライブラリ・プレイリストとフォルダ</td></tr>
+<tr><td>AdManagers</td><td>広告マネージャー（停止する）</td></tr>
+<tr><td>AuthorizationAPI</td><td>ログイン情報</td></tr>
+</table>
+
+<h2>5.7 polyfill.js の中身</h2>
+<ul>
+<li><b>MediaSession の代用</b>：Android WebView に無い <code>navigator.mediaSession</code> と <code>MediaMetadata</code> を補う。無いと Web Player の再生処理が止まる</li>
+<li><b>アプリとの窓口</b>：<code>window.__native</code>（<code>send</code>・<code>setPlaying</code>・<code>getSetting</code>・<code>setSetting</code>・<code>relay</code>）</li>
+<li><b>Connect</b>：<code>connect-state</code> の通信から自分の機器 ID とクラスタ（機器の一覧・再生中の機器）を覚え、<code>window.__mConnect</code>（<code>get</code>・<code>onChange</code>・<code>transfer</code>）で使えるようにする。再生コマンドは <code>ConnectRelay</code> で端末から送り直す</li>
+</ul>
+
+<div class="pager"><a href="04-android-host.html">← 4. Android ホスト</a><a href="06-ui.html">6. 画面（UI） →</a></div>
+</main>
+</div>
+</body>
+</html>

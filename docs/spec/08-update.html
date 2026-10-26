@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8. アプリ内アップデート | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html" class="on">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>8. アプリ内アップデート</h1>
+<p class="lead">GitHub Releases の最新版を確かめ、ダウンロードしてインストーラーに渡すまで。</p>
+
+<h2>8.1 状態</h2>
+<svg class="diagram" viewBox="0 0 900 220" role="img" aria-label="アップデートの状態遷移">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="fill:var(--sub)"/></marker></defs>
+<rect class="box" x="10" y="80" width="90" height="40" rx="8"/><text x="34" y="105">Idle</text>
+<rect class="box" x="140" y="80" width="110" height="40" rx="8"/><text x="160" y="105">Checking</text>
+<rect class="box" x="300" y="20" width="120" height="40" rx="8"/><text x="316" y="45">UpToDate</text>
+<rect class="box" x="300" y="80" width="120" height="40" rx="8"/><text x="318" y="105">Available</text>
+<rect class="box" x="300" y="140" width="120" height="40" rx="8"/><text x="330" y="165">Failed</text>
+<rect class="box" x="480" y="80" width="140" height="40" rx="8"/><text x="498" y="105">Downloading</text>
+<rect class="box" x="680" y="80" width="100" height="40" rx="8"/><text x="706" y="105">Ready</text>
+<rect class="box" x="680" y="160" width="200" height="40" rx="8"/><text x="694" y="185">インストーラー（Android）</text>
+<path class="arrow" d="M100 100 H140"/><path class="arrow" d="M250 95 L300 45"/><path class="arrow" d="M250 100 H300"/><path class="arrow" d="M250 105 L300 155"/>
+<path class="arrow" d="M420 100 H480"/><path class="arrow" d="M620 100 H680"/><path class="arrow" d="M730 120 V160"/><path class="arrow" d="M550 120 L420 160"/>
+<text x="430" y="94" class="sub">更新</text><text x="200" y="74" class="sub">確認</text>
+</svg>
+<table>
+<tr><th>状態</th><th>設定の行の表示</th></tr>
+<tr><td>Idle</td><td>押すと新しい版を確認します</td></tr>
+<tr><td>Checking</td><td>確認中…</td></tr>
+<tr><td>UpToDate</td><td>最新の版です</td></tr>
+<tr><td>Available</td><td>新しい版 X があります（お知らせのダイアログも出る）</td></tr>
+<tr><td>Downloading</td><td>ダウンロード中… N%</td></tr>
+<tr><td>Ready</td><td>押すと X をインストールします</td></tr>
+<tr><td>Failed</td><td>確認できませんでした／ダウンロードに失敗しました</td></tr>
+</table>
+
+<h2>8.2 確認のタイミング</h2>
+<ul>
+<li>起動して Web Player の準備ができたとき（<code>checkIfDue</code>）。前回の確認から 6 時間たっていなければ何もしない</li>
+<li>設定の「アップデート」を押したとき（<code>check(manual = true)</code>）</li>
+<li>起動時の確認では、「あとで」にした版はもう出さない（手動の確認では出す）</li>
+</ul>
+
+<h2>8.3 最新版の調べ方</h2>
+<ol>
+<li><b>GitHub API</b>：<code>GET https://api.github.com/repos/ninjin0802/spotfy/releases/latest</code>。<code>tag_name</code>・<code>body</code>（リリースノート）・<code>.apk</code> の資産の URL と大きさを取る</li>
+<li><b>API に断られたとき</b>（IP ごとに 1 時間 60 回まで。VPN などで 403 になる）：<code>https://github.com/ninjin0802/spotfy/releases/latest</code> の転送先（<code>/tag/vX.Y.Z</code>）から版を取り、APK は <code>releases/download/vX.Y.Z/spotfy-X.Y.Z.apk</code>、リリースノートはそのタグの <code>CHANGELOG.md</code> の節から取る</li>
+<li>版の比較は数字ごと（<code>2.10.0 &gt; 2.9.3</code>）</li>
+</ol>
+
+<h2>8.4 ダウンロードとインストール</h2>
+<ul>
+<li>保存先は <code>cacheDir/updates/spotfy.apk</code>。まず <code>.part</code> に書き、大きさが合っていれば名前を変える</li>
+<li>進み具合は 1% ごとに知らせる。ダウンロードは画面を閉じても続ける（Updater 自身のコルーチン）</li>
+<li>転送（リダイレクト）は自分で追い、https 以外への転送は拒否する（最大 5 回）</li>
+<li>終わったら <code>FileProvider</code>（<code>${applicationId}.updates</code>）の URI で <code>ACTION_VIEW</code> を開く</li>
+<li>「この提供元のアプリを許可」がまだなら、先にその設定画面を開く</li>
+<li>最新の版だと分かったら、残っている APK を消す</li>
+</ul>
+
+<h2>8.5 安全性</h2>
+<ul>
+<li>Android は同じ署名の APK でしか上書きを許さないため、ほかの人が作った APK に置き換わることはない</li>
+<li>通信は https だけ。トークンなどの秘密の情報は使わない</li>
+</ul>
+
+<h2>8.6 記録</h2>
+<table>
+<tr><th>イベント</th><th>意味</th></tr>
+<tr><td>update.api.failed</td><td>API に断られ、リリースページから調べ直した</td></tr>
+<tr><td>update.check.failed</td><td>確認に失敗した</td></tr>
+<tr><td>update.download.failed</td><td>ダウンロードに失敗した</td></tr>
+</table>
+
+<div class="pager"><a href="07-playback.html">← 7. 再生と広告</a><a href="09-settings-i18n.html">9. 設定と多言語 →</a></div>
+</main>
+</div>
+</body>
+</html>

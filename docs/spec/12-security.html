@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12. セキュリティと制約 | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html" class="on">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>12. セキュリティと制約</h1>
+<p class="lead">守っていること、既知の制約、運用上のリスク。</p>
+
+<h2>12.1 守っていること</h2>
+<table>
+<tr><th>対象</th><th>対策</th></tr>
+<tr><td>ログイン</td><td>Spotify 公式のログインページを使う。アプリはパスワードを扱わない</td></tr>
+<tr><td>ページとの通信</td><td><code>AndroidBridge</code> は open.spotify.com のメインフレームにだけ注入し、届いたメッセージの送信元とメインフレームかを確認する</td></tr>
+<tr><td>スクリプトの注入</td><td>polyfill.js・bridge.js は open.spotify.com にだけ入れる</td></tr>
+<tr><td>独自スキーム</td><td><code>spotify:</code>・<code>intent:</code> などの独自スキームへの移動は無視する（ほかのアプリを勝手に開かない）</td></tr>
+<tr><td>Connect の送り直し</td><td>Spotify のドメインの決まったパスと方法だけ。Cookie・User-Agent は付けない。リダイレクト先に Cookie を渡さない</td></tr>
+<tr><td>共有</td><td>アプリから共有できるのは https://open.spotify.com/ のリンクだけ</td></tr>
+<tr><td>アップデート</td><td>https だけ、同じ署名の APK でしか上書きできない。https 以外への転送は拒否</td></tr>
+<tr><td>ログ</td><td>トークン・Cookie は記録しない。長さと文字を制限する。ログアウトで消す</td></tr>
+<tr><td>保存</td><td>曲を端末に保存しない。中継サーバーを持たない</td></tr>
+<tr><td>Activity・Service</td><td>外部に公開するのは起動用の MainActivity だけ。Receiver・Service・FileProvider は非公開</td></tr>
+</table>
+
+<h2>12.2 既知の制約</h2>
+<ul>
+<li>Web Player の内部の部品・GraphQL のハッシュに依存するため、Spotify の更新で動かなくなることがある</li>
+<li>Premium・公式アプリ専用の機能（ロスレス・Jam・ダウンロード・最高音質）は使えない</li>
+<li>Spotify の公開 Web API はこのアプリのトークンでは 429 になるため使えない（再生回数の統計なども作れない）</li>
+<li>準備が終わる前に再生ボタンを押すと、反応しないことがある（<code>bridge.error toggle</code>）</li>
+<li>起動には Web Player の読み込み分の時間がかかる（約 2 秒）</li>
+</ul>
+
+<h2>12.3 運用上のリスク</h2>
+<div class="warn">広告の処理は Spotify の利用規約に反する可能性があり、アカウントに影響する場合があります。spotfy は Spotify AB とは関係のない非公式のアプリです。「Spotify」は Spotify AB の商標です。</div>
+<ul>
+<li>目立つと削除の要請を受ける可能性があるため、特設サイトなどで広く宣伝しない方針</li>
+<li>GitHub API の回数制限に達したときは、リリースページから更新を確かめる（<a href="08-update.html">8 章</a>）</li>
+</ul>
+
+<div class="pager"><a href="11-build-release.html">← 11. ビルドとリリース</a><span></span></div>
+</main>
+</div>
+</body>
+</html>

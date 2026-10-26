@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1. 概要 | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html" class="on">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>1. 概要</h1>
+<p class="lead">spotfy が何をするアプリか、だれのためのものか、何ができて何ができないか。</p>
+
+<h2>1.1 目的</h2>
+<p>Spotify の公式アプリに近い操作感で、Spotify Web Player の再生エンジンを Android から使えるようにすることが目的です。
+特に無料プランで、広告の間の音を消して早く終わらせる、公式アプリに近い画面で操作できる、という体験を提供します。</p>
+
+<h2>1.2 対象</h2>
+<table>
+<tr><th>項目</th><th>内容</th></tr>
+<tr><td>対象の端末</td><td>Android 8.0（API 26）以上。Android System WebView が動くこと</td></tr>
+<tr><td>対象のアカウント</td><td>Spotify の無料プラン・Premium（Premium 限定の機能は Web Player の範囲でのみ使える）</td></tr>
+<tr><td>表示の言語</td><td>日本語・英語（端末に合わせる／設定で固定）</td></tr>
+<tr><td>配布</td><td>GitHub Releases の APK（<code>spotfy-&lt;版&gt;.apk</code>）。Play ストアでは配布しない</td></tr>
+<tr><td>パッケージ名</td><td><code>com.ninjin.spotifyweb</code>（表示名は spotfy）</td></tr>
+</table>
+
+<h2>1.3 機能一覧</h2>
+<table>
+<tr><th>分類</th><th>機能</th></tr>
+<tr><td>ホーム</td><td>すべて／音楽／ポッドキャスト（フォロー中）の切り替え、ショートカット、棚、最新リリース</td></tr>
+<tr><td>検索</td><td>ジャンルのタイル、最近の検索（保存・削除）、入力に合わせた結果、種類の絞り込み</td></tr>
+<tr><td>ライブラリ</td><td>絞り込み・並べ替え・リスト／グリッド、ピン、ライブラリ内検索、プレイリスト・フォルダの作成</td></tr>
+<tr><td>ページ</td><td>アルバム・プレイリスト・アーティスト・ジャンル・プロフィールの表示</td></tr>
+<tr><td>プレーヤー</td><td>ミニ／全画面プレーヤー（ジャケット色）、歌詞、アーティストについて、次に再生</td></tr>
+<tr><td>キュー</td><td>ドラッグでの並べ替え、外す、シャッフル、リピート、おやすみタイマー</td></tr>
+<tr><td>再生</td><td>ギャップレス再生、クロスフェード（1〜12 秒）、バックグラウンド再生、音質（Wi-Fi／モバイル別）</td></tr>
+<tr><td>広告の処理</td><td>Web Player の広告マネージャーの停止、広告中のミュートと 16 倍速、可能ならスキップ</td></tr>
+<tr><td>キャスト</td><td>Spotify Connect で PC・スピーカー・TV へ、スマホのスピーカー／Bluetooth の切り替え</td></tr>
+<tr><td>メニュー</td><td>最近（再生したものを日ごとに）、あなたへのおすすめ新着、設定</td></tr>
+<tr><td>ソーシャル</td><td>プロフィールの編集、フォロワー／フォロー中、ほかのユーザーのフォロー</td></tr>
+<tr><td>通知</td><td>メディア通知（再生・一時停止・前後・シーク）、ロック画面の操作</td></tr>
+<tr><td>設定</td><td>テーマカラー 5 色、AMOLED ブラック、言語、デバッグログの共有、アップデート、このアプリについて</td></tr>
+<tr><td>アップデート</td><td>GitHub Releases の新しい版を知らせ、ダウンロードしてインストーラーに渡す</td></tr>
+</table>
+
+<h2>1.4 前提と制約</h2>
+<ul>
+<li>Spotify の公開 Web API（api.spotify.com）は使わない。このアプリのトークンでは回数制限（429）になるため、Web Player 自身が使う GraphQL・内部 API を同じ手段で呼ぶ</li>
+<li>Web Player の内部の部品に依存するため、Spotify の更新で一部の機能が動かなくなることがある（<a href="10-diagnostics.html">健康診断</a>で検知する）</li>
+<li>Premium・公式アプリ専用の機能（ロスレス、Jam、ダウンロード、最高音質など）は使えない。Jam は Web Player 側でこのアカウントに配られていないことを確認済み</li>
+<li>無料プランの音質の上限は AAC 128 kbps（Web Player の制限）</li>
+<li>中継サーバーは持たない。通信は端末と Spotify・GitHub の間だけ</li>
+</ul>
+
+<h2>1.5 非機能要件</h2>
+<table>
+<tr><th>項目</th><th>方針</th></tr>
+<tr><td>起動</td><td>約 2 秒で画面が出る（前回のホームなどを覚えておき、先に出す）</td></tr>
+<tr><td>電池</td><td>バックグラウンド再生中は CPU 1 コアの 45〜55% 程度（主に DRM の復号）。ページ自体は描かない</td></tr>
+<tr><td>安定性</td><td>WebView のプロセスが落ちても作り直す。通信エラーは自前の画面で知らせ、つながると自動で開き直す</td></tr>
+<tr><td>保守性</td><td>Spotify の更新で壊れた部品を健康診断とデバッグログで特定できるようにする</td></tr>
+</table>
+
+<div class="pager"><a href="index.html">← spotfy 仕様書</a><a href="02-architecture.html">2. アーキテクチャ →</a></div>
+</main>
+</div>
+</body>
+</html>

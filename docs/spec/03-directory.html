@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3. ディレクトリ構成 | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html" class="on">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>3. ディレクトリ構成</h1>
+<p class="lead">リポジトリのファイル構成と、各ファイルの役割。</p>
+
+<h2>3.1 全体</h2>
+<pre><code>spotfy/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                 # CI（構文チェック・ビルド・スモークテスト）
+├── app/
+│   ├── build.gradle.kts           # アプリのビルド設定（VERSION から versionCode を計算）
+│   ├── proguard-rules.pro         # R8（難読化・縮小）の設定
+│   └── src/main/
+│       ├── AndroidManifest.xml    # 権限・Activity・Service・FileProvider
+│       ├── assets/
+│       │   ├── bridge.js          # ページ側のブリッジ（読み込み完了後に注入）
+│       │   └── polyfill.js        # 読み込み開始時に入る下支え
+│       ├── java/com/ninjin/spotifyweb/
+│       │   ├── MainActivity.kt    # ホスト（WebView・通信・通知・設定）
+│       │   ├── Bridge.kt          # アプリ側のブリッジとデータ型
+│       │   ├── AppHost.kt         # 画面から使う端末側の機能（interface）
+│       │   ├── NativeApp.kt       # 画面のルート・タブ・サイドメニュー
+│       │   ├── HomeScreen.kt      # ホーム
+│       │   ├── Screens.kt         # ページ・検索・ライブラリ
+│       │   ├── Player.kt          # ミニ／全画面プレーヤー・歌詞
+│       │   ├── Sheets.kt          # メニュー・デバイスのシート
+│       │   ├── Extras.kt          # キュー・タイマー・作成・プロフィール
+│       │   ├── DrawerScreens.kt   # 最近・新着
+│       │   ├── SettingsScreen.kt  # 設定
+│       │   ├── UpdateUi.kt        # アップデートの表示
+│       │   ├── AboutScreen.kt     # このアプリについて
+│       │   ├── Components.kt      # 共通部品（読み込み中など）
+│       │   ├── Theme.kt           # 色・アクセント・AMOLED
+│       │   ├── I18n.kt            # 日本語／英語・言語の設定
+│       │   ├── Updater.kt         # アプリ内アップデート
+│       │   ├── DebugLog.kt        # デバッグログ
+│       │   ├── ConnectRelay.kt    # Connect の通信の送り直し
+│       │   ├── SpotifyWebView.kt  # WebView の設定（UA・Client Hints）
+│       │   ├── AwakeWebView.kt    # 裏でも止まらない WebView
+│       │   ├── MediaControls.kt   # メディア通知・MediaSession
+│       │   ├── PlaybackService.kt # バックグラウンド再生のサービス
+│       │   └── WebViewMissingActivity.kt # WebView が無いときの案内
+│       └── res/
+│           ├── drawable/          # アイコン（イコライザー）・通知アイコン
+│           ├── mipmap-anydpi-v26/ # アダプティブアイコン
+│           ├── values/            # 文字列・色・テーマ
+│           ├── values-v31/        # Android 12 以降のテーマ
+│           └── xml/
+│               ├── locales_config.xml  # アプリの言語（ja / en）
+│               └── update_paths.xml    # 更新用 APK の置き場（FileProvider）
+├── docs/
+│   ├── icon.png                   # README のアイコン
+│   └── spec/                      # この仕様書
+├── scripts/
+│   ├── release.sh                 # リリース（ビルド・タグ・GitHub Releases）
+│   └── smoke-test.sh              # エミュレーターでの起動まわりの確認
+├── build.gradle.kts               # ルートのビルド設定（プラグインの版）
+├── settings.gradle.kts
+├── gradle.properties
+├── VERSION                        # 版の番号（唯一の置き場）
+├── CHANGELOG.md                   # 変更履歴（リリースノートの元）
+├── README.md / README.en.md       # 説明（日本語／英語）
+└── LICENSE                        # MIT</code></pre>
+
+<h2>3.2 Kotlin のファイル</h2>
+<table>
+<tr><th>ファイル</th><th>主な中身</th></tr>
+<tr><td>MainActivity.kt</td><td>WebView の生成、<code>WebViewClient</code>（読み込み・エラー・プロセス停止）、<code>onPageMessage</code>、AppHost の実装、通知・サービス・音声出力・通信状態の監視</td></tr>
+<tr><td>Bridge.kt</td><td><code>call()</code>、<code>onMessage()</code>、データ型（Card・Shelf・Track・Page・HomeFeed・PlayerState）、キャッシュ（ホーム・ライブラリ・ページ 40 件）</td></tr>
+<tr><td>AppHost.kt</td><td>設定の読み書き、音質、共有、出力の切り替え、デバッグログの共有、ログアウト、Updater</td></tr>
+<tr><td>NativeApp.kt</td><td>タブ（ホーム・検索・ライブラリ）、ページの積み重ね、各シートの表示状態、サイドメニュー、タブバー</td></tr>
+<tr><td>HomeScreen.kt</td><td>HomeScreen・Chips・Shortcuts・FeedCard・ShelfRow</td></tr>
+<tr><td>Screens.kt</td><td>PageScreen・SearchScreen・GenreTile・SearchTyping・LibraryScreen</td></tr>
+<tr><td>Player.kt</td><td>MiniPlayer・FullPlayer・PlayerMain・PlayerExtras・LyricsScreen</td></tr>
+<tr><td>Sheets.kt</td><td>MenuSheet（曲・アルバムなどのメニュー）・DevicesSheet</td></tr>
+<tr><td>Extras.kt</td><td>QueueSheet・SleepTimerSheet・CreateSheet・ProfileScreen・FollowListScreen・EditProfileSheet</td></tr>
+<tr><td>DrawerScreens.kt</td><td>WhatsNewScreen・RecentsScreen</td></tr>
+<tr><td>SettingsScreen.kt</td><td>設定のページ（アカウント・表示・再生・音質・言語）と共通の行（SettingRow・SwitchRow・RadioRow）</td></tr>
+<tr><td>UpdateUi.kt</td><td>UpdateRow（設定の行）・UpdateDialog（お知らせ）</td></tr>
+<tr><td>AboutScreen.kt</td><td>AboutPage（版・作者のクレジット・リンク・注意書き）</td></tr>
+<tr><td>Updater.kt</td><td>状態（Idle〜Failed）、確認（API → リリースページ）、ダウンロード、インストール</td></tr>
+<tr><td>I18n.kt</td><td><code>tr(ja, en)</code>・<code>isJapanese</code>・<code>AppLanguage</code></td></tr>
+<tr><td>DebugLog.kt</td><td>記録（最大 800 行）、logcat への出力、通信の記録</td></tr>
+</table>
+
+<div class="pager"><a href="02-architecture.html">← 2. アーキテクチャ</a><a href="04-android-host.html">4. Android ホスト →</a></div>
+</main>
+</div>
+</body>
+</html>

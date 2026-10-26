@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9. 設定と多言語 | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html" class="on">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>9. 設定と多言語</h1>
+<p class="lead">設定の項目、保存先、言語の切り替えの仕組み。</p>
+
+<h2>9.1 設定の画面</h2>
+<table>
+<tr><th>項目</th><th>中身</th></tr>
+<tr><td>⚠ 一部の機能が使えません</td><td>健康診断で足りない部品があるときだけ、いちばん上に出る。押すとデバッグログを共有する</td></tr>
+<tr><td>アカウント</td><td>ユーザー名、ログアウト</td></tr>
+<tr><td>コンテンツと表示</td><td>テーマカラー（5 色）、AMOLED ブラック</td></tr>
+<tr><td>再生</td><td>バックグラウンド再生、広告をブロック、ギャップレス再生、クロスフェード（1〜12 秒）</td></tr>
+<tr><td>メディアの音質</td><td>Wi-Fi／モバイルの音質、いまの接続、いま再生中の音質</td></tr>
+<tr><td>言語</td><td>端末の設定に合わせる（初期値）／日本語／English</td></tr>
+<tr><td>デバッグログを共有</td><td>直近の記録を共有シートで送る</td></tr>
+<tr><td>アップデート</td><td>いまの版と更新の状態（<a href="08-update.html">8 章</a>）</td></tr>
+<tr><td>このアプリについて</td><td>アイコン・版・作者のクレジット・リンク・注意書き</td></tr>
+</table>
+
+<h2>9.2 保存先</h2>
+<table>
+<tr><th>SharedPreferences</th><th>キー</th><th>初期値</th><th>意味</th></tr>
+<tr><td rowspan="11">settings</td><td>background</td><td>true</td><td>バックグラウンド再生</td></tr>
+<tr><td>adblock</td><td>true</td><td>広告の処理</td></tr>
+<tr><td>gapless</td><td>true</td><td>ギャップレス再生</td></tr>
+<tr><td>crossfade</td><td>0</td><td>クロスフェードの秒数（0 はオフ）</td></tr>
+<tr><td>quality / quality.cell</td><td>auto / Wi-Fi と同じ</td><td>音質</td></tr>
+<tr><td>accent</td><td>green</td><td>テーマカラー</td></tr>
+<tr><td>amoled</td><td>false</td><td>AMOLED ブラック</td></tr>
+<tr><td>orientation</td><td>portrait</td><td>画面の向き</td></tr>
+<tr><td>webdebug</td><td>false</td><td>PC から WebView を調べられるようにする</td></tr>
+<tr><td>language</td><td>（空）</td><td>言語（Android 12 以前のみ。13 以降はシステムのアプリの言語）</td></tr>
+<tr><td>debug.log</td><td>—</td><td>デバッグログの本文</td></tr>
+<tr><td>cache</td><td>home / library / browse / user / player</td><td>—</td><td>前回の結果（先に表示するため）。ログアウトで消す</td></tr>
+<tr><td>update</td><td>checkedAt / skipped</td><td>—</td><td>前回の確認の時刻、「あとで」にした版</td></tr>
+</table>
+
+<h2>9.3 多言語</h2>
+<ul>
+<li>文言は <code>tr("日本語", "English")</code> で並べて書き、<code>Locale.getDefault().language == "ja"</code> なら日本語、それ以外は英語を使う</li>
+<li>ページ側（bridge.js）も <code>T(ja, en)</code> で同じように切り替える（<code>navigator.language</code>）</li>
+<li>Android 13 以降は <code>locales_config.xml</code>（ja・en）で、システムの「アプリの言語」からも選べる</li>
+</ul>
+<h3>言語の設定（AppLanguage）</h3>
+<table>
+<tr><th>処理</th><th>内容</th></tr>
+<tr><td>get</td><td>Android 13 以降は <code>LocaleManager.applicationLocales</code>、それより前は <code>settings.language</code></td></tr>
+<tr><td>set</td><td>上と同じ場所に保存して apply する</td></tr>
+<tr><td>apply</td><td>設定が空なら端末の言語、あればその言語を <code>Locale.setDefault</code> にし、<code>revision</code> を 1 増やす</td></tr>
+</table>
+<p>Activity は作り直しません（<code>configChanges</code> に <code>locale|layoutDirection</code>）。作り直すと WebView も作り直され、再生が止まるためです。
+代わりに <code>isJapanese</code> が <code>revision</code>（Compose の状態）を読むので、文言を使っている部分だけが描き直されます。</p>
+
+<div class="pager"><a href="08-update.html">← 8. アプリ内アップデート</a><a href="10-diagnostics.html">10. 診断とログ →</a></div>
+</main>
+</div>
+</body>
+</html>

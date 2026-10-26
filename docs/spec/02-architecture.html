@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2. アーキテクチャ | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html" class="on">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>2. アーキテクチャ</h1>
+<p class="lead">画面・ブリッジ・Web Player の 3 層と、その間のデータと操作の流れ。</p>
+
+<h2>2.1 全体構成</h2>
+<svg class="diagram" viewBox="0 0 900 520" role="img" aria-label="全体構成図">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="fill:var(--sub)"/></marker></defs>
+<rect class="box" x="10" y="10" width="640" height="500" rx="12"/><text x="26" y="36" font-weight="700">Android アプリ（com.ninjin.spotifyweb）</text>
+<rect class="box" x="30" y="56" width="260" height="150" rx="8"/><text x="44" y="80" font-weight="700">ネイティブ UI（Compose）</text>
+<text x="44" y="104" class="sub">NativeApp / HomeScreen / Screens</text><text x="44" y="122" class="sub">Player / Sheets / Extras</text><text x="44" y="140" class="sub">SettingsScreen / UpdateUi / AboutScreen</text><text x="44" y="158" class="sub">DrawerScreens / Components / Theme</text>
+<rect class="box" x="330" y="56" width="300" height="150" rx="8"/><text x="344" y="80" font-weight="700">ホスト（MainActivity）</text>
+<text x="344" y="104" class="sub">AppHost（設定・共有・ログアウト）</text><text x="344" y="122" class="sub">Updater / DebugLog / ConnectRelay</text><text x="344" y="140" class="sub">MediaControls / PlaybackService</text><text x="344" y="158" class="sub">SpotifyWebView / AwakeWebView</text>
+<rect class="box" x="30" y="236" width="600" height="56" rx="8"/><rect class="hl" x="30" y="236" width="600" height="56" rx="8"/><text x="44" y="260" font-weight="700">Bridge.kt</text><text x="44" y="280" class="sub">call(method,args) → postMessage / StateFlow（ready・player・missing）</text>
+<rect class="box" x="30" y="322" width="600" height="170" rx="8"/><text x="44" y="346" font-weight="700">WebView（非表示）</text>
+<rect class="box" x="50" y="362" width="170" height="110" rx="6"/><text x="62" y="384" font-weight="700">polyfill.js</text><text x="62" y="404" class="sub">MediaSession の代用</text><text x="62" y="420" class="sub">AndroidBridge の窓口</text><text x="62" y="436" class="sub">Connect の送り直し</text>
+<rect class="box" x="235" y="362" width="170" height="110" rx="6"/><text x="247" y="384" font-weight="700">bridge.js</text><text x="247" y="404" class="sub">メソッド（__mb.call）</text><text x="247" y="420" class="sub">状態の送信（bstate）</text><text x="247" y="436" class="sub">広告・クロスフェード</text>
+<rect class="box" x="420" y="362" width="190" height="110" rx="6"/><text x="432" y="384" font-weight="700">Spotify Web Player</text><text x="432" y="404" class="sub">登録簿（PlayerAPI など）</text><text x="432" y="420" class="sub">GraphQL ローダー</text><text x="432" y="436" class="sub">再生（EME / DRM）</text>
+<rect class="box" x="700" y="160" width="190" height="90" rx="8"/><text x="716" y="190" font-weight="700">Spotify</text><text x="716" y="212" class="sub">open / spclient / GraphQL</text><text x="716" y="228" class="sub">accounts（ログイン）</text>
+<rect class="box" x="700" y="300" width="190" height="70" rx="8"/><text x="716" y="330" font-weight="700">GitHub</text><text x="716" y="350" class="sub">Releases（更新の確認）</text>
+<path class="arrow" d="M160 206 V236"/><path class="arrow" d="M480 206 V236"/><path class="arrow" d="M330 292 V362"/>
+<path class="arrow" d="M405 417 H420"/><path class="arrow" d="M610 400 C 660 400, 660 220, 700 210"/><path class="arrow" d="M630 120 C 670 120, 680 190, 700 195"/><path class="arrow" d="M630 160 C 670 200, 670 320, 700 330"/>
+</svg>
+
+<h2>2.2 層と責務</h2>
+<table>
+<tr><th>層</th><th>主なファイル</th><th>責務</th></tr>
+<tr><td>ネイティブ UI</td><td><code>NativeApp.kt</code> ほか</td><td>画面の表示と操作。データは Bridge から受け取り、端末側の機能は AppHost 経由で使う</td></tr>
+<tr><td>ホスト</td><td><code>MainActivity.kt</code></td><td>WebView の生成と設定、ページとの通信の受け口、通知・バックグラウンド・設定・エラー表示・アップデート</td></tr>
+<tr><td>ブリッジ（アプリ側）</td><td><code>Bridge.kt</code></td><td>ページのメソッドを suspend 関数として呼ぶ。結果を型（Card・Page など）に直す。再生状態などを StateFlow で配る</td></tr>
+<tr><td>ブリッジ（ページ側）</td><td><code>bridge.js</code></td><td>Web Player の登録簿・GraphQL を呼んでデータを作る。再生状態を送る。広告・クロスフェード・ギャップレス</td></tr>
+<tr><td>下支え</td><td><code>polyfill.js</code></td><td>ページの読み込み開始時に入る。MediaSession の代用、アプリとの窓口（<code>__native</code>）、Connect の通信の送り直し</td></tr>
+<tr><td>再生エンジン</td><td>Spotify Web Player</td><td>ログイン状態・データ取得・再生（DRM）・Connect</td></tr>
+</table>
+
+<h2>2.3 データの流れ（読み込み）</h2>
+<ol>
+<li>画面（例：<code>HomeScreen</code>）が <code>bridge.home()</code> を呼ぶ</li>
+<li><code>Bridge.call("home")</code> が ID を振り、<code>__mb.call(id, "home", args)</code> をページで実行する（<code>evaluateJavascript</code>）</li>
+<li><code>bridge.js</code> の <code>methods.home</code> が Web Player の GraphQL ローダー（<code>gql()</code>）を呼び、結果を軽い JSON に整える</li>
+<li>ページが <code>{type:"bres", id, ok, value}</code> を <code>AndroidBridge.postMessage</code> で返す</li>
+<li><code>MainActivity.onPageMessage</code> → <code>Bridge.onMessage</code> が待っている呼び出しを再開し、<code>HomeFeed</code> などに直して返す</li>
+</ol>
+
+<h2>2.4 状態の流れ（再生）</h2>
+<ol>
+<li><code>bridge.js</code> は <code>PlayerAPI</code> の update イベントと 1 秒ごとのタイマーで <code>snapshot()</code> を作る</li>
+<li>前回と変わっていれば <code>bstate</code>（画面用）・<code>playing</code>（サービス用）・<code>meta</code>（通知用）を送る</li>
+<li><code>Bridge</code> が <code>player: StateFlow&lt;PlayerState&gt;</code> を更新し、ミニプレーヤー・全画面プレーヤーが描き直される</li>
+<li><code>MediaControls</code> が通知とロック画面の表示を更新し、<code>PlaybackService</code> がバックグラウンド再生を保つ</li>
+</ol>
+
+<h2>2.5 操作の流れ（通知のボタン）</h2>
+<p>通知のボタン → <code>MediaControls.Receiver</code> → <code>MainActivity</code> → <code>window.__mMedia(action, pos)</code> → <code>PlayerAPI.resume / pause / skipToNext / skipToPrevious / seekTo</code>。</p>
+
+<h2>2.6 設計の判断</h2>
+<table>
+<tr><th>判断</th><th>理由</th></tr>
+<tr><td>ページの画面は使わず、ネイティブ UI を重ねる</td><td>v1 はページの見た目を組み替えていたが、重く壊れやすかった。データだけ取り出して自前で描くほうが軽く、公式アプリに近づけられる</td></tr>
+<tr><td>Web Player 自身の GraphQL ローダーを使う</td><td>ログイン情報・トークンの扱いを Web Player に任せられる。公開 Web API は 429 になる</td></tr>
+<tr><td>デスクトップの Chrome を名乗る</td><td>モバイル UA だとアプリのダウンロード案内に飛ばされ、再生デバイスとして動かない</td></tr>
+<tr><td>WebView を常に「見えている」扱いにする</td><td>裏に回るとページのタイマーと再生が止まるため（<code>AwakeWebView</code>）</td></tr>
+<tr><td>ページは描かない（<code>content-visibility: hidden</code>）</td><td>見えない画面の描画をやめて電池を節約する</td></tr>
+<tr><td>Connect の通信は端末から送り直す</td><td>WebView が付ける <code>X-Requested-With</code> で再生コマンドが拒否されるため（<code>ConnectRelay</code>）</td></tr>
+</table>
+
+<div class="pager"><a href="01-overview.html">← 1. 概要</a><a href="03-directory.html">3. ディレクトリ構成 →</a></div>
+</main>
+</div>
+</body>
+</html>

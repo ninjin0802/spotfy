@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4. Android ホスト | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html" class="on">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>4. Android ホスト</h1>
+<p class="lead">MainActivity が受け持つ WebView の設定・読み込み・ライフサイクル・バックグラウンド再生。</p>
+
+<h2>4.1 起動の流れ</h2>
+<ol>
+<li><code>dumpDebugLogIfAsked</code>：起動の Intent に <code>dumpDebugLog=true</code> があればログを logcat に出す</li>
+<li><code>WebViewMissingActivity.webViewUsable</code>：WebView が無い・古いときは案内の画面に切り替えて終わる</li>
+<li><code>AppLanguage.apply</code>・<code>applyOrientation</code>：言語と画面の向きを合わせる</li>
+<li><code>AwakeWebView</code> を作り、<code>Bridge</code> と <code>ComposeView</code>（<code>NativeApp</code>）を用意する</li>
+<li>重ね順は WebView → ComposeView → 接続エラーの画面（<code>loadError</code>）</li>
+<li><code>SpotifyWebView.configure</code>：JavaScript・DOM Storage・自動再生・デスクトップ UA・Client Hints・<code>X-Requested-With</code> の送信先を空に</li>
+<li><code>addWebMessageListener("AndroidBridge", open.spotify.com)</code> と <code>addDocumentStartJavaScript(polyfill.js)</code></li>
+<li>最初の URL（共有された open.spotify.com のリンク、または <code>https://open.spotify.com/</code>）を読み込む</li>
+<li><code>bridge.ready</code> を見て、ログインしていなければログインページへ、していれば音質・クロスフェード・ギャップレスを適用して画面を出す</li>
+</ol>
+
+<h2>4.2 WebView の設定</h2>
+<table>
+<tr><th>設定</th><th>値・理由</th></tr>
+<tr><td>User-Agent</td><td>Windows のデスクトップ Chrome。モバイルだとアプリの案内に飛ばされる</td></tr>
+<tr><td>Client Hints</td><td>デスクトップ Windows を名乗る。名乗らないと再生デバイスとして動かない</td></tr>
+<tr><td>X-Requested-With</td><td>送信先の許可リストを空にして付けない（対応している WebView のみ）</td></tr>
+<tr><td>自動再生</td><td><code>mediaPlaybackRequiresUserGesture = false</code></td></tr>
+<tr><td>Cookie</td><td>受け入れる（サードパーティも）。ログイン状態は Cookie で保つ</td></tr>
+<tr><td>描画の優先度</td><td><code>RENDERER_PRIORITY_IMPORTANT</code></td></tr>
+<tr><td>デバッグ</td><td>デバッグビルド、または設定の <code>webdebug</code> が true のときだけ PC から調べられる</td></tr>
+</table>
+
+<h2>4.3 ページの読み込みとエラー</h2>
+<table>
+<tr><th>コールバック</th><th>動き</th></tr>
+<tr><td>shouldOverrideUrlLoading</td><td>http / https はそのまま WebView で開く。<code>spotify:</code>・<code>intent:</code> などの独自スキームは開けないので無視する</td></tr>
+<tr><td>shouldInterceptRequest</td><td>通信を記録する（<code>DebugLog.traceRequest</code>）。中身は変えない</td></tr>
+<tr><td>onPageCommitVisible / onPageFinished</td><td><code>bridge.js</code> を注入する（<code>injectMobileUi</code>）</td></tr>
+<tr><td>onReceivedError</td><td>メインフレームの失敗なら <code>loadError</code> を出す。再試行ボタンと、つながったときの自動再試行。失敗した URL を読み直す</td></tr>
+<tr><td>onRenderProcessGone</td><td>WebView のプロセスが落ちたら Activity を作り直す</td></tr>
+</table>
+
+<h2>4.4 バックグラウンド再生</h2>
+<ul>
+<li><code>AwakeWebView</code> は <code>getWindowVisibility()</code> を常に VISIBLE にし、裏に回ってもページを止めない</li>
+<li>再生が始まると <code>PlaybackService</code>（フォアグラウンドサービス、種類は mediaPlayback）を起動し、WakeLock と WifiLock を持つ</li>
+<li>一時停止してから 10 分たつとサービスを止める</li>
+<li>設定の「バックグラウンド再生」がオフなら、サービスは起動しない</li>
+<li>イヤホンが抜けたとき（<code>ACTION_AUDIO_BECOMING_NOISY</code>）は一時停止する</li>
+</ul>
+
+<h2>4.5 通知とメディア操作</h2>
+<p><code>MediaControls</code> が <code>MediaSession</code> と通知を持ちます。<code>meta</code> メッセージで曲名・アーティスト・アルバム・ジャケット・再生中か・位置・長さを受け取り、通知とロック画面を更新します。
+ボタンの操作は <code>Receiver</code>（BroadcastReceiver）→ <code>window.__mMedia</code> の順に伝えます。</p>
+
+<h2>4.6 端末の状態の監視</h2>
+<table>
+<tr><th>対象</th><th>用途</th></tr>
+<tr><td>通信（ConnectivityManager）</td><td>モバイルかどうかで音質を切り替える（<code>applyQuality</code>）。ページにも伝える</td></tr>
+<tr><td>音声出力（AudioDeviceCallback）</td><td>Bluetooth などの出力先の名前をミニプレーヤーに出す</td></tr>
+<tr><td>画面の余白（WindowInsets）</td><td>ステータスバー・ナビゲーションバーの高さ。edge-to-edge に対応する</td></tr>
+<tr><td>設定の変更（onConfigurationChanged）</td><td>言語の変更を受けて画面の文言を描き直す（Activity は作り直さない）</td></tr>
+</table>
+
+<h2>4.7 ログアウト</h2>
+<p>覚えておいたホーム・ユーザー名などのキャッシュ、デバッグログ、ページの保存データ（WebStorage）、Cookie を消し、Activity を作り直してログインページから始めます。</p>
+
+<h2>4.8 権限</h2>
+<table>
+<tr><th>権限</th><th>用途</th></tr>
+<tr><td>INTERNET / ACCESS_NETWORK_STATE</td><td>通信と、モバイル通信かどうかの判定</td></tr>
+<tr><td>FOREGROUND_SERVICE / FOREGROUND_SERVICE_MEDIA_PLAYBACK</td><td>バックグラウンド再生</td></tr>
+<tr><td>POST_NOTIFICATIONS</td><td>メディア通知</td></tr>
+<tr><td>WAKE_LOCK</td><td>再生中にスリープで止まらないようにする</td></tr>
+<tr><td>REQUEST_INSTALL_PACKAGES</td><td>アプリ内アップデートで新しい版をインストールする</td></tr>
+</table>
+
+<div class="pager"><a href="03-directory.html">← 3. ディレクトリ構成</a><a href="05-bridge.html">5. ブリッジ →</a></div>
+</main>
+</div>
+</body>
+</html>
