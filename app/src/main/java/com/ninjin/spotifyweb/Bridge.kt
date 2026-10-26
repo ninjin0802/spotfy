@@ -246,9 +246,15 @@ class Bridge(
     }
     suspend fun whatsNew(type: String): List<Card> = cards(call("whatsNew", JSONObject().put("type", type)) as? JSONArray)
     /** 最近再生したもの（URI と再生した時刻 ms、新しい順） */
-    suspend fun recents(): List<Pair<String, Long>> = (call("recents") as? JSONArray)?.let { a ->
-        (0 until a.length()).map { a.getJSONObject(it).let { o -> o.optString("uri") to o.optLong("at") } }
-    } ?: emptyList()
+    data class Recent(val uri: String, val at: Long, val title: String, val artist: String, val image: String, val round: Boolean)
+
+    /** 「最近」。前回の結果を覚えておき、次に開いたときに先に出す */
+    suspend fun recents(): List<Recent> = (call("recents") as? JSONArray)
+        ?.also { cache.edit().putString("recents", it.toString()).apply() }.let(::parseRecents)
+    fun cachedRecents(): List<Recent>? = cache.getString("recents", null)?.let { runCatching { parseRecents(JSONArray(it)) }.getOrNull() }
+    private fun parseRecents(a: JSONArray?): List<Recent> = if (a == null) emptyList() else (0 until a.length()).map { i ->
+        a.getJSONObject(i).let { Recent(it.optString("uri"), it.optLong("at"), it.optString("title"), it.optString("artist"), it.optString("image"), it.optBoolean("round")) }
+    }
     suspend fun transfer(id: String) = call("transfer", JSONObject().put("id", id)) == true
 
     data class Lyrics(val synced: Boolean, val lines: List<Pair<Long, String>>, val bg: Int)

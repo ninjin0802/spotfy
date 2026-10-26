@@ -84,9 +84,9 @@ internal fun WhatsNewScreen(bridge: Bridge, onBack: () -> Unit, onPlay: (Card) -
 /** 「最近」：最近再生したアルバム・プレイリスト・アーティストを、日ごとにまとめて新しい順に */
 @Composable
 internal fun RecentsScreen(bridge: Bridge, onBack: () -> Unit, onOpen: (Card) -> Unit) {
-    var recents by remember { mutableStateOf<List<Pair<String, Long>>?>(null) }
+    var recents by remember { mutableStateOf(bridge.cachedRecents()) }
     var failed by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { runCatching { bridge.recents() }.onSuccess { recents = it }.onFailure { failed = true } }
+    LaunchedEffect(Unit) { runCatching { bridge.recents() }.onSuccess { recents = it }.onFailure { if (recents == null) failed = true } }
     Column(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}) {
         DrawerHeader(tr("最近", "Recents"), onBack)
         val list = recents
@@ -95,36 +95,31 @@ internal fun RecentsScreen(bridge: Bridge, onBack: () -> Unit, onOpen: (Card) ->
             list == null -> Loading()
             list.isEmpty() -> Placeholder(tr("最近再生したものはありません", "Nothing played recently"))
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 170.dp)) {
-                list.groupBy { dayLabel(it.second) }.forEach { (day, entries) ->
+                list.groupBy { dayLabel(it.at) }.forEach { (day, entries) ->
                     item(key = "day-$day") { Text(day, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp)) }
-                    items(entries, key = { it.first }) { (uri, _) -> RecentRow(bridge, uri, onOpen) }
+                    items(entries, key = { it.uri }) { RecentRow(it, onOpen) }
                 }
             }
         }
     }
 }
 
-/** 1 件ずつ、画面に出たときに名前と画像を読み込む（一覧には URI しか来ないため） */
 @Composable
-private fun RecentRow(bridge: Bridge, uri: String, onOpen: (Card) -> Unit) {
-    var page by remember(uri) { mutableStateOf<Page?>(null) }
-    LaunchedEffect(uri) { page = runCatching { bridge.page(uri) }.getOrNull() }
-    val p = page
-    val round = p?.round == true || uri.startsWith("spotify:artist:")
-    val liked = uri.contains(":collection")
+private fun RecentRow(r: Bridge.Recent, onOpen: (Card) -> Unit) {
+    val round = r.round || r.uri.startsWith("spotify:artist:")
+    val liked = r.uri.contains(":collection")
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = p != null) { p?.let { onOpen(Card(uri, it.title, it.subtitle, it.image, round)) } }.padding(horizontal = 16.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().clickable { onOpen(Card(r.uri, r.title, r.artist, r.image, round)) }.padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val shape = if (round) CircleShape else RoundedCornerShape(4.dp)
         if (liked) Box(Modifier.size(56.dp).clip(shape).background(Color(0xFF5038A0)), contentAlignment = Alignment.Center) { Text("♥", color = Color.White, fontSize = 22.sp) }
-        else AsyncImage(p?.image, null, Modifier.size(56.dp).clip(shape).background(Card2), contentScale = ContentScale.Crop)
+        else AsyncImage(r.image, null, Modifier.size(56.dp).clip(shape).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
-            Text(p?.title ?: "", color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(kindLabel(uri) + (p?.artist?.takeIf { it.isNotEmpty() }?.let { " • $it" } ?: ""), color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(r.title, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(kindLabel(r.uri) + (r.artist.takeIf { it.isNotEmpty() }?.let { " • $it" } ?: ""), color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
-    if (p == null) Box(Modifier.height(0.dp))
 }
 
 private fun kindLabel(uri: String) = when {

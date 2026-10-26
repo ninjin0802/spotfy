@@ -632,8 +632,14 @@
         if (!r.ok) throw new Error('recently-played ' + r.status);
         return r.json();
       }).then(function (j) {
-        return (j.playContexts || []).filter(function (c) { return /^spotify:(album|playlist|artist|user:[^:]+:collection)/.test(c.uri || ''); })
-          .map(function (c) { return { uri: c.uri, at: c.lastPlayedTime || 0 }; });
+        var list = (j.playContexts || []).filter(function (c) { return /^spotify:(album|playlist|artist|user:[^:]+:collection)/.test(c.uri || ''); });
+        // 名前と画像もここでまとめて取る（曲の一覧は要らないので 1 曲だけ頼む）
+        return Promise.all(list.map(function (c) {
+          return recentInfo(c.uri).then(null, function () { return {}; }).then(function (i) {
+            i.uri = c.uri; i.at = c.lastPlayedTime || 0;
+            return i;
+          });
+        }));
       });
     },
     transfer: function (a) {
@@ -776,6 +782,24 @@
       shuffle: !!st.shuffle, repeat: st.repeat || 0, context: st.context && st.context.uri || ''
     };
   }
+  // 「最近」の 1 件分の名前・画像・作った人（ページを丸ごと読むと重いので、要るところだけ）
+  function recentInfo(uri) {
+    var kind = uri.split(':')[1];
+    if (uri.indexOf(':collection') > 0) return Promise.resolve({ title: T('お気に入りの曲', 'Liked Songs') });
+    if (kind === 'album') return gql('getAlbum', { uri: uri, locale: '', offset: 0, limit: 1 }).then(function (r) {
+      var d = r.data.albumUnion;
+      return { title: d.name, image: pickImg(d.coverArt), artist: names(d.artists) };
+    });
+    if (kind === 'artist') return gql('queryArtistOverview', { uri: uri, locale: '', includePrerelease: false }).then(function (r) {
+      var d = r.data.artistUnion;
+      return { title: d.profile && d.profile.name, image: pickImg(d.visuals), round: true };
+    });
+    return gql('fetchPlaylist', { uri: uri, offset: 0, limit: 1, enableWatchFeedEntrypoint: false }).then(function (r) {
+      var d = r.data.playlistV2;
+      return { title: d.name, image: pickImg(d.images), artist: d.ownerV2 && d.ownerV2.data && d.ownerV2.data.name || '' };
+    });
+  }
+
   // 再生中の曲がお気に入りかどうか（曲が変わったときに一度だけ調べる）
   var likedFor = '', liked = false;
   function checkLiked(uri) {
