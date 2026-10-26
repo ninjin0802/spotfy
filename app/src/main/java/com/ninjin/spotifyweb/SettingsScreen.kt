@@ -61,7 +61,7 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 24) { if (page != null) page = null else onBack() }
             Text(
-                when (page) { "quality" -> tr("メディアの音質", "Media quality"); "playback" -> tr("再生", "Playback"); "account" -> tr("アカウント", "Account"); "look" -> tr("コンテンツと表示", "Content and display"); else -> tr("設定", "Settings") },
+                when (page) { "quality" -> tr("メディアの音質", "Media quality"); "playback" -> tr("再生", "Playback"); "account" -> tr("アカウント", "Account"); "look" -> tr("コンテンツと表示", "Content and display"); "about" -> tr("このアプリについて", "About"); else -> tr("設定", "Settings") },
                 color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp),
             )
         }
@@ -98,7 +98,24 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                             else -> scope.launch { host.updater.check() }
                         }
                     }
-                    SettingRow(tr("このアプリについて", "About this app"), tr("Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません", "An unofficial app built on the Spotify Web Player. Nothing is saved to your device")) {}
+                    SettingRow(tr("このアプリについて", "About this app"), tr("Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません", "An unofficial app built on the Spotify Web Player. Nothing is saved to your device")) { page = "about" }
+                }
+                "about" -> {
+                    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+                    val repo = "https://github.com/${Updater.REPO}"
+                    Section(tr("バージョン情報", "Version"))
+                    SettingRow(tr("バージョン", "Version"), "${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）") {}
+                    SettingRow(tr("変更履歴", "Release notes"), tr("GitHub の Releases で見る", "View on GitHub Releases")) { uri.openUri("$repo/releases") }
+                    Section(tr("クレジット", "Credits"))
+                    SettingRow(tr("作者", "Author"), "ninjin0802") { uri.openUri("https://github.com/ninjin0802") }
+                    SettingRow(tr("ソースコード", "Source code"), repo.removePrefix("https://")) { uri.openUri(repo) }
+                    SettingRow(tr("ライセンス", "License"), "MIT License") { uri.openUri("$repo/blob/main/LICENSE") }
+                    Section(tr("ご注意", "Notice"))
+                    SettingRow(
+                        tr("非公式のアプリです", "Unofficial app"),
+                        tr("Spotify AB とは関係がなく、承認も受けていません。「Spotify」は Spotify AB の商標です。Spotify Web Player を使っており、曲は端末に保存しません",
+                            "Not affiliated with or endorsed by Spotify AB. \"Spotify\" is a trademark of Spotify AB. Built on the Spotify Web Player; nothing is saved to your device"),
+                    ) {}
                 }
                 "account" -> {
                     SettingRow(tr("ユーザー名", "Username"), user?.name ?: "") {}
