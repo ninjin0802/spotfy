@@ -100,23 +100,7 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     }
                     SettingRow(tr("このアプリについて", "About this app"), tr("Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません", "An unofficial app built on the Spotify Web Player. Nothing is saved to your device")) { page = "about" }
                 }
-                "about" -> {
-                    val uri = androidx.compose.ui.platform.LocalUriHandler.current
-                    val repo = "https://github.com/${Updater.REPO}"
-                    Section(tr("バージョン情報", "Version"))
-                    SettingRow(tr("バージョン", "Version"), "${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）") {}
-                    SettingRow(tr("変更履歴", "Release notes"), tr("GitHub の Releases で見る", "View on GitHub Releases")) { uri.openUri("$repo/releases") }
-                    Section(tr("クレジット", "Credits"))
-                    SettingRow(tr("作者", "Author"), "ninjin0802") { uri.openUri("https://github.com/ninjin0802") }
-                    SettingRow(tr("ソースコード", "Source code"), repo.removePrefix("https://")) { uri.openUri(repo) }
-                    SettingRow(tr("ライセンス", "License"), "MIT License") { uri.openUri("$repo/blob/main/LICENSE") }
-                    Section(tr("ご注意", "Notice"))
-                    SettingRow(
-                        tr("非公式のアプリです", "Unofficial app"),
-                        tr("Spotify AB とは関係がなく、承認も受けていません。「Spotify」は Spotify AB の商標です。Spotify Web Player を使っており、曲は端末に保存しません",
-                            "Not affiliated with or endorsed by Spotify AB. \"Spotify\" is a trademark of Spotify AB. Built on the Spotify Web Player; nothing is saved to your device"),
-                    ) {}
-                }
+                "about" -> AboutPage()
                 "account" -> {
                     SettingRow(tr("ユーザー名", "Username"), user?.name ?: "") {}
                     SettingRow(tr("ログアウト", "Log out"), tr("このアプリからログアウトします", "Log out of this app")) { host.logout() }
@@ -260,4 +244,52 @@ internal fun UpdateDialog(updater: Updater) {
         },
         containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
     )
+}
+
+/** 「このアプリについて」。アイコンと版、作者のクレジット、リンク、注意書き */
+@Composable
+private fun AboutPage() {
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val repo = "https://github.com/${Updater.REPO}"
+    Column(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(96.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp)).background(Color(0xFF121212)), contentAlignment = Alignment.Center) {
+            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize())
+        }
+        Text("spotfy", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
+        Text(
+            tr("バージョン ${BuildConfig.VERSION_NAME}", "Version ${BuildConfig.VERSION_NAME}"),
+            color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 8.dp).clip(CircleShape).background(Accent.copy(alpha = 0.15f)).padding(horizontal = 12.dp, vertical = 4.dp),
+        )
+        Text(tr("Spotify Web Player を、公式アプリのような操作感で", "The Spotify Web Player, with the feel of the official app"), color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp))
+    }
+
+    Section(tr("クレジット", "Credits"))
+    // 作者のカード（GitHub のアイコンと名前。押すとプロフィールを開く）
+    Row(
+        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .background(Color(0xFF1F1F1F)).clickable { uri.openUri("https://github.com/ninjin0802") }.padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        coil.compose.AsyncImage("https://github.com/ninjin0802.png?size=128", null, Modifier.size(52.dp).clip(CircleShape).background(Color(0xFF333333)))
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Text(tr("作者", "Created by"), color = Sub, fontSize = 12.sp)
+            Text("ninjin0802", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+            Text(tr("設計・開発・デザイン", "Design & development"), color = Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        Text("GitHub ›", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+
+    Section(tr("リンク", "Links"))
+    SettingRow(tr("変更履歴", "Release notes"), tr("GitHub の Releases で見る", "View on GitHub Releases")) { uri.openUri("$repo/releases") }
+    SettingRow(tr("ソースコード", "Source code"), repo.removePrefix("https://")) { uri.openUri(repo) }
+    SettingRow(tr("ライセンス", "License"), "MIT License") { uri.openUri("$repo/blob/main/LICENSE") }
+
+    Text(
+        tr("これは非公式のアプリです。Spotify AB とは関係がなく、承認も受けていません。「Spotify」は Spotify AB の商標です。曲は端末に保存しません。",
+            "This is an unofficial app, not affiliated with or endorsed by Spotify AB. \"Spotify\" is a trademark of Spotify AB. Nothing is saved to your device."),
+        color = Color(0x80FFFFFF), fontSize = 12.sp, lineHeight = 18.sp,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+    )
+    Text("© 2026 ninjin0802", color = Color(0x80FFFFFF), fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
 }
