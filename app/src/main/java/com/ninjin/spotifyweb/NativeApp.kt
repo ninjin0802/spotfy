@@ -93,6 +93,8 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     var user by remember { mutableStateOf(bridge.cachedUser()) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(ready) { if (ready) runCatching { bridge.user() }.getOrNull()?.let { user = it } }
+    // 新しい版が出ていないか、起動して準備ができたら確かめる（6 時間に 1 回まで）
+    LaunchedEffect(ready) { if (ready) host.updater.checkIfDue() }
     val tint = rememberArtColor(player.image)
 
     BackHandler(enabled = playerOpen) { playerOpen = false }
@@ -177,6 +179,7 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false }) { Text(tr("キャンセル", "Cancel"), color = Color.White) } },
             containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
         )
+        UpdateDialog(host.updater)
         if (devicesOpen) DevicesSheet(bridge, host) { devicesOpen = false }
         if (queueOpen) QueueSheet(bridge, player) { queueOpen = false }
         if (createOpen) CreateSheet(bridge, onCreated = { c -> open(c) }) { createOpen = false }

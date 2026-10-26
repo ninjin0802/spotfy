@@ -13,4 +13,6 @@ interface AppHost {
     fun outputName(): String
     fun shareDebugLog()
     fun logout()
+    /** アプリ内アップデート（GitHub Releases から新しい版を落としてインストール） */
+    val updater: Updater
 }
