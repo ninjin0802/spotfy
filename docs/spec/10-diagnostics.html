@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10. 診断とログ | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html" class="on">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>10. 診断とログ</h1>
+<p class="lead">Spotify の更新で壊れたときに原因を追うための仕組み。</p>
+
+<h2>10.1 デバッグログ</h2>
+<table>
+<tr><th>項目</th><th>内容</th></tr>
+<tr><td>形式</td><td><code>yyyy-MM-dd HH:mm:ss.SSS イベント 詳細</code>（1 行 1 件）</td></tr>
+<tr><td>上限</td><td>最新 800 行。古いものから消える</td></tr>
+<tr><td>保存</td><td>SharedPreferences（<code>settings</code> の <code>debug.log</code>）。少し待ってからまとめて保存</td></tr>
+<tr><td>logcat</td><td>タグ <code>spotfy-debug</code> でも出す</td></tr>
+<tr><td>消すとき</td><td>ログアウトしたとき</td></tr>
+<tr><td>安全</td><td>イベント名は英数字と <code>._-</code> だけ（64 文字まで）、詳細は改行を消して 160 文字まで。通信は URL の主要部分だけ記録する</td></tr>
+</table>
+
+<h3>取り出し方</h3>
+<pre><code>adb shell am start -n com.ninjin.spotifyweb/.MainActivity --ez dumpDebugLog true
+adb logcat -s spotfy-debug</code></pre>
+<p>アプリの設定 →「デバッグログを共有」からも送れます。</p>
+
+<h3>主なイベント</h3>
+<table>
+<tr><th>イベント</th><th>意味</th></tr>
+<tr><td>bridge.health</td><td>健康診断の結果（ok か、足りない機能の名前）</td></tr>
+<tr><td>bridge.error / bridge.timeout</td><td>メソッドの失敗・時間切れ</td></tr>
+<tr><td>ad.manager.disabled / enabled</td><td>広告マネージャーの停止・復帰</td></tr>
+<tr><td>ad.detected / ad.mute.* / ad.speed.applied / ad.skip.* / ad.state.ended</td><td>広告の処理（<a href="07-playback.html">7 章</a>）</td></tr>
+<tr><td>connect.active</td><td>再生中の機器が変わった（種類・音量）</td></tr>
+<tr><td>net / net.adpath</td><td>通信の記録（広告関係の通信は net.adpath）</td></tr>
+<tr><td>page.error / page.renderer_gone</td><td>ページの読み込みの失敗、WebView のプロセスの停止（crash / killed）</td></tr>
+<tr><td>update.*</td><td>アップデートの失敗（<a href="08-update.html">8 章</a>）</td></tr>
+</table>
+
+<h2>10.2 健康診断</h2>
+<p>Web Player の準備ができてから 5 秒後に、使っている部品がそろっているかを確かめ、足りないものを <code>bhealth</code> で知らせます。足りないものがあれば、設定のいちばん上に「⚠ 一部の機能が使えません」と出ます。</p>
+<table>
+<tr><th>機能</th><th>確かめること</th></tr>
+<tr><td>データの取得（ホーム・検索・ライブラリ）</td><td>GraphQL ローダーがある</td></tr>
+<tr><td>再生の操作</td><td>PlayerAPI に getState・skipToNext・seekTo がある</td></tr>
+<tr><td>音量・広告の早送り・クロスフェード</td><td>streamer の音声要素にたどり着ける</td></tr>
+<tr><td>音質の切り替え</td><td>setMediaPlaybackQuality がある</td></tr>
+<tr><td>ギャップレス再生</td><td>先読みの関数がある</td></tr>
+<tr><td>広告の停止</td><td>AdManagers.audio がある</td></tr>
+<tr><td>ログイン情報</td><td>AuthorizationAPI.getState がある</td></tr>
+</table>
+
+<h2>10.3 エラーの表示</h2>
+<table>
+<tr><th>場面</th><th>表示</th></tr>
+<tr><td>通信できない</td><td>「Spotify に接続できません」の画面。再試行ボタン、つながったら自動で開き直す</td></tr>
+<tr><td>WebView が無い・古い</td><td>WebViewMissingActivity で「Android System WebView が必要です」と案内する（落ちない）</td></tr>
+<tr><td>WebView のプロセスが落ちた</td><td>Activity を作り直す</td></tr>
+<tr><td>データの読み込みに失敗</td><td>各画面で「読み込めませんでした」などを出す</td></tr>
+</table>
+
+<div class="pager"><a href="09-settings-i18n.html">← 9. 設定と多言語</a><a href="11-build-release.html">11. ビルドとリリース →</a></div>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7. 再生と広告 | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html" class="on">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>7. 再生と広告</h1>
+<p class="lead">再生の操作、広告の処理、クロスフェード、ギャップレス、音質、Spotify Connect。</p>
+
+<h2>7.1 再生の操作</h2>
+<p>再生の操作はすべて <code>PlayerAPI</code> を呼びます（play・pause・resume・skipToNext・skipToPrevious・seekTo・setShuffle・setRepeat・addToQueue・skipTo・removeFromQueue）。
+曲を指定して再生するときは、再生元（アルバム・プレイリスト）と曲の URI を渡します。</p>
+
+<h2>7.2 広告の処理</h2>
+<div class="note">設定の「広告をブロック」がオン（初期値）のときだけ動きます。オフにすると、広告マネージャーを元に戻し、広告の処理もやめます。</div>
+<h3>流れ</h3>
+<ol>
+<li><b>広告マネージャーの停止</b>：<code>AdManagers.audio</code> と <code>inStreamApi</code> を止める（<code>ad.manager.disabled</code>）。ページの読み込み直しや更新のあとにも、何度でも適用できる</li>
+<li><b>見張り</b>：0.3 秒ごとに再生中の項目を調べ、広告かどうかを判定する（<code>isAd</code>）。広告の切り替えでは update イベントが来ないことがあるため、イベントとは別にタイマーで見る</li>
+<li><b>見つけたら</b>：<code>ad.detected</code> を記録し、音声要素の音量を 0.001 にする（<code>ad.mute.applied</code>）。<code>muted</code> にはしない（止めると先へ進めなくなる）</li>
+<li><b>16 倍速</b>：<code>playbackRate = 16</code>（だめなら 4）。Web Player が速度を戻してくるので付け直す（<code>ad.speed.applied</code>、記録は広告 1 本につき 1 回）</li>
+<li><b>スキップ</b>：広告の区切りごとに 1 回だけ試す（<code>ad.skip.request</code> → accepted / rejected）</li>
+<li><b>終わったら</b>：音量と速度を戻す（<code>ad.mute.restored</code>）。その後 15 秒は、音量が下がったままになっていないか見張る（<code>ad.volume.fixed</code>）</li>
+<li><b>保険</b>：ミュートから 75 秒たっても広告のままなら、音量を戻す（<code>ad.mute.failsafe</code>）</li>
+</ol>
+<h3>やらないこと（試してやめたこと）</h3>
+<table>
+<tr><th>方法</th><th>やめた理由</th></tr>
+<tr><td>広告の音声の通信を止める</td><td>再生が止まって進まなくなった</td></tr>
+<tr><td>広告の最後までシークする</td><td>再生が止まった</td></tr>
+<tr><td>Worker で通信を書き換える</td><td>不安定で、ほかの機能に影響した</td></tr>
+</table>
+
+<h2>7.3 クロスフェード</h2>
+<ul>
+<li>設定で 1〜12 秒（0 はオフ）。<code>crossfade(sec)</code> でページに伝える</li>
+<li>曲の始めと終わりの、それぞれ設定の半分の時間で音量を変える。変え方はサイン曲線（耳に自然な変化）</li>
+<li>音量 = 元の音量 × sin(x × π / 2)。x は「始めからの時間 ÷ 半分」と「終わりまでの時間 ÷ 半分」の小さいほう（0〜1）</li>
+<li>広告の間はクロスフェードしない。元の音量は 0.01 以上として覚える（広告のミュートの値を覚えないため）</li>
+<li>クロスフェード中は、曲の切り替えの無音をなくす処理（ギャップの見張り）も動かす</li>
+</ul>
+
+<h2>7.4 ギャップレス再生</h2>
+<p>次の曲を早めに先読みさせ（<code>_preloadUpcomingTrack</code>）、曲の終わりの無音を飛ばして続けて再生します。広告の間と曲の終わり付近の扱いは、広告の処理と食い違わないようにしています。</p>
+
+<h2>7.5 音質</h2>
+<table>
+<tr><th>設定値</th><th>表示</th><th>説明</th></tr>
+<tr><td>auto</td><td>自動</td><td>通信状況に合わせる（初期値）</td></tr>
+<tr><td>low</td><td>低音質</td><td>通信量を抑える</td></tr>
+<tr><td>normal</td><td>標準</td><td>通信量を少し抑える</td></tr>
+<tr><td>high</td><td>高音質</td><td>AAC 128 kbps（無料プランの Web Player の上限）</td></tr>
+<tr><td>very_high</td><td>最高音質</td><td>AAC 256 kbps（Premium のみ。選べない表示）</td></tr>
+</table>
+<p>Wi-Fi 用（<code>quality</code>）とモバイル用（<code>quality.cell</code>）を別に持ち、通信が変わると切り替えます。いまの音質は <code>bitrate()</code> で確かめられます。</p>
+
+<h2>7.6 Spotify Connect</h2>
+<ul>
+<li>機器の一覧と再生中の機器は、<code>polyfill.js</code> が <code>connect-state</code> の通信から覚えたクラスタから作る</li>
+<li>機器の切り替え（<code>transfer</code>）とほかの機器への再生コマンドは、WebView ではなく端末から送る（<code>ConnectRelay</code>）。WebView が付ける <code>X-Requested-With</code> で拒否されるため</li>
+<li>送り直してよいのは、Spotify のドメインの <code>connect-state/v1</code> と <code>track-playback/v1</code> で、GET・POST・PUT・DELETE だけ。Cookie・User-Agent・X-Requested-With は付けない</li>
+<li>スマホのスピーカーと Bluetooth の切り替えは Android の出力の切り替え画面を開く</li>
+</ul>
+
+<div class="pager"><a href="06-ui.html">← 6. 画面（UI）</a><a href="08-update.html">8. アプリ内アップデート →</a></div>
+</main>
+</div>
+</body>
+</html>

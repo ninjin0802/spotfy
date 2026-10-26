@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spotfy 仕様書 | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html" class="on">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>spotfy 仕様書</h1>
+<p class="lead">非公式 Android アプリ spotfy（バージョン 2.4.2）の設計と仕様をまとめた文書です。章ごとにページを分けています。</p>
+
+<h2>この文書について</h2>
+<p>spotfy は、Spotify Web Player（open.spotify.com）を画面に出さない WebView で動かし、その上にアプリ独自のネイティブ UI（Jetpack Compose）を重ねて動く Android アプリです。
+データの取得と再生（DRM を含む）は Web Player に任せ、画面・通知・設定・広告の処理・アップデートなどをアプリ側で受け持ちます。</p>
+<p>この仕様書は、実装（<code>main</code> ブランチ）の内容をもとに書いています。コードと食い違う場合はコードが正です。</p>
+
+<h2>章の一覧</h2>
+<div class="grid">
+  <div class="card"><a href="01-overview.html"><b>1. 概要</b></a>目的・対象・機能一覧・前提と制約</div>
+  <div class="card"><a href="02-architecture.html"><b>2. アーキテクチャ</b></a>全体構成、層の分け方、データと操作の流れ</div>
+  <div class="card"><a href="03-directory.html"><b>3. ディレクトリ構成</b></a>リポジトリのファイル構成と各ファイルの役割</div>
+  <div class="card"><a href="04-android-host.html"><b>4. Android ホスト</b></a>MainActivity・WebView の設定・ライフサイクル・バックグラウンド再生</div>
+  <div class="card"><a href="05-bridge.html"><b>5. ブリッジ</b></a>アプリ ⇔ ページの通信、メッセージ形式、メソッド一覧</div>
+  <div class="card"><a href="06-ui.html"><b>6. 画面（UI）</b></a>画面構成・遷移・状態管理・テーマ</div>
+  <div class="card"><a href="07-playback.html"><b>7. 再生と広告</b></a>再生操作・広告の処理・クロスフェード・ギャップレス・音質・Connect</div>
+  <div class="card"><a href="08-update.html"><b>8. アプリ内アップデート</b></a>GitHub Releases を使った更新の流れ</div>
+  <div class="card"><a href="09-settings-i18n.html"><b>9. 設定と多言語</b></a>設定項目・保存先・言語の切り替え</div>
+  <div class="card"><a href="10-diagnostics.html"><b>10. 診断とログ</b></a>デバッグログ・健康診断・エラー表示</div>
+  <div class="card"><a href="11-build-release.html"><b>11. ビルドとリリース</b></a>バージョン管理・CI・スモークテスト・リリース手順</div>
+  <div class="card"><a href="12-security.html"><b>12. セキュリティと制約</b></a>守っていること・既知の制約・リスク</div>
+</div>
+
+<h2>用語</h2>
+<table>
+<tr><th>用語</th><th>意味</th></tr>
+<tr><td>Web Player</td><td>Spotify が提供するブラウザ版プレーヤー（open.spotify.com）。spotfy は画面に出さずに裏で動かす</td></tr>
+<tr><td>ネイティブ UI</td><td>アプリが Jetpack Compose で描く画面。Web Player のページの上に重ねて表示する</td></tr>
+<tr><td>ブリッジ</td><td>アプリ（Kotlin）とページ（JavaScript）の間の通信の仕組み。<code>Bridge.kt</code> と <code>bridge.js</code></td></tr>
+<tr><td>登録簿（Registry）</td><td>Web Player 内部のサービスの登録簿。<code>PlayerAPI</code> などの部品を名前で取り出せる</td></tr>
+<tr><td>Connect</td><td>Spotify Connect。ほかの機器（PC・スピーカー・TV）での再生を操作する仕組み</td></tr>
+<tr><td>健康診断</td><td>起動後に、使っている Web Player の部品がそろっているかを確かめる処理（<code>bhealth</code>）</td></tr>
+</table>
+
+<div class="pager"><span></span><a href="01-overview.html">1. 概要 →</a></div>
+</main>
+</div>
+</body>
+</html>

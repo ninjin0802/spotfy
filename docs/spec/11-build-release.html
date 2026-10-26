@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11. ビルドとリリース | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html" class="on">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>11. ビルドとリリース</h1>
+<p class="lead">バージョン管理、ビルドの設定、CI、スモークテスト、リリースの手順。</p>
+
+<h2>11.1 ビルドの環境</h2>
+<table>
+<tr><th>項目</th><th>値</th></tr>
+<tr><td>Android Gradle Plugin</td><td>9.4.1（Kotlin は AGP に組み込み）</td></tr>
+<tr><td>Gradle</td><td>9.8.2</td></tr>
+<tr><td>Kotlin</td><td>2.4.21</td></tr>
+<tr><td>compileSdk / targetSdk / minSdk</td><td>37 / 36 / 26</td></tr>
+<tr><td>Java</td><td>17</td></tr>
+<tr><td>主な依存</td><td>androidx.webkit、Jetpack Compose（BOM）、activity-compose、Coil、Palette</td></tr>
+<tr><td>リリースビルド</td><td>R8 で縮小・難読化（<code>isMinifyEnabled</code>・<code>isShrinkResources</code>）</td></tr>
+</table>
+
+<h2>11.2 バージョン管理</h2>
+<ul>
+<li>版の番号はルートの <code>VERSION</code>（<code>メジャー.マイナー.パッチ</code>）だけに書く</li>
+<li><code>versionName</code> はこの値、<code>versionCode</code> は <code>メジャー × 10000 + マイナー × 100 + パッチ</code>（2.4.2 → 20402）</li>
+<li>不具合の修正はパッチ、機能の追加はマイナーを上げる</li>
+<li><code>CHANGELOG.md</code> の先頭に <code>## &lt;版&gt;</code> の節を書く。リリースノートとアプリ内のお知らせに使う</li>
+</ul>
+
+<h2>11.3 署名</h2>
+<p>リリース用の署名鍵の情報は、リポジトリの外の <code>~/.config/spotfy/keystore.properties</code>（環境変数 <code>SPOTFY_KEYSTORE_PROPERTIES</code> で変えられる）から読みます。CI には鍵が無いので、デバッグ鍵で署名します。</p>
+
+<h2>11.4 ブランチと CI</h2>
+<ul>
+<li>作業ブランチから main への PR を作り、CI がすべて通ったらマージする。main へ直接 push しない</li>
+<li>CI（GitHub Actions）は PR と main への push のたびに動く</li>
+</ul>
+<table>
+<tr><th>ジョブ</th><th>内容</th></tr>
+<tr><td>build</td><td>bridge.js・polyfill.js・スクリプトの構文チェック、リリース設定でのビルド、APK の保存</td></tr>
+<tr><td>smoke（Android 15）</td><td>google_apis のエミュレーター（新しい WebView）でスモークテスト</td></tr>
+<tr><td>smoke（Android 8）</td><td>素のエミュレーター（WebView なし）でスモークテスト</td></tr>
+</table>
+
+<h2>11.5 スモークテスト（scripts/smoke-test.sh）</h2>
+<ul>
+<li>初回の起動でログイン画面が出る</li>
+<li>通信できないときに「Spotify に接続できません」が出て、つながると自動でログイン画面に戻る（日本語・英語のどちらの表示でも判定する）</li>
+<li>WebView が使えない端末で、落ちずに更新の案内が出る</li>
+<li>「応答なし」のダイアログが出たら自動で「待機」を押す</li>
+<li>環境変数：<code>SMOKE_AVD</code>・<code>SMOKE_AVD_OLD</code>（使う AVD）、<code>SMOKE_SERIAL</code>・<code>SMOKE_CASES</code>（起動済みのエミュレーターを使う）</li>
+</ul>
+
+<h2>11.6 リリースの手順（scripts/release.sh）</h2>
+<ol>
+<li><code>VERSION</code> と <code>CHANGELOG.md</code> を更新して PR → CI → main にマージ</li>
+<li>main の最新で <code>scripts/release.sh</code> を実行する</li>
+<li>スクリプトは次のどれかなら止まる：同じ版のタグがある、コミットしていない変更がある、main の最新でない、CHANGELOG に節がない</li>
+<li>スモークテストを実行する（急ぐときは <code>SKIP_SMOKE=1</code>）</li>
+<li>署名付きでビルドし、<code>build/spotfy-&lt;版&gt;.apk</code> を作る</li>
+<li><code>v&lt;版&gt;</code> のタグを付けて push し、GitHub Releases に APK とその版の節を上げる</li>
+<li>利用者の端末では、アプリ内アップデートで新しい版のお知らせが出る</li>
+</ol>
+
+<div class="pager"><a href="10-diagnostics.html">← 10. 診断とログ</a><a href="12-security.html">12. セキュリティと制約 →</a></div>
+</main>
+</div>
+</body>
+</html>

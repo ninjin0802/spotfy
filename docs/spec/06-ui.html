@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6. 画面（UI） | spotfy 仕様書</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav><div class="brand"><i><b style="height:8px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:12px"></b><b style="height:16px"></b></i>spotfy 仕様書</div>
+<div class="ver">バージョン 2.4.2</div><ol><li><a href="index.html">spotfy 仕様書</a></li><li><a href="01-overview.html">1. 概要</a></li><li><a href="02-architecture.html">2. アーキテクチャ</a></li><li><a href="03-directory.html">3. ディレクトリ構成</a></li><li><a href="04-android-host.html">4. Android ホスト</a></li><li><a href="05-bridge.html">5. ブリッジ</a></li><li><a href="06-ui.html" class="on">6. 画面（UI）</a></li><li><a href="07-playback.html">7. 再生と広告</a></li><li><a href="08-update.html">8. アプリ内アップデート</a></li><li><a href="09-settings-i18n.html">9. 設定と多言語</a></li><li><a href="10-diagnostics.html">10. 診断とログ</a></li><li><a href="11-build-release.html">11. ビルドとリリース</a></li><li><a href="12-security.html">12. セキュリティと制約</a></li></ol></nav>
+<main>
+<h1>6. 画面（UI）</h1>
+<p class="lead">Jetpack Compose で描く画面の構成・遷移・状態管理・テーマ。</p>
+
+<h2>6.1 画面の構成</h2>
+<svg class="diagram" viewBox="0 0 900 360" role="img" aria-label="画面の構成">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="fill:var(--sub)"/></marker></defs>
+<rect class="box" x="340" y="10" width="220" height="44" rx="8"/><text x="400" y="38" font-weight="700">NativeApp</text>
+<rect class="box" x="20" y="100" width="160" height="44" rx="8"/><text x="36" y="128">タブ：ホーム</text>
+<rect class="box" x="200" y="100" width="160" height="44" rx="8"/><text x="216" y="128">タブ：検索</text>
+<rect class="box" x="380" y="100" width="160" height="44" rx="8"/><text x="396" y="128">タブ：ライブラリ</text>
+<rect class="box" x="560" y="100" width="150" height="44" rx="8"/><text x="576" y="128">サイドメニュー</text>
+<rect class="box" x="730" y="100" width="150" height="44" rx="8"/><text x="746" y="128">プレーヤー</text>
+<rect class="box" x="80" y="200" width="440" height="44" rx="8"/><text x="96" y="228">ページの積み重ね（PageScreen：アルバム・プレイリストなど）</text>
+<rect class="box" x="560" y="200" width="150" height="120" rx="8"/><text x="572" y="224" class="sub">プロフィール</text><text x="572" y="244" class="sub">最近</text><text x="572" y="264" class="sub">あなたへのおすすめ新着</text><text x="572" y="284" class="sub">設定</text><text x="572" y="304" class="sub">アカウントの追加</text>
+<rect class="box" x="730" y="200" width="150" height="120" rx="8"/><text x="742" y="224" class="sub">ミニプレーヤー</text><text x="742" y="244" class="sub">全画面プレーヤー</text><text x="742" y="264" class="sub">歌詞</text><text x="742" y="284" class="sub">キュー・タイマー</text><text x="742" y="304" class="sub">デバイス</text>
+<rect class="box" x="80" y="290" width="440" height="44" rx="8"/><text x="96" y="318">シート：メニュー・作成・プロフィール編集・アップデート</text>
+<path class="arrow" d="M450 54 L100 100"/><path class="arrow" d="M450 54 L280 100"/><path class="arrow" d="M450 54 L460 100"/><path class="arrow" d="M450 54 L635 100"/><path class="arrow" d="M450 54 L805 100"/>
+<path class="arrow" d="M100 144 L250 200"/><path class="arrow" d="M280 144 L280 200"/><path class="arrow" d="M460 144 L330 200"/><path class="arrow" d="M635 144 V200"/><path class="arrow" d="M805 144 V200"/>
+</svg>
+
+<h2>6.2 画面の一覧</h2>
+<table>
+<tr><th>画面</th><th>Composable</th><th>データ</th></tr>
+<tr><td>ホーム</td><td>HomeScreen</td><td>home（前回の結果を先に出す）</td></tr>
+<tr><td>検索</td><td>SearchScreen・SearchTyping</td><td>browse・recent・search</td></tr>
+<tr><td>ライブラリ</td><td>LibraryScreen</td><td>library（前回の結果を先に出す）</td></tr>
+<tr><td>ページ</td><td>PageScreen</td><td>album・playlist・artist・genre（最大 40 件を覚える）</td></tr>
+<tr><td>ミニプレーヤー</td><td>MiniPlayer</td><td>player（StateFlow）</td></tr>
+<tr><td>全画面プレーヤー</td><td>FullPlayer・PlayerMain・PlayerExtras</td><td>player・about・nextUp</td></tr>
+<tr><td>歌詞</td><td>LyricsScreen</td><td>lyrics（同期歌詞なら位置に合わせて流れる）</td></tr>
+<tr><td>キュー</td><td>QueueSheet</td><td>queueList・reorder・unqueue</td></tr>
+<tr><td>デバイス</td><td>DevicesSheet</td><td>devices（2 秒ごと）・transfer</td></tr>
+<tr><td>メニュー</td><td>MenuSheet</td><td>trackInfo・inLibrary・like・queue</td></tr>
+<tr><td>プロフィール</td><td>ProfileScreen・FollowListScreen・EditProfileSheet</td><td>profile・followList・editProfile</td></tr>
+<tr><td>最近・新着</td><td>RecentsScreen・WhatsNewScreen</td><td>recents・whatsNew</td></tr>
+<tr><td>設定</td><td>SettingsScreen・UpdateRow・AboutPage</td><td>AppHost・Updater</td></tr>
+</table>
+
+<h2>6.3 遷移と戻る操作</h2>
+<ul>
+<li>タブごとにページの積み重ね（URI のリスト）を持つ。同じタブをもう一度押すと積み重ねを空にする</li>
+<li>戻る操作は、開いているものの上から順に閉じる：プレーヤー → 設定 → サイドメニュー → ページの積み重ね → ホームのタブ</li>
+<li>カードを押したとき、アルバム・プレイリスト・アーティストはページを開き、曲は再生する。ユーザーはプロフィールで開く</li>
+<li>ほかの機器の名前は 2.5 秒続いたときだけ出す（起動直後に前の再生先が一瞬見えるのを防ぐ）</li>
+</ul>
+
+<h2>6.4 下の帯（ミニプレーヤーとタブバー）</h2>
+<p>ミニプレーヤーとタブバーは画面の下にまとめて重ねます。帯の全体が押した判定を受け止め、余白やジェスチャーバーの上を押しても裏の画面に届かないようにしています。タブの当たり判定は上下の余白まで含めます。</p>
+
+<h2>6.5 テーマ</h2>
+<table>
+<tr><th>項目</th><th>内容</th></tr>
+<tr><td>背景</td><td>#121212（AMOLED ブラックがオンなら #000000）</td></tr>
+<tr><td>アクセント</td><td>緑・青・紫・ピンク・オレンジの 5 色から選ぶ（設定の <code>accent</code>）</td></tr>
+<tr><td>プレーヤーの色</td><td>ジャケットから色を取り出して使う（Palette）</td></tr>
+<tr><td>読み込み中</td><td>公式アプリと同じ動きの 3 つの点（LoadingDots）</td></tr>
+</table>
+
+<div class="pager"><a href="05-bridge.html">← 5. ブリッジ</a><a href="07-playback.html">7. 再生と広告 →</a></div>
+</main>
+</div>
+</body>
+</html>
