@@ -98,7 +98,11 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                 }
                 "look" -> {
                     Section(tr("テーマカラー", "Theme color"))
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // 1 段に 5 色まで（スマホの幅に収まるように折り返す）
+                    androidx.compose.foundation.layout.FlowRow(
+                        Modifier.padding(horizontal = 16.dp, vertical = 12.dp), maxItemsInEachRow = 5,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
                         Theme.accents.forEach { (key, color) ->
                             Box(
                                 Modifier.size(44.dp).clip(CircleShape).background(if (Theme.accent == color) Color.White else Color.Transparent).padding(3.dp)
