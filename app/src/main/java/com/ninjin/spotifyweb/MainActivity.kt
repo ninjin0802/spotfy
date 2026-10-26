@@ -327,6 +327,7 @@ class MainActivity : ComponentActivity() {
             val log = debug.lines().joinToString("\n").ifBlank { "No playback debug events recorded." }
             shareText("spotfy ${BuildConfig.VERSION_NAME} debug log\n$log", tr("デバッグログを共有", "Share debug log"), subject = "spotfy debug log")
         }
+        override val updater get() = this@MainActivity.updater
         override fun logout() {
             // Cookie を消して最初からログインページへ
             // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ、デバッグログ）も消し、画面を作り直す
@@ -481,6 +482,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val debug by lazy { DebugLog(settings) }
+    private val updater by lazy { Updater(applicationContext, ::recordDebug) }
     private fun recordDebug(event: String, detail: String = "") = debug.record(event, detail)
 
     private fun shareText(text: String, chooserTitle: String?, subject: String? = null) {

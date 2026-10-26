@@ -84,6 +84,7 @@ Share a debug log with a single tap.
 | 👥 **Social** | Edit your profile, followers / following, follow other users |
 | 🎨 **Theme** | 5 accent colors, AMOLED black |
 | 🌐 **Language** | English or Japanese, following your device (per-app language on Android 13+) |
+| 🔄 **Updates** | The app tells you when a new version is out and installs it with one tap |
 | 🎚 **Audio quality** | Separate settings for Wi-Fi and mobile data (free plan: up to AAC 128 kbps) |
 
 <br>

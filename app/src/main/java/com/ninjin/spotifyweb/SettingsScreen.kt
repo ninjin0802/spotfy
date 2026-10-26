@@ -39,7 +39,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // 端末の言語が変わったときに読み直すよう、毎回作る
 internal val QUALITIES get() = listOf(
@@ -53,6 +55,7 @@ internal val QUALITIES get() = listOf(
 @Composable
 internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, onBack: () -> Unit) {
     var page by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     BackHandler(enabled = page != null) { page = null }
     Column(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -76,6 +79,25 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     SettingRow(tr("再生", "Playback"), tr("バックグラウンド再生・広告抑制・クロスフェード", "Background playback, ad handling, crossfade")) { page = "playback" }
                     SettingRow(tr("メディアの音質", "Media quality"), tr("Wi-Fi・モバイルデータ通信でのストリーミング", "Streaming on Wi-Fi and mobile data")) { page = "quality" }
                     SettingRow(tr("デバッグログを共有", "Share debug log"), tr("直近の広告の検出・ミュート・早送りなどの記録", "Recent ad detection, muting and fast-forward events")) { host.shareDebugLog() }
+                    val update by host.updater.state.collectAsState()
+                    SettingRow(
+                        tr("アップデート", "Updates"),
+                        tr("いまの版: ${BuildConfig.VERSION_NAME}", "Current version: ${BuildConfig.VERSION_NAME}") + "\n" + when (val u = update) {
+                            Updater.State.Checking -> tr("確認中…", "Checking…")
+                            Updater.State.UpToDate -> tr("最新の版です", "You're up to date")
+                            is Updater.State.Available -> tr("新しい版 ${u.release.version} があります", "Version ${u.release.version} is available")
+                            is Updater.State.Downloading -> tr("ダウンロード中… ${(u.progress * 100).toInt()}%", "Downloading… ${(u.progress * 100).toInt()}%")
+                            is Updater.State.Ready -> tr("押すと ${u.release.version} をインストールします", "Tap to install ${u.release.version}")
+                            is Updater.State.Failed -> u.message
+                            Updater.State.Idle -> tr("押すと新しい版を確認します", "Tap to check for updates")
+                        },
+                    ) {
+                        when (update) {
+                            is Updater.State.Ready -> host.updater.install()
+                            is Updater.State.Checking, is Updater.State.Downloading -> {}
+                            else -> scope.launch { host.updater.check() }
+                        }
+                    }
                     SettingRow(tr("このアプリについて", "About this app"), tr("Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません", "An unofficial app built on the Spotify Web Player. Nothing is saved to your device")) {}
                 }
                 "account" -> {
@@ -180,4 +202,45 @@ internal fun RadioRow(q: Triple<String, String, String>, selected: Boolean, onCl
             else Box(Modifier.size(22.dp).clip(CircleShape).background(Color(0xFF7C7C7C)).padding(2.dp)) { Box(Modifier.fillMaxSize().clip(CircleShape).background(Bg)) }
         }
     }
+}
+
+/** 新しい版のお知らせ。「更新」で APK を落とし、終わったらインストーラーを開く */
+@Composable
+internal fun UpdateDialog(updater: Updater) {
+    val state by updater.state.collectAsState()
+    val release = when (val s = state) {
+        is Updater.State.Available -> s.release
+        is Updater.State.Downloading -> s.release
+        else -> return
+    }
+    val downloading = state as? Updater.State.Downloading
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { if (downloading == null) updater.later(release) },
+        title = { Text(tr("新しい版 ${release.version} があります", "Version ${release.version} is available")) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (downloading != null) {
+                    Text(tr("ダウンロード中… ${(downloading.progress * 100).toInt()}%", "Downloading… ${(downloading.progress * 100).toInt()}%"))
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { downloading.progress }, color = Accent, trackColor = Color(0x4DFFFFFF),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    )
+                } else {
+                    Text(tr("いまの版: ${BuildConfig.VERSION_NAME}", "Current version: ${BuildConfig.VERSION_NAME}"))
+                    // リリースノート（CHANGELOG の節）。Markdown の記号は見出しと箇条書きだけ軽く整える
+                    if (release.notes.isNotEmpty()) Text(
+                        release.notes.lines().joinToString("\n") { it.replace(Regex("^#+\\s*"), "").replace(Regex("^[-*]\\s+"), "・") },
+                        fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (downloading == null) androidx.compose.material3.TextButton(onClick = { updater.download(release) }) { Text(tr("更新", "Update"), color = Accent) }
+        },
+        dismissButton = {
+            if (downloading == null) androidx.compose.material3.TextButton(onClick = { updater.later(release) }) { Text(tr("あとで", "Later"), color = Color.White) }
+        },
+        containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
+    )
 }
