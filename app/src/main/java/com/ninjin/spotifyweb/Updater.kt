@@ -122,14 +122,19 @@ class Updater(private val context: Context, private val log: (String, String) ->
         )
     }
 
+    /** API で調べる。API は IP ごとに 1 時間 60 回までなので、断られたらリリースページの転送先から調べる */
     private suspend fun fetchLatest(): Release? = withContext(Dispatchers.IO) {
-        val conn = open("https://api.github.com/repos/$REPO/releases/latest")
-        conn.setRequestProperty("Accept", "application/vnd.github+json")
-        val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+        runCatching { fromApi() }.getOrElse { e ->
+            log("update.api.failed", e.message ?: e.javaClass.simpleName)
+            fromReleasePage()
+        }
+    }
+
+    private fun fromApi(): Release? {
+        val json = JSONObject(open("https://api.github.com/repos/$REPO/releases/latest").inputStream.bufferedReader().use { it.readText() })
         val assets = json.getJSONArray("assets")
-        val asset = (0 until assets.length()).map { assets.getJSONObject(it) }.firstOrNull { it.getString("name").endsWith(".apk") }
-            ?: return@withContext null
-        Release(
+        val asset = (0 until assets.length()).map { assets.getJSONObject(it) }.firstOrNull { it.getString("name").endsWith(".apk") } ?: return null
+        return Release(
             version = json.getString("tag_name").removePrefix("v"),
             notes = json.optString("body").trim(),
             apkUrl = asset.getString("browser_download_url"),
@@ -137,7 +142,21 @@ class Updater(private val context: Context, private val log: (String, String) ->
         )
     }
 
-    private fun open(url: String): HttpURLConnection {
+    /** releases/latest は最新のタグのページへ転送される。APK の名前は release.sh が付ける spotfy-<版>.apk */
+    private fun fromReleasePage(): Release {
+        val conn = open("https://github.com/$REPO/releases/latest", follow = false)
+        val tag = conn.getHeaderField("Location")?.substringAfterLast("/tag/", "")?.takeIf { it.isNotEmpty() } ?: error("no release tag")
+        conn.disconnect()
+        val version = tag.removePrefix("v")
+        // リリースノートは、そのタグの CHANGELOG.md の節から取る
+        val notes = runCatching {
+            val md = open("https://raw.githubusercontent.com/$REPO/$tag/CHANGELOG.md").inputStream.bufferedReader().use { it.readText() }
+            md.substringAfter("## $version\n", "").substringBefore("\n## ").trim()
+        }.getOrDefault("")
+        return Release(version, notes, "https://github.com/$REPO/releases/download/$tag/spotfy-$version.apk", 0)
+    }
+
+    private fun open(url: String, follow: Boolean = true): HttpURLConnection {
         // GitHub の APK はほかのホストへリダイレクトされる。https のまま追うだけなので自分で追う
         var target = url
         repeat(5) {
@@ -148,6 +167,7 @@ class Updater(private val context: Context, private val log: (String, String) ->
             conn.setRequestProperty("User-Agent", "spotfy/${BuildConfig.VERSION_NAME}")
             when (val code = conn.responseCode) {
                 in 200..299 -> return conn
+                in 300..399 if !follow -> return conn
                 in 300..399 -> {
                     val next = conn.getHeaderField("Location") ?: error("redirect without location")
                     conn.disconnect()
