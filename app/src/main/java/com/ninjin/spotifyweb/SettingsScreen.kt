@@ -39,9 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 // 端末の言語が変わったときに読み直すよう、毎回作る
 internal val QUALITIES get() = listOf(
@@ -52,16 +50,23 @@ internal val QUALITIES get() = listOf(
     Triple("very_high", tr("最高音質", "Very high"), tr("AAC 256 kbps（Spotify Premium のみ）", "AAC 256 kbps (Spotify Premium only)")),
 )
 
+// 言語の選択肢（各言語の名前はその言語で書く）
+internal val LANGUAGES get() = listOf(
+    Triple("", tr("端末の設定に合わせる", "System default"), tr("端末の言語が日本語なら日本語、それ以外は英語", "Japanese if your device is set to Japanese, otherwise English")),
+    Triple("ja", "日本語", "Japanese"),
+    Triple("en", "English", "英語"),
+)
+
 @Composable
 internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, onBack: () -> Unit) {
     var page by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
     BackHandler(enabled = page != null) { page = null }
     Column(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 24) { if (page != null) page = null else onBack() }
             Text(
-                when (page) { "quality" -> tr("メディアの音質", "Media quality"); "playback" -> tr("再生", "Playback"); "account" -> tr("アカウント", "Account"); "look" -> tr("コンテンツと表示", "Content and display"); "about" -> tr("このアプリについて", "About"); else -> tr("設定", "Settings") },
+                when (page) { "quality" -> tr("メディアの音質", "Media quality"); "playback" -> tr("再生", "Playback"); "account" -> tr("アカウント", "Account"); "look" -> tr("コンテンツと表示", "Content and display"); "about" -> tr("このアプリについて", "About"); "language" -> tr("言語", "Language"); else -> tr("設定", "Settings") },
                 color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp),
             )
         }
@@ -78,29 +83,15 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     SettingRow(tr("コンテンツと表示", "Content and display"), tr("テーマカラー・背景", "Theme color, background")) { page = "look" }
                     SettingRow(tr("再生", "Playback"), tr("バックグラウンド再生・広告抑制・クロスフェード", "Background playback, ad handling, crossfade")) { page = "playback" }
                     SettingRow(tr("メディアの音質", "Media quality"), tr("Wi-Fi・モバイルデータ通信でのストリーミング", "Streaming on Wi-Fi and mobile data")) { page = "quality" }
+                    SettingRow(tr("言語", "Language"), LANGUAGES.first { it.first == AppLanguage.get(context) }.second) { page = "language" }
                     SettingRow(tr("デバッグログを共有", "Share debug log"), tr("直近の広告の検出・ミュート・早送りなどの記録", "Recent ad detection, muting and fast-forward events")) { host.shareDebugLog() }
-                    val update by host.updater.state.collectAsState()
-                    SettingRow(
-                        tr("アップデート", "Updates"),
-                        tr("いまの版: ${BuildConfig.VERSION_NAME}", "Current version: ${BuildConfig.VERSION_NAME}") + "\n" + when (val u = update) {
-                            Updater.State.Checking -> tr("確認中…", "Checking…")
-                            Updater.State.UpToDate -> tr("最新の版です", "You're up to date")
-                            is Updater.State.Available -> tr("新しい版 ${u.release.version} があります", "Version ${u.release.version} is available")
-                            is Updater.State.Downloading -> tr("ダウンロード中… ${(u.progress * 100).toInt()}%", "Downloading… ${(u.progress * 100).toInt()}%")
-                            is Updater.State.Ready -> tr("押すと ${u.release.version} をインストールします", "Tap to install ${u.release.version}")
-                            is Updater.State.Failed -> u.message
-                            Updater.State.Idle -> tr("押すと新しい版を確認します", "Tap to check for updates")
-                        },
-                    ) {
-                        when (update) {
-                            is Updater.State.Ready -> host.updater.install()
-                            is Updater.State.Checking, is Updater.State.Downloading -> {}
-                            else -> scope.launch { host.updater.check() }
-                        }
-                    }
+                    UpdateRow(host.updater)
                     SettingRow(tr("このアプリについて", "About this app"), tr("Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません", "An unofficial app built on the Spotify Web Player. Nothing is saved to your device")) { page = "about" }
                 }
                 "about" -> AboutPage()
+                "language" -> LANGUAGES.forEach { l ->
+                    RadioRow(l, AppLanguage.get(context) == l.first) { AppLanguage.set(context, l.first) }
+                }
                 "account" -> {
                     SettingRow(tr("ユーザー名", "Username"), user?.name ?: "") {}
                     SettingRow(tr("ログアウト", "Log out"), tr("このアプリからログアウトします", "Log out of this app")) { host.logout() }
@@ -203,93 +194,4 @@ internal fun RadioRow(q: Triple<String, String, String>, selected: Boolean, onCl
             else Box(Modifier.size(22.dp).clip(CircleShape).background(Color(0xFF7C7C7C)).padding(2.dp)) { Box(Modifier.fillMaxSize().clip(CircleShape).background(Bg)) }
         }
     }
-}
-
-/** 新しい版のお知らせ。「更新」で APK を落とし、終わったらインストーラーを開く */
-@Composable
-internal fun UpdateDialog(updater: Updater) {
-    val state by updater.state.collectAsState()
-    val release = when (val s = state) {
-        is Updater.State.Available -> s.release
-        is Updater.State.Downloading -> s.release
-        else -> return
-    }
-    val downloading = state as? Updater.State.Downloading
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = { if (downloading == null) updater.later(release) },
-        title = { Text(tr("新しい版 ${release.version} があります", "Version ${release.version} is available")) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                if (downloading != null) {
-                    Text(tr("ダウンロード中… ${(downloading.progress * 100).toInt()}%", "Downloading… ${(downloading.progress * 100).toInt()}%"))
-                    androidx.compose.material3.LinearProgressIndicator(
-                        progress = { downloading.progress }, color = Accent, trackColor = Color(0x4DFFFFFF),
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    )
-                } else {
-                    Text(tr("いまの版: ${BuildConfig.VERSION_NAME}", "Current version: ${BuildConfig.VERSION_NAME}"))
-                    // リリースノート（CHANGELOG の節）。Markdown の記号は見出しと箇条書きだけ軽く整える
-                    if (release.notes.isNotEmpty()) Text(
-                        release.notes.lines().joinToString("\n") { it.replace(Regex("^#+\\s*"), "").replace(Regex("^[-*]\\s+"), "・") },
-                        fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            if (downloading == null) androidx.compose.material3.TextButton(onClick = { updater.download(release) }) { Text(tr("更新", "Update"), color = Accent) }
-        },
-        dismissButton = {
-            if (downloading == null) androidx.compose.material3.TextButton(onClick = { updater.later(release) }) { Text(tr("あとで", "Later"), color = Color.White) }
-        },
-        containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
-    )
-}
-
-/** 「このアプリについて」。アイコンと版、作者のクレジット、リンク、注意書き */
-@Composable
-private fun AboutPage() {
-    val uri = androidx.compose.ui.platform.LocalUriHandler.current
-    val repo = "https://github.com/${Updater.REPO}"
-    Column(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(96.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp)).background(Color(0xFF121212)), contentAlignment = Alignment.Center) {
-            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize())
-        }
-        Text("spotfy", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
-        Text(
-            tr("バージョン ${BuildConfig.VERSION_NAME}", "Version ${BuildConfig.VERSION_NAME}"),
-            color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 8.dp).clip(CircleShape).background(Accent.copy(alpha = 0.15f)).padding(horizontal = 12.dp, vertical = 4.dp),
-        )
-        Text(tr("Spotify Web Player を、公式アプリのような操作感で", "The Spotify Web Player, with the feel of the official app"), color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp))
-    }
-
-    Section(tr("クレジット", "Credits"))
-    // 作者のカード（GitHub のアイコンと名前。押すとプロフィールを開く）
-    Row(
-        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-            .background(Color(0xFF1F1F1F)).clickable { uri.openUri("https://github.com/ninjin0802") }.padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        coil.compose.AsyncImage("https://github.com/ninjin0802.png?size=128", null, Modifier.size(52.dp).clip(CircleShape).background(Color(0xFF333333)))
-        Column(Modifier.weight(1f).padding(start = 14.dp)) {
-            Text(tr("作者", "Created by"), color = Sub, fontSize = 12.sp)
-            Text("ninjin0802", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
-            Text(tr("設計・開発・デザイン", "Design & development"), color = Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-        }
-        Text("GitHub ›", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-    }
-
-    Section(tr("リンク", "Links"))
-    SettingRow(tr("変更履歴", "Release notes"), tr("GitHub の Releases で見る", "View on GitHub Releases")) { uri.openUri("$repo/releases") }
-    SettingRow(tr("ソースコード", "Source code"), repo.removePrefix("https://")) { uri.openUri(repo) }
-    SettingRow(tr("ライセンス", "License"), "MIT License") { uri.openUri("$repo/blob/main/LICENSE") }
-
-    Text(
-        tr("これは非公式のアプリです。Spotify AB とは関係がなく、承認も受けていません。「Spotify」は Spotify AB の商標です。曲は端末に保存しません。",
-            "This is an unofficial app, not affiliated with or endorsed by Spotify AB. \"Spotify\" is a trademark of Spotify AB. Nothing is saved to your device."),
-        color = Color(0x80FFFFFF), fontSize = 12.sp, lineHeight = 18.sp,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
-    )
-    Text("© 2026 ninjin0802", color = Color(0x80FFFFFF), fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
 }
