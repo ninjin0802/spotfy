@@ -125,7 +125,8 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
                 }
             }
         }
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+        // ミニプレーヤーの左右の余白も、裏の画面に押した判定が届かないようにする
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) {}) {
             if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true }, onDevices = { devicesOpen = true })
             TabBar(tab) { if (it == tab) stacks[it]!!.clear() else tab = it }
         }
@@ -194,12 +195,15 @@ internal fun TabBar(tab: Tab, onSelect: (Tab) -> Unit) {
     Row(
         Modifier.fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color(0x99121212), Color(0xF2121212), Color(0xFF121212))))
-            .windowInsetsPadding(WindowInsets.navigationBars).padding(top = 12.dp, bottom = 4.dp),
+            // タブのすき間やジェスチャーバーの上を押しても、裏の画面に届かないようにする
+            .clickable(remember { MutableInteractionSource() }, null) {}
+            .windowInsetsPadding(WindowInsets.navigationBars),
     ) {
         Tab.entries.forEach { t ->
             val on = t == tab
             Column(
-                Modifier.weight(1f).clickable(remember { MutableInteractionSource() }, null) { onSelect(t) },
+                // 当たり判定はタブの上下の余白まで含める
+                Modifier.weight(1f).clickable(remember { MutableInteractionSource() }, null) { onSelect(t) }.padding(top = 12.dp, bottom = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Image(rememberVectorPainter(t.icon), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(if (on) Color.White else Sub))
