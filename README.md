@@ -14,7 +14,7 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7f52ff?logo=kotlin&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-### [⬇ 最新の APK をダウンロード](https://github.com/ninjin0802/spotfy/releases/latest)
+### [⬇ 最新の APK をダウンロード](https://github.com/ninjin0802/spotfy/releases/latest) ・ [📖 取扱説明書](docs/manual.md)
 
 **日本語** ・ [English](README.en.md)
 
@@ -91,6 +91,8 @@ Spotify 側の更新で使えない機能が出ると、設定画面でお知ら
 1. [**Releases**](https://github.com/ninjin0802/spotfy/releases/latest) から `spotfy-*.apk` をダウンロード
 2. 端末で開いてインストール（初回は「提供元不明のアプリ」の許可が必要です）
 3. アプリを開き、Spotify アカウントでログイン
+
+使い方と設定の意味は [取扱説明書](docs/manual.md) にまとめています。
 
 > [!NOTE]
 > 表示は端末の言語に合わせて **日本語・英語** が切り替わります（Android 13 以降は、このアプリだけ言語を変えることもできます）。
