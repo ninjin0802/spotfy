@@ -676,9 +676,13 @@
       var opts = a.track ? { skipTo: { uri: a.track } } : {};
       return Promise.resolve(p.play({ uri: a.uri }, {}, opts)).then(function () { return true; });
     },
-    toggle: function () { var p = service('PlayerAPI'); var st = p.getState(); return Promise.resolve(st && st.isPaused ? p.resume() : p.pause()).then(function () { return true; }); },
+    toggle: function () {
+      var p = service('PlayerAPI'), st = p.getState();
+      if (st && st.item && !st.isPaused) return Promise.resolve(p.pause()).then(function () { return true; });
+      return resumeHere();
+    },
     pause: function () { return Promise.resolve(service('PlayerAPI').pause()).then(function () { return true; }); },
-    resume: function () { return Promise.resolve(service('PlayerAPI').resume()).then(function () { return true; }); },
+    resume: function () { return resumeHere(); },
     next: function () { return Promise.resolve(service('PlayerAPI').skipToNext()).then(function () { return true; }); },
     prev: function () { return Promise.resolve(service('PlayerAPI').skipToPrevious()).then(function () { return true; }); },
     seek: function (a) { return Promise.resolve(service('PlayerAPI').seekTo(a.ms)).then(function () { return true; }); },
@@ -821,6 +825,21 @@
     });
   }
 
+  // 続きから再生する。起動直後はこのスマホが再生する端末としてまだ登録されておらず、
+  // resume が「No such device」で断られるので、登録されるまで少し待って送り直す
+  function resumeHere() {
+    var started = Date.now();
+    return (function attempt(n) {
+      return Promise.resolve(service('PlayerAPI').resume()).then(function () {
+        pageDebug('play.resume', 'tries=' + (n + 1) + ' ms=' + (Date.now() - started));
+        return true;
+      }, function (e) {
+        if (n >= 8 || !/no such device/i.test(String(e && (e.message || e)))) throw e;
+        return new Promise(function (r) { setTimeout(r, 1000); }).then(function () { return attempt(n + 1); });
+      });
+    })(0);
+  }
+
   // 再生中の曲がお気に入りかどうか（曲が変わったときに一度だけ調べる）
   var likedFor = '', liked = false;
   function checkLiked(uri) {
@@ -846,7 +865,7 @@
   window.__mMedia = function (action, pos) {
     var p = service('PlayerAPI');
     if (!p) return;
-    if (action === 'play') p.resume();
+    if (action === 'play') resumeHere().catch(function () {});
     else if (action === 'pause') p.pause();
     else if (action === 'next') p.skipToNext();
     else if (action === 'prev') p.skipToPrevious();
