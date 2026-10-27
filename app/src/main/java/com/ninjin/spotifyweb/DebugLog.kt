@@ -1,5 +1,8 @@
 package com.ninjin.spotifyweb
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Handler
@@ -11,6 +14,20 @@ import java.time.format.DateTimeFormatter
 /** デバッグモード。設定には保存せず、アプリを起動し直すと必ずオフに戻る */
 object DebugMode {
     @Volatile var on = false
+    /** 画面が開いていれば、切り替えをそちらに伝える（ログ・WebView の調査・ページの記録をまとめて切り替える） */
+    @Volatile var changed: ((Boolean) -> Unit)? = null
+}
+
+/**
+ * adb から `am broadcast -n com.ninjin.spotifyweb/.DebugModeReceiver --ez on true|false` でデバッグモードを切り替える。
+ * 送り主に DUMP 権限を求める（adb の shell は持っていて、ふつうのアプリは持てない）ので、ほかのアプリからは切り替えられない
+ */
+class DebugModeReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val on = intent.getBooleanExtra("on", true)
+        DebugMode.on = on
+        DebugMode.changed?.invoke(on)
+    }
 }
 
 /**
@@ -57,14 +74,18 @@ class DebugLog(private val prefs: SharedPreferences) {
     fun record(event: String, detail: String = "") {
         val safeEvent = event.filter { it.isLetterOrDigit() || it in "._-" }.take(64).ifBlank { "unknown" }
         val full = fullLog != null
-        val safeDetail = detail.replace('\r', ' ').replace('\n', ' ').replace('\t', ' ').take(if (full) 2000 else 160)
-        val line = "${STAMP.format(LocalDateTime.now())} $safeEvent $safeDetail"
-        Log.i(TAG, line)
-        synchronized(lines) {
-            lines.addLast(line)
-            while (lines.size > MAX_LINES) lines.removeFirst()
+        val flat = detail.replace('\r', ' ').replace('\n', ' ').replace('\t', ' ')
+        val stamp = STAMP.format(LocalDateTime.now())
+        val line = "$stamp $safeEvent ${flat.take(160)}"
+        // 通信 1 件ごとなどの細かい記録は全部の記録にだけ入れる。いつものログ（設定に保存する 800 行）に入れると、広告や再生の記録を押し出してしまう
+        if (!full || !FULL_ONLY.containsMatchIn(safeEvent)) {
+            Log.i(TAG, line)
+            synchronized(lines) {
+                lines.addLast(line)
+                while (lines.size > MAX_LINES) lines.removeFirst()
+            }
         }
-        if (full) synchronized(fullBuf) { fullBuf.append(line).append('\n') }
+        if (full) synchronized(fullBuf) { fullBuf.append(stamp).append(' ').append(safeEvent).append(' ').append(flat.take(2000)).append('\n') }
         // 続けて記録が来ても先送りし続けないよう、最初の 1 行から 3 秒後にまとめて保存する
         if (!savePending) { savePending = true; handler.postDelayed(save, 3_000) }
     }
@@ -85,17 +106,17 @@ class DebugLog(private val prefs: SharedPreferences) {
         return file.takeIf { it.exists() }
     }
 
-    /** ログアウトしたら前のアカウントの記録は消す */
-    fun clear() {
+    /** ログアウトしたら前のアカウントの記録は消す。全部の記録のファイルも、デバッグモードがオフでも消す */
+    fun clear(fullLogFile: java.io.File) {
         synchronized(lines) { lines.clear() }
         synchronized(fullBuf) { fullBuf.setLength(0) }
-        fullLog?.let { f -> deleteFullLog(f) }
+        deleteFullLog(fullLogFile)
         handler.removeCallbacks(save)
         prefs.edit().remove(KEY).apply()
     }
 
-    /** 全部の記録のファイル（と 1 世代前）を消す。デバッグモードがオフでも、前のアカウントの記録を残さないよう呼ぶ */
-    fun deleteFullLog(file: java.io.File) {
+    /** 全部の記録のファイル（と 1 世代前）を消す */
+    private fun deleteFullLog(file: java.io.File) {
         writer.execute { file.delete(); java.io.File(file.path + ".1").delete() }
     }
 
@@ -137,6 +158,7 @@ class DebugLog(private val prefs: SharedPreferences) {
         private const val MAX_LINES = 800
         private const val FULL_MAX_BYTES = 8L * 1024 * 1024
         private val STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+        private val FULL_ONLY = Regex("^(net\\.(req|fetch|xhr|canvas)|ws\\.|seam\\.tick|xf\\.fade)")
         private val AD_PATH = Regex("/(ads?|ad-logic|adlogic|ad-?break|sponsor[a-z-]*|instream[a-z-]*|slots?)(/|$)", RegexOption.IGNORE_CASE)
     }
 }

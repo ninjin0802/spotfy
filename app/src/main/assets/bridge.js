@@ -685,31 +685,62 @@
     toggle: function () {
       // 先読みで鳴らしている途中に押されたら、止めずにそのまま本当の再生にする
       if (warming) { claimPlayback(); return true; }
-      if (playingNow()) return Promise.resolve(service('PlayerAPI').pause()).then(function () { return true; });
+      if (playingNow()) return methods.pause();
       return resumeHere();
     },
-    pause: function () { seamDrop('user'); return Promise.resolve(service('PlayerAPI').pause()).then(function () { return true; }); },
+    // つなぎ目の途中（次の曲が鳴っている）なら、Web Player も次の曲のその位置で止める。
+    // 前の曲のまま止めると、再生し直したときに前の曲の終わりに戻ったり、次の曲が頭から鳴り直したりする
+    pause: function () {
+      var e2 = seam.tp && seam.tp._player, p = service('PlayerAPI');
+      var shown = e2 && (seam.phase === 'handoff' || seam.phase === 'swap' || seam.phase === 'playing2' && seam.lead) ? seam.uri : '';
+      var ms = shown ? e2.currentTime * 1000 : 0, g = ++cmdGen;
+      seekTarget = '';
+      seamDrop('user');
+      if (!shown) return Promise.resolve(p.pause()).then(function () { return true; });
+      // 止めたまま合わせられなかったら（次の曲の読み込み中はシークが無視される）、再生し直すときに合わせる
+      resumeAt = { uri: shown, ms: ms };
+      return audioEl().then(function (el) {
+        // 次の曲へ進めて位置を合わせる間は音を出さない
+        if (el) el.muted = true;
+        var st = p.getState();
+        return Promise.resolve(st && st.item && st.item.uri === shown ? null : p.skipToNext()).then(function () {
+          if (g === cmdGen) return p.pause();
+        }).then(function () {
+          return (function wait(n) {
+            var st = p.getState();
+            if (g !== cmdGen || n >= 60) return null;
+            if (!st || !st.item || st.item.uri !== shown || !st.isPaused) {
+              // 次の曲へ進んだあとで Web Player が鳴らし始めたら、止め直す
+              if (st && st.item && st.item.uri === shown && n % 10 === 9) p.pause();
+              return sleep(50).then(function () { return wait(n + 1); });
+            }
+            if (Math.abs((st.positionAsOfTimestamp || 0) - ms) < 1500) { resumeAt = null; return null; }
+            return Promise.resolve(p.seekTo(ms)).then(function () { return sleep(300); }).then(function () { return wait(n + 6); });
+          })(0);
+        }).then(function () { return audioEl(); }, function () { return null; }).then(function (el2) {
+          if (el) el.muted = false;
+          if (el2) el2.muted = false;
+          return true;
+        });
+      });
+    },
     resume: function () { return resumeHere(); },
     // 先読みの途中に操作されたら、先読みが後で止めたり位置を戻したりしないよう、先に終わらせる
     next: function () { claimPlayback(); return Promise.resolve(service('PlayerAPI').skipToNext()).then(function () { return true; }); },
     prev: function () { claimPlayback(); return Promise.resolve(service('PlayerAPI').skipToPrevious()).then(function () { return true; }); },
     seek: function (a) {
       // クロスフェード中は次の曲を表示している。その曲の位置として扱い、次の曲へ進めてから合わせる（前の曲を動かさない）
-      var shown = seam.phase === 'playing2' && seam.lead ? seam.uri : '', p = service('PlayerAPI');
+      // 前のシークで次の曲へ進めている途中（seekTarget）なら、もう一度進めずに同じ曲の位置として合わせ直す
+      var pending = seekTarget, shown = seam.phase === 'playing2' && seam.lead ? seam.uri : pending, p = service('PlayerAPI');
       claimPlayback();
+      // 位置を合わせている途中にほかの操作（続けてシークなど）が来たら、そちらを優先してやめる
+      var g = cmdGen;
       if (!shown) return Promise.resolve(p.seekTo(a.ms)).then(function () { return true; });
-      // 次の曲が鳴り始める前の位置合わせは無視されるので、鳴り始めるのを待ち、合うまで数回やり直す
-      return Promise.resolve(p.skipToNext()).then(function () {
-        return (function wait(n) {
-          return audioEl().then(function (el) {
-            var st = p.getState();
-            if (n >= 80) return null;
-            if (!st || !st.item || st.item.uri !== shown || !el || el.paused || el.currentTime <= 0) return sleep(50).then(function () { return wait(n + 1); });
-            if (Math.abs(el.currentTime * 1000 - a.ms) < 1500) return null;
-            return Promise.resolve(p.seekTo(a.ms)).then(function () { return sleep(400); }).then(function () { return wait(n + 8); });
-          });
-        })(0);
-      }).then(function () { return true; });
+      seekTarget = shown;
+      return Promise.resolve(shown === pending ? null : p.skipToNext()).then(function () { return seekWhenPlaying(shown, a.ms, g); }).then(function () {
+        if (g === cmdGen) seekTarget = '';
+        return true;
+      });
     },
     shuffle: function (a) { return Promise.resolve(service('PlayerAPI').setShuffle(!!a.on)).then(function () { return true; }); },
     repeat: function (a) { return Promise.resolve(service('PlayerAPI').setRepeat(a.mode | 0)).then(function () { return true; }); },
@@ -755,7 +786,8 @@
     xfTimer = setInterval(function () {
       if (!xfSec && xfBase == null) return;
       // 2 台目の再生器が引き受けた曲のつなぎ目はそちらがやる（引き受けなかった曲・失敗した曲は、ここで音量を上げ下げする）
-      if (seamClaimed()) return;
+      // ただし、引き受ける前（先読み中）に前の曲から続く大きくする途中なら、それは最後までやる（短い曲だとすぐ先読みが始まる）
+      if (seamClaimed() && !(seam.fadeIn && (seam.phase === 'loading' || seam.phase === 'ready'))) return;
       // 広告のミュート中に音量を拾うと、広告後の曲がミュートの音量のままになる
       if (adBreakActive) return;
       audioEl().then(function (el) {
@@ -773,7 +805,7 @@
         var x = Math.max(0, Math.min(1, t / half, rest / half));
         // 曲の途中は触らない（音量を変えられても上書きしない）。上げ下げが終わったら元の音量に戻し、次は改めて拾う
         if (x >= 1) { seam.fadeIn = false; el.volume = xfBase; xfBase = null; return; }
-        if (verbose && Math.floor(t * 2) !== xfLogged) { xfLogged = Math.floor(t * 2); vlog('xf.fade', (seam.fadeIn ? 'in' : rest < half ? 'out' : 'in') + ' t=' + t.toFixed(1) + ' v=' + (xfBase * Math.sin(x * Math.PI / 2)).toFixed(2)); }
+        if (verbose && Math.floor(t * 2) !== xfLogged) { xfLogged = Math.floor(t * 2); vlog('xf.fade', (rest < half ? 'out' : 'in') + ' t=' + t.toFixed(1) + ' v=' + (xfBase * Math.sin(x * Math.PI / 2)).toFixed(2)); }
         el.volume = Math.max(0, Math.min(1, xfBase * Math.sin(x * Math.PI / 2)));
       });
     }, 100);
@@ -880,10 +912,11 @@
     };
     var wo = WebSocket.prototype.send;
     WebSocket.prototype.send = function (d) {
+      // 中身をまとめるのも手間なので、デバッグモードでないときは作らない
       if (verbose) vlog('ws.out', short(this.url) + ' ' + wsHead(d));
       if (!this.__mbNet) {
         this.__mbNet = true;
-        this.addEventListener('message', function (e) { vlog('ws.in', wsHead(e.data)); });
+        this.addEventListener('message', function (e) { if (verbose) vlog('ws.in', wsHead(e.data)); });
         this.addEventListener('close', function (e) { vlog('ws.close', 'code=' + e.code); });
       }
       return wo.apply(this, arguments);
@@ -1211,13 +1244,31 @@
     lastKey = ''; pushState();
   }
   // 再生の操作が来たら呼ぶ。準備で鳴らしている途中なら、音を戻してそのまま本当の再生にする
+  // cmdGen：再生の操作が来るたびに増やし、前の操作の続き（シークのやり直しなど）が後から上書きしないようにする
+  // resumeAt：つなぎ目の途中で一時停止して、次の曲の位置を合わせられなかったときの曲と位置（再生し直すときに合わせる）
+  // seekTarget：クロスフェード中のシークで、次の曲へ進めて位置を合わせている曲
+  var cmdGen = 0, resumeAt = null, seekTarget = '';
   function claimPlayback() {
+    cmdGen++; resumeAt = null; seekTarget = '';
     playRequested = true;
     endWarm();
     // 曲のつなぎ目の途中に操作されたら、2 台目をやめて Web Player に任せる
     if (seam.phase === 'playing2' || seam.phase === 'handoff' || seam.phase === 'swap') seamDrop('user');
   }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // 曲 uri が鳴り始めてから ms へシークする（鳴り始める前のシークは無視される）。合うまで数回やり直し、ほかの操作が来たらやめる
+  function seekWhenPlaying(uri, ms, g) {
+    var p = service('PlayerAPI');
+    return (function wait(n) {
+      return audioEl().then(function (el) {
+        var st = p.getState();
+        if (g !== cmdGen || n >= 80) return null;
+        if (!st || !st.item || st.item.uri !== uri || !el || el.paused || el.currentTime <= 0) return sleep(50).then(function () { return wait(n + 1); });
+        if (Math.abs(el.currentTime * 1000 - ms) < 1500) return null;
+        return Promise.resolve(p.seekTo(ms)).then(function () { return sleep(400); }).then(function () { return wait(n + 8); });
+      });
+    })(0);
+  }
   function prewarm() {
     var started = Date.now();
     var skip = function (why) { pageDebug('play.prewarm', 'skip ' + why); return false; };
@@ -1292,9 +1343,21 @@
     return !!(st && st.item && !st.isPaused);
   }
   function resumeHere() {
+    // 合わせ損ねた位置は、まだ頭のまま（ほかの操作で動いていない）ときだけ使う。合わせ終わるまで音を出さない
+    var at = resumeAt, cur = service('PlayerAPI').getState();
+    if (at && !(cur && cur.item && cur.item.uri === at.uri && (cur.positionAsOfTimestamp || 0) < 1500)) at = null;
     claimPlayback();
-    var started = Date.now();
-    var done = function (tries) { pageDebug('play.resume', 'tries=' + tries + ' ms=' + (Date.now() - started)); return true; };
+    var started = Date.now(), g = cmdGen, muted = at ? audioEl().then(function (el) { if (el) el.muted = true; return el; }) : null;
+    var done = function (tries) {
+      pageDebug('play.resume', 'tries=' + tries + ' ms=' + (Date.now() - started) + (at ? ' at=' + Math.round(at.ms) : ''));
+      if (muted) muted.then(function (el) {
+        return seekWhenPlaying(at.uri, at.ms, g).then(function () { return audioEl(); }).then(function (el2) {
+          if (el) el.muted = false;
+          if (el2) el2.muted = false;
+        });
+      });
+      return true;
+    };
     return (function attempt(n) {
       if (playingNow()) return Promise.resolve(done(n));
       var timer = 0;
@@ -1311,7 +1374,10 @@
         if (n >= 9 || !/no such device|timeout/i.test(msg)) throw e;
         return nextClusterOr(1000).then(function () { return attempt(n + 1); });
       });
-    })(0);
+    })(0).catch(function (e) {
+      if (muted) muted.then(function (el) { if (el) el.muted = false; });
+      throw e;
+    });
   }
 
   // 再生中の曲がお気に入りかどうか（曲が変わったときに一度だけ調べる）

@@ -89,6 +89,7 @@ class MainActivity : ComponentActivity() {
         runCatching { connectivity.registerDefaultNetworkCallback(networkCallback) }
         // 設定の「開発者向けデバッグ」をオンにしたときだけ、PC から WebView を調べられるようにする
         applyDebugMode()
+        DebugMode.changed = onDebugChanged
         // targetSdk 35+ は edge-to-edge 強制なので、ステータスバー/ナビバー分の余白を確保する
         // 上はステータスバーの裏までページを描き（公式アプリと同じ）、その高さをページに伝える
         root.setOnApplyWindowInsetsListener { v, insets ->
@@ -355,8 +356,7 @@ class MainActivity : ComponentActivity() {
             // Cookie を消して最初からログインページへ
             // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ、デバッグログ）も消し、画面を作り直す
             getSharedPreferences("cache", MODE_PRIVATE).edit().clear().apply()
-            debug.clear()
-            debug.deleteFullLog(fullLogFile())
+            debug.clear(fullLogFile())
             android.webkit.WebStorage.getInstance().deleteAllData()
             CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush(); webView.post { recreate() } }
         }
@@ -501,20 +501,15 @@ class MainActivity : ComponentActivity() {
     /**
      * adb から起こされたときの開発用の指示。
      * `am start --ez dumpDebugLog true`：保存済みのログ全体を logcat に流す。
-     * `am start --ez debugMode true|false`：デバッグモードを切り替える（アイコンを 10 回押すのと同じ）
+     * デバッグモードの切り替えは DebugModeReceiver（ほかのアプリから切り替えられないよう、adb からだけ受け付ける）
      */
     private fun dumpDebugLogIfAsked(intent: Intent?): Boolean {
-        // ほかのアプリからも送れてしまうので、USB デバッグがオンの端末でだけ受け付ける
-        if (intent?.hasExtra("debugMode") == true) {
-            val adb = android.provider.Settings.Global.getInt(contentResolver, android.provider.Settings.Global.ADB_ENABLED, 0) == 1
-            if (adb) setDebugMode(intent.getBooleanExtra("debugMode", false))
-            return true
-        }
         if (intent?.getBooleanExtra("dumpDebugLog", false) != true) return false
         debug.dumpToLogcat()
         return true
     }
 
+    private val onDebugChanged: (Boolean) -> Unit = { on -> runOnUiThread { setDebugMode(on) } }
     private fun setDebugMode(value: Boolean) {
         DebugMode.on = value
         recordDebug("debug.mode", if (value) "on" else "off")
@@ -598,6 +593,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         // WebView が使えず onCreate の途中で WebViewMissingActivity に切り替えたときは、何も作っていない
         if (!::webView.isInitialized) { super.onDestroy(); return }
+        if (DebugMode.changed === onDebugChanged) DebugMode.changed = null
         audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
         unregisterReceiver(noisyReceiver)
         runCatching { connectivity.unregisterNetworkCallback(networkCallback) }

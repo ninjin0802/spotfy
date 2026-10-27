@@ -35,7 +35,6 @@ import coil.compose.AsyncImage
 
 private const val AUTHOR = "ninjin0802"
 private val Faint = Color(0x80FFFFFF)
-private var toast: Toast? = null
 
 /** 設定の「このアプリについて」。アイコンと版、作者のクレジット、リンク、注意書き */
 @Composable
@@ -43,6 +42,7 @@ internal fun AboutPage(host: AppHost) {
     val uri = LocalUriHandler.current
     val context = LocalContext.current
     var taps by remember { mutableIntStateOf(0) }
+    val toast = remember { arrayOfNulls<Toast>(1) }
     val repo = "https://github.com/${Updater.REPO}"
     Column(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         // アイコンを 10 回続けて押すと、デバッグモードを切り替える（7 回目から残りの回数を出す）
@@ -54,7 +54,7 @@ internal fun AboutPage(host: AppHost) {
                 taps >= 7 -> tr("あと ${10 - taps} 回でデバッグモード${if (host.debugMode) "をオフ" else ""}", "${10 - taps} more taps to turn debug mode ${if (host.debugMode) "off" else "on"}")
                 else -> null
             }
-            if (msg != null) { toast?.cancel(); toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT).also { it.show() } }
+            if (msg != null) { toast[0]?.cancel(); toast[0] = Toast.makeText(context, msg, Toast.LENGTH_SHORT).also { it.show() } }
         }) {
             Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize())
         }
