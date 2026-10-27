@@ -77,7 +77,7 @@ Share a debug log with a single tap.
 | 📚 **Library** | Filters, sorting, list / grid, pins, search in library, create playlists and folders |
 | 🎧 **Player** | Mini and full-screen players tinted by the artwork, lyrics, About the artist, Next up |
 | 📋 **Queue** | Drag to reorder, remove, shuffle / repeat, sleep timer |
-| 🔀 **Playback** | Truly gapless playback, overlapping crossfade (1–12 s), background playback |
+| 🔀 **Playback** | Gapless playback, crossfade (1–12 s), background playback |
 | ⏩ **Ad handling** | Disables the Web Player's ad managers, then mutes ads and plays them at 16× |
 | 📡 **Cast** | Spotify Connect to PCs, speakers and TVs; switch between phone speaker and Bluetooth |
 | 🧭 **Menu** | Recents (grouped by day), What's new (releases and episodes from what you follow) |
