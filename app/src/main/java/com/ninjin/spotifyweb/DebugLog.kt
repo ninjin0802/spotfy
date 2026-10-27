@@ -46,7 +46,12 @@ class DebugLog(private val prefs: SharedPreferences) {
      * 大きくなったら 1 世代だけ残して作り直す
      */
     @Volatile var fullLog: java.io.File? = null
-        set(value) { field = value; if (value == null) synchronized(fullBuf) { fullBuf.setLength(0) } }
+        set(value) {
+            // オフにするときは、まだ書いていない分（最大 3 秒）を今のファイルに書いてから切り替える
+            val old = field
+            if (value == null && old != null) writeFull(old)
+            field = value
+        }
     private val fullBuf = StringBuilder()
     private val writer = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val lines by lazy {
@@ -58,8 +63,8 @@ class DebugLog(private val prefs: SharedPreferences) {
         writeFull()
     }
 
-    private fun writeFull() {
-        val file = fullLog ?: return
+    private fun writeFull(file: java.io.File? = fullLog) {
+        if (file == null) return
         val chunk = synchronized(fullBuf) { fullBuf.toString().also { fullBuf.setLength(0) } }
         if (chunk.isEmpty()) return
         writer.execute {

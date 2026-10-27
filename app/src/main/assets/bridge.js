@@ -1179,6 +1179,8 @@
       var rest = el.duration - el.currentTime;
       // 読み込みが進むと 2 台目が勝手に鳴り始めるので、出番まで止めて頭に戻し続ける
       var w2 = seam.phase === 'ready' && seam.tp._player;
+      // 次の曲も短ければ引き受けない（重ねている途中や 1 台目に戻す前に終わってしまう）
+      if (w2 && isFinite(w2.duration) && w2.duration < 20) { pageDebug('seamless.preload', 'short-next'); return seamFail(); }
       if (w2 && (!w2.paused || w2.currentTime > 0.05)) { w2.muted = true; Promise.resolve(seam.tp.pause()).catch(function () {}); w2.currentTime = 0; }
       if (!seam.phase && rest <= SEAM_PRELOAD + xfSec) seamPreload(cur);
       // 見張りは 50ms ごとなので、残り 60ms を切ったら鳴らし始める（少し重なっても途切れるよりよい）
