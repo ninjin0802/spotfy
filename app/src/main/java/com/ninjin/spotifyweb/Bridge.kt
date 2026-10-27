@@ -5,6 +5,7 @@ import android.webkit.WebView
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
@@ -97,11 +98,15 @@ class Bridge(
         val id = nextId.getAndIncrement()
         val done = CompletableDeferred<Any?>()
         pending[id] = done
-        web.post {
-            web.evaluateJavascript("window.__mb && __mb.call($id, ${JSONObject.quote(method)}, $args)", null)
-        }
         return try {
-            withTimeout(40_000) { done.await() }
+            withTimeout(40_000) {
+                // 起動直後は橋がまだ無く、送っても誰も受け取らない（40 秒待って失敗していた）ので、準備ができるまで待ってから送る
+                _ready.first { it }
+                web.post {
+                    web.evaluateJavascript("window.__mb && __mb.call($id, ${JSONObject.quote(method)}, $args)", null)
+                }
+                done.await()
+            }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             log("bridge.timeout", method)
             throw e
@@ -175,7 +180,18 @@ class Bridge(
     }
 
     suspend fun play(uri: String, track: String? = null) = call("play", JSONObject().put("uri", uri).apply { if (track != null) put("track", track) })
-    suspend fun toggle() = call("toggle")
+    /** 再生／一時停止。結果を待たずに表示だけ先に切り替え、失敗したら戻す */
+    suspend fun toggle(): Any? {
+        val before = _player.value
+        val now = SystemClock.elapsedRealtime()
+        _player.value = before.copy(playing = !before.playing, pos = before.positionNow(), receivedAt = now)
+        return try {
+            call("toggle")
+        } catch (e: Exception) {
+            if (_player.value.receivedAt == now) _player.value = before.copy(pos = before.positionNow(), receivedAt = SystemClock.elapsedRealtime())
+            throw e
+        }
+    }
     suspend fun next() = call("next")
     suspend fun prev() = call("prev")
     suspend fun seek(ms: Long) = call("seek", JSONObject().put("ms", ms))
