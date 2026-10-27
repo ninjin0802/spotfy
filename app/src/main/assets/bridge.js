@@ -848,8 +848,12 @@
     })(0).then(function (c) {
       if (!c) return skip('no-device-list');
       var cl = c.cluster, act = cl.active_device_id;
+      // このスマホの ID は、端末一覧のキーの先頭部分だけが取れている（前方一致で比べる）
       // PC やスピーカーなど、ほかの端末が再生する端末になっているときは、止まっていても奪わない
-      if (act && act !== c.self && (cl.devices || {})[act]) return skip('other-device');
+      if (act && act.indexOf(c.self) !== 0 && (cl.devices || {})[act]) return skip('other-device');
+      // 端末の一覧に載らない端末（Alexa など）で再生中のこともあるので、どこかで鳴っていれば奪わない
+      var ps = cl.player_state || {};
+      if (ps.is_playing && !ps.is_paused) return skip('playing-elsewhere');
       var p = service('PlayerAPI'), st = p.getState();
       if (!st || !st.item) return skip('no-track');
       if (!st.isPaused) return skip('playing');
