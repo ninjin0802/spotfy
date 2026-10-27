@@ -14,7 +14,7 @@ An unofficial Android app powered by a native UI and the Web Player's playback e
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7f52ff?logo=kotlin&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-### [⬇ Download the latest APK](https://github.com/ninjin0802/spotfy/releases/latest)
+### [⬇ Download the latest APK](https://github.com/ninjin0802/spotfy/releases/latest) · [📖 User guide](docs/manual.en.md)
 
 [日本語](README.md) ・ **English**
 
@@ -94,6 +94,8 @@ Share a debug log with a single tap.
 1. Download `spotfy-*.apk` from [**Releases**](https://github.com/ninjin0802/spotfy/releases/latest)
 2. Open it on your device to install (the first time you need to allow "unknown apps")
 3. Open the app and sign in with your Spotify account
+
+See the [user guide](docs/manual.en.md) for how to use the app and what each setting does.
 
 > [!NOTE]
 > Works with free accounts. Premium / official-app-only features such as lossless audio, Jam and downloads are not available.
