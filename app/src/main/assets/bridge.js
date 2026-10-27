@@ -673,6 +673,7 @@
       return Promise.resolve(a.on ? lib.add({ uris: [a.uri] }) : lib.remove({ uris: [a.uri] })).then(function () { return true; });
     },
     play: function (a) {
+      playRequested = true;
       var p = service('PlayerAPI');
       var opts = a.track ? { skipTo: { uri: a.track } } : {};
       return Promise.resolve(p.play({ uri: a.uri }, {}, opts)).then(function () { return true; });
@@ -685,7 +686,10 @@
       return resumeHere();
     },
     pause: function () { return Promise.resolve(service('PlayerAPI').pause()).then(function () { return true; }); },
-    resume: function () { return resumeHere(); },
+    resume: function () {
+      if (warming) { warmTaken = true; endWarm(); return true; }
+      return resumeHere();
+    },
     next: function () { return Promise.resolve(service('PlayerAPI').skipToNext()).then(function () { return true; }); },
     prev: function () { return Promise.resolve(service('PlayerAPI').skipToPrevious()).then(function () { return true; }); },
     seek: function (a) { return Promise.resolve(service('PlayerAPI').seekTo(a.ms)).then(function () { return true; }); },
@@ -830,7 +834,8 @@
 
   // 起動直後の 1 回目の再生は、曲の場所・暗号の鍵・データを順に取るので 1 秒ほどかかる。
   // ほかの端末が再生する端末になっていなければ、音を消して一瞬だけ再生して止め、押したらすぐ鳴るようにしておく
-  var warming = false, warmTaken = false, warmEl = null;
+  // playRequested：準備の前や途中に再生が頼まれた（そのときは準備で止めてはいけない）
+  var warming = false, warmTaken = false, warmEl = null, playRequested = false;
   function endWarm() {
     if (warmEl) warmEl.muted = false;
     warming = false; warmEl = null;
@@ -851,15 +856,14 @@
       // このスマホの ID は、端末一覧のキーの先頭部分だけが取れている（前方一致で比べる）
       // PC やスピーカーなど、ほかの端末が再生する端末になっているときは、止まっていても奪わない
       if (act && act.indexOf(c.self) !== 0 && (cl.devices || {})[act]) return skip('other-device');
-      // 端末の一覧に載らない端末（Alexa など）で再生中のこともあるので、どこかで鳴っていれば奪わない
-      var ps = cl.player_state || {};
-      if (ps.is_playing && !ps.is_paused) return skip('playing-elsewhere');
       var p = service('PlayerAPI'), st = p.getState();
       if (!st || !st.item) return skip('no-track');
       if (!st.isPaused) return skip('playing');
       if (isAd(st.item)) return skip('ad');
+      if (playRequested) return skip('tapped');
       return audioEl().then(function (el) {
         if (!el) return skip('no-element');
+        if (playRequested) return skip('tapped');
         var pos = st.positionAsOfTimestamp || 0;
         // muted なら音は出ず、ほかのアプリの音も止めない（音の出ない再生は音声フォーカスを取らない）
         warming = true; warmTaken = false; warmEl = el; el.muted = true;
@@ -869,6 +873,7 @@
           Promise.resolve(p.resume()).catch(function () { clearTimeout(timer); resolve('failed'); });
         }).then(function (result) {
           if (warmTaken) return skip('tapped');
+          if (playRequested) { endWarm(); return skip('tapped'); }
           return Promise.resolve(p.pause()).catch(function () {}).then(function () {
             return Promise.resolve(p.seekTo(pos)).catch(function () {});
           }).then(function () {
@@ -882,17 +887,37 @@
     });
   }
 
-  // 続きから再生する。起動直後はこのスマホが再生する端末としてまだ登録されておらず、
-  // resume が「No such device」で断られるので、登録されるまで少し待って送り直す
+  // 続きから再生する。起動直後はこのスマホが再生する端末としてまだ登録されておらず、resume が「No such device」で断られたり、
+  // 返事が来ないまま止まったりする。断られても返事が無くても、端末の一覧の知らせか 1 秒のどちらか早いほうで送り直す
+  function registered() {
+    var c = window.__mConnect ? __mConnect.get() : {}, devs = c.cluster && c.cluster.devices;
+    return !!(c.self && devs && Object.keys(devs).some(function (k) { return k.indexOf(c.self) === 0; }));
+  }
+  var clusterWaiters = [];
+  function nextClusterOr(ms) {
+    return new Promise(function (resolve) { clusterWaiters.push(resolve); setTimeout(resolve, ms); });
+  }
+  if (window.__mConnect) __mConnect.onChange(function () { clusterWaiters.splice(0).forEach(function (r) { r(); }); });
+  function playingNow() {
+    var st = service('PlayerAPI').getState();
+    return !!(st && st.item && !st.isPaused);
+  }
   function resumeHere() {
+    playRequested = true;
     var started = Date.now();
     return (function attempt(n) {
-      return Promise.resolve(service('PlayerAPI').resume()).then(function () {
-        pageDebug('play.resume', 'tries=' + (n + 1) + ' ms=' + (Date.now() - started));
-        return true;
-      }, function (e) {
-        if (n >= 8 || !/no such device/i.test(String(e && (e.message || e)))) throw e;
-        return new Promise(function (r) { setTimeout(r, 1000); }).then(function () { return attempt(n + 1); });
+      if (playingNow()) { pageDebug('play.resume', 'tries=' + n + ' ms=' + (Date.now() - started)); return Promise.resolve(true); }
+      var sent = Promise.resolve().then(function () { return service('PlayerAPI').resume(); });
+      // 4 秒たっても返事が無ければ、届かなかったとみなして送り直す
+      var timeout = new Promise(function (r) { setTimeout(function () { r('timeout'); }, 4000); });
+      return Promise.race([sent.then(function () { return 'ok'; }), timeout]).then(function (r) {
+        if (r === 'ok' || playingNow()) { pageDebug('play.resume', 'tries=' + (n + 1) + ' ms=' + (Date.now() - started)); return true; }
+        throw new Error('timeout');
+      }).catch(function (e) {
+        var msg = String(e && (e.message || e));
+        pageDebug('play.resume.retry', 'try=' + (n + 1) + ' registered=' + registered() + ' ' + msg);
+        if (n >= 9 || !/no such device|timeout/i.test(msg)) throw e;
+        return nextClusterOr(1000).then(function () { return attempt(n + 1); });
       });
     })(0);
   }
