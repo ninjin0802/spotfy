@@ -516,25 +516,26 @@ class MainActivity : ComponentActivity() {
         PlaybackService.stop(this)
     }
 
-    /** 再生ボタンが押された瞬間（まだ画面が前にある）に、バックグラウンド再生用のサービスを起動しておく */
+    /** バックグラウンド再生用のサービスを起動する（裏に回ってからは Android の制限で起動できない） */
+    private fun ensureService() {
+        stopHandler.removeCallbacks(stopService)
+        if (serviceRunning || !backgroundPlayback) return
+        serviceRunning = PlaybackService.start(this)
+    }
+
+    /** 再生ボタンが押された瞬間（まだ画面が前にある）に、サービスを起動しておく */
     private fun willPlay() {
         if (!backgroundPlayback) return
         PlaybackService.hold(this, true)
-        stopHandler.removeCallbacks(stopService)
-        if (!serviceRunning) serviceRunning = PlaybackService.start(this)
+        ensureService()
         // 鳴らなかったときは 1 分で片付ける（鳴れば setPlaying(true) が取り消す）
         stopHandler.postDelayed(stopService, 60_000L)
     }
 
     private fun setPlaying(playing: Boolean) {
         PlaybackService.hold(this, playing)
-        if (playing) {
-            stopHandler.removeCallbacks(stopService)
-            if (serviceRunning || !backgroundPlayback) return
-            serviceRunning = true
-            // バックグラウンドからは起動できない（再生中に裏へ回った場合は既に起動済み）
-            if (!PlaybackService.start(this)) serviceRunning = false
-        } else if (serviceRunning) {
+        if (playing) ensureService()
+        else if (serviceRunning) {
             // 一時停止してから 10 分たったらサービスを止める
             stopHandler.removeCallbacks(stopService)
             stopHandler.postDelayed(stopService, 10 * 60 * 1000L)
