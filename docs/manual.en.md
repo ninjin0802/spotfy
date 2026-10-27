@@ -81,7 +81,8 @@ Crossfade  ♪♪♪♪♪♪♪♪＼ ／♪♪♪♪♪♪♪♪♪♪
   - If the next song can't be prepared in time, the app moves on the usual way (a very short break can remain).
 - **Crossfade** smoothly lowers and raises the volume at the join, like a radio station. The two songs really overlap.
   - The artwork and title switch to the next song as soon as it starts playing.
-  - The seconds are the length of the fade (half at the end of one song, half at the start of the next). Longer means a slower change.
+  - The seconds are how long the two songs overlap (the start of the next song plays over the last seconds of the current one). Longer means a slower change.
+  - If the next song can't be prepared in time, the current song fades out and then the next fades in (half the seconds each).
   - **We recommend 5–6 seconds.**
 
     | Seconds | Feel | Good for |

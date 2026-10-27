@@ -356,6 +356,7 @@ class MainActivity : ComponentActivity() {
             // 前のアカウントの情報（覚えておいたホーム・ユーザー名、ページの保存データ、デバッグログ）も消し、画面を作り直す
             getSharedPreferences("cache", MODE_PRIVATE).edit().clear().apply()
             debug.clear()
+            debug.deleteFullLog(fullLogFile())
             android.webkit.WebStorage.getInstance().deleteAllData()
             CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush(); webView.post { recreate() } }
         }

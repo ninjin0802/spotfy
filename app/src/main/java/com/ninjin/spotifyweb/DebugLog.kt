@@ -25,7 +25,8 @@ class DebugLog(private val prefs: SharedPreferences) {
 
     /**
      * デバッグモード（「このアプリについて」のアイコンを 10 回押す）のとき、全部の記録をこのファイルに足していく。
-     * 置き場所は adb で取り出せる Android/data/…/files/logs。大きくなったら 1 世代だけ残して作り直す
+     * 置き場所は、Android 11 以降は adb で取り出せる Android/data/…/files/logs、10 以前はアプリの中（adb では取り出せない。共有で送る）。
+     * 大きくなったら 1 世代だけ残して作り直す
      */
     @Volatile var fullLog: java.io.File? = null
         set(value) { field = value; if (value == null) synchronized(fullBuf) { fullBuf.setLength(0) } }
@@ -88,9 +89,14 @@ class DebugLog(private val prefs: SharedPreferences) {
     fun clear() {
         synchronized(lines) { lines.clear() }
         synchronized(fullBuf) { fullBuf.setLength(0) }
-        fullLog?.let { f -> writer.execute { f.delete(); java.io.File(f.path + ".1").delete() } }
+        fullLog?.let { f -> deleteFullLog(f) }
         handler.removeCallbacks(save)
         prefs.edit().remove(KEY).apply()
+    }
+
+    /** 全部の記録のファイル（と 1 世代前）を消す。デバッグモードがオフでも、前のアカウントの記録を残さないよう呼ぶ */
+    fun deleteFullLog(file: java.io.File) {
+        writer.execute { file.delete(); java.io.File(file.path + ".1").delete() }
     }
 
     /** adb から `am start --ez dumpDebugLog true` で起こされたときに、全体を logcat に流す */
