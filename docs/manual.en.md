@@ -58,8 +58,8 @@ Open them from the top-left icon → Settings.
 | Background playback | On | Keeps playing when you close the app or switch to another app. When off, playback pauses when you leave the app |
 | Handle ads | On | Mutes ads and plays them to the end at 16× speed (a 30-second ad is over in 2–3 seconds). This may violate Spotify's Terms of Use |
 | Get ready to play at launch | On | When the app opens, it briefly plays muted and pauses, so your first ▶ starts right away (about 1.2 s → about 0.15 s). Skipped when another device such as a PC or speaker is playing |
-| Gapless playback | On | Joins songs without a break. See [Gapless playback and crossfade](#gapless-playback-and-crossfade) below |
-| Crossfade | Off | Overlaps the end of one song with the start of the next. When on, choose how long they overlap (1–12 s) |
+| Gapless playback | On | Shortens the silence between songs. See [Gapless playback and crossfade](#gapless-playback-and-crossfade) below |
+| Crossfade | Off | Fades the end of one song out and the start of the next in. When on, choose the length (1–12 s) |
 
 #### Gapless playback and crossfade
 
@@ -69,28 +69,26 @@ These control what happens where one song ends and the next begins.
 Normal     ♪♪♪♪♪♪ …… (silence) …… ♪♪♪♪♪♪
            current song            next song
 
-Gapless    ♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪♪
-           plays the current song to the very end, then the next one at once
+Gapless    ♪♪♪♪♪♪♪♪♪♪♪ ♪♪♪♪♪♪♪♪♪♪♪
+           keeps the silence as short as possible
 
-Crossfade  ♪♪♪♪♪♪♪♪＼
-                    ／♪♪♪♪♪♪♪♪♪♪♪
-           fades the current song out while fading the next one in
+Crossfade  ♪♪♪♪♪♪♪♪＼ ／♪♪♪♪♪♪♪♪♪♪
+           fades the current song out, then the next one in
 ```
 
-- **Gapless playback** removes the silence between songs. Great for live albums and albums where tracks run into each other.
-- **Crossfade** blends songs together, like a radio station or a DJ.
-  - The seconds are how long the two songs overlap. Longer means a slower blend.
+- **Gapless playback** shortens the silence between songs. Great for live albums and albums where tracks run into each other. Because of how the Web Player works, a very short break can remain.
+- **Crossfade** smoothly lowers and raises the volume at the join, like a radio station.
+  - The seconds are the length of the fade (half at the end of one song, half at the start of the next). Longer means a slower change.
   - **We recommend 5–6 seconds.**
 
     | Seconds | Feel | Good for |
     |:--|:--|:--|
     | 1–3 | Just removes the silence | Listening to albums start to finish |
     | 5–6 | Melts naturally into the next song | Most playlists |
-    | 8–12 | Long overlap, like a DJ mix | Background music |
+    | 8–12 | Slow change | Background music |
 
   - Shorter suits songs with hard endings; longer suits songs that fade out slowly.
-- You can turn both on. When crossfade is on, songs are overlapped.
-- When the next item is an ad, or when repeating one song, songs join the normal way.
+- You can turn both on.
 
 ### Media quality
 
