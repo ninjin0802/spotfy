@@ -3,4 +3,5 @@
 <paths>
     <cache-path name="updates" path="updates/" />
     <external-files-path name="logs" path="logs/" />
+    <files-path name="logs-internal" path="logs/" />
 </paths>

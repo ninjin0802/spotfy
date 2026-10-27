@@ -503,7 +503,12 @@ class MainActivity : ComponentActivity() {
      * `am start --ez debugMode true|false`：デバッグモードを切り替える（アイコンを 10 回押すのと同じ）
      */
     private fun dumpDebugLogIfAsked(intent: Intent?): Boolean {
-        if (intent?.hasExtra("debugMode") == true) { setDebugMode(intent.getBooleanExtra("debugMode", false)); return true }
+        // ほかのアプリからも送れてしまうので、USB デバッグがオンの端末でだけ受け付ける
+        if (intent?.hasExtra("debugMode") == true) {
+            val adb = android.provider.Settings.Global.getInt(contentResolver, android.provider.Settings.Global.ADB_ENABLED, 0) == 1
+            if (adb) setDebugMode(intent.getBooleanExtra("debugMode", false))
+            return true
+        }
         if (intent?.getBooleanExtra("dumpDebugLog", false) != true) return false
         debug.dumpToLogcat()
         return true
@@ -517,7 +522,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private val debug by lazy { DebugLog(settings) }
-    private fun fullLogFile() = java.io.File(getExternalFilesDir(null), "logs/debug-full.log")
+    // Android 11 以降は Android/data をほかのアプリが読めないので、adb で取り出せるそこに置く。10 以前はアプリの中に置く
+    private fun fullLogFile() = java.io.File(
+        if (Build.VERSION.SDK_INT >= 30) getExternalFilesDir(null) ?: filesDir else filesDir, "logs/debug-full.log")
 
     /** デバッグモードなら、PC から WebView を調べられるようにし、全部の記録をファイルにも残す */
     private fun applyDebugMode() {

@@ -853,9 +853,10 @@
             ' track=' + String(ps.track && ps.track.uri || '').slice(-22) + ' pos=' + (ps.position_as_of_timestamp || 0) +
             ' paused=' + !!ps.is_paused + ' playing=' + !!ps.is_playing + ' devices=' + Object.keys(c.devices || {}).length;
         }
-        if (m.uri) return (m.type || '') + ' ' + m.uri.slice(0, 120);
+        // ほかの知らせは種類と宛先だけ。宛先に入る接続 ID などの長い値は伏せる（中身は残さない）
+        return (m.type || '') + ' ' + String(m.uri || '').replace(/[A-Za-z0-9+\/=_-]{20,}/g, '*').slice(0, 120);
       } catch (e) {}
-      return d.slice(0, 300);
+      return '[text ' + d.length + ']';
     };
     var wo = WebSocket.prototype.send;
     WebSocket.prototype.send = function (d) {
