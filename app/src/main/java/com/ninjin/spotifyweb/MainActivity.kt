@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
             setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         }
         bridge = Bridge(webView, getSharedPreferences("cache", MODE_PRIVATE), ::recordDebug)
+        bridge.onWillPlay = ::willPlay
         // アプリの画面（Compose）は Web Player の上に重ねる。Web Player は裏で再生とデータ取得だけを受け持つ
         composeView = ComposeView(this).apply {
             visibility = View.GONE
@@ -513,6 +514,16 @@ class MainActivity : ComponentActivity() {
     private val stopService = Runnable {
         serviceRunning = false
         PlaybackService.stop(this)
+    }
+
+    /** 再生ボタンが押された瞬間（まだ画面が前にある）に、バックグラウンド再生用のサービスを起動しておく */
+    private fun willPlay() {
+        if (!backgroundPlayback) return
+        PlaybackService.hold(this, true)
+        stopHandler.removeCallbacks(stopService)
+        if (!serviceRunning) serviceRunning = PlaybackService.start(this)
+        // 鳴らなかったときは 1 分で片付ける（鳴れば setPlaying(true) が取り消す）
+        stopHandler.postDelayed(stopService, 60_000L)
     }
 
     private fun setPlaying(playing: Boolean) {

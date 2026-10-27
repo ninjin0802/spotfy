@@ -75,6 +75,11 @@ class Bridge(
     /** 呼び出しの失敗をデバッグログに残す（Spotify の更新で壊れたとき、どの機能かを後から追えるように） */
     private val log: (event: String, detail: String) -> Unit = { _, _ -> },
 ) {
+    /**
+     * 再生を頼む直前に呼ぶ。押してすぐ裏に回すと、鳴り始めた時点ではもうフォアグラウンドサービスを起動できず
+     * （Android の制限）、裏でアプリごと止められてしまうので、画面が前にある押した瞬間に起動しておく
+     */
+    var onWillPlay: () -> Unit = {}
     private val nextId = AtomicInteger(1)
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<Any?>>()
 
@@ -181,7 +186,7 @@ class Bridge(
         )
     }
 
-    suspend fun play(uri: String, track: String? = null) = call("play", JSONObject().put("uri", uri).apply { if (track != null) put("track", track) })
+    suspend fun play(uri: String, track: String? = null): Any? = onWillPlay().let { call("play", JSONObject().put("uri", uri).apply { if (track != null) put("track", track) }) }
     /** 押されたあと、結果が出るまで表示しておく再生状態（起動直後に押すと、準備ができるまで数秒かかる） */
     @Volatile private var expectPlaying: Boolean? = null
 
@@ -192,6 +197,7 @@ class Bridge(
     suspend fun toggle(): Any? {
         val before = _player.value
         val want = !before.playing
+        if (want) onWillPlay()
         expectPlaying = want
         _player.value = before.copy(playing = want, pos = before.positionNow(), receivedAt = SystemClock.elapsedRealtime())
         return try {
