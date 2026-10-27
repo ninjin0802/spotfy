@@ -591,6 +591,7 @@
     // クロスフェード（秒。0 でオフ）
     crossfade: function (a) { xfSec = a.sec | 0; xfWatch(); gapWatch(); return true; },
     gapless: function (a) { gapOn = !!a.on; gapWatch(); return true; },
+    prewarm: function () { return prewarm(); },
     library: function () {
       var lib = service('LibraryAPI');
       return Promise.resolve(lib.getContents({ limit: 300, offset: 0 })).then(function (c) {
@@ -677,6 +678,8 @@
       return Promise.resolve(p.play({ uri: a.uri }, {}, opts)).then(function () { return true; });
     },
     toggle: function () {
+      // 先読みで鳴らしている途中に押されたら、止めずにそのまま本当の再生にする
+      if (warming) { warmTaken = true; endWarm(); return true; }
       var p = service('PlayerAPI'), st = p.getState();
       if (st && st.item && !st.isPaused) return Promise.resolve(p.pause()).then(function () { return true; });
       return resumeHere();
@@ -825,6 +828,56 @@
     });
   }
 
+  // 起動直後の 1 回目の再生は、曲の場所・暗号の鍵・データを順に取るので 1 秒ほどかかる。
+  // ほかの端末が再生する端末になっていなければ、音を消して一瞬だけ再生して止め、押したらすぐ鳴るようにしておく
+  var warming = false, warmTaken = false, warmEl = null;
+  function endWarm() {
+    if (warmEl) warmEl.muted = false;
+    warming = false; warmEl = null;
+    lastKey = ''; pushState();
+  }
+  function prewarm() {
+    var started = Date.now();
+    var skip = function (why) { pageDebug('play.prewarm', 'skip ' + why); return false; };
+    // 起動直後は端末の一覧も前回の曲もまだ届いていないので、揃うまで待つ（最大 10 秒）
+    return (function waitCluster(n) {
+      var c = window.__mConnect ? __mConnect.get() : {}, st = service('PlayerAPI').getState();
+      if (c.self && c.cluster && st && st.item) return Promise.resolve(c);
+      if (n >= 50) return Promise.resolve(null);
+      return new Promise(function (r) { setTimeout(r, 200); }).then(function () { return waitCluster(n + 1); });
+    })(0).then(function (c) {
+      if (!c) return skip('no-device-list');
+      var cl = c.cluster, act = cl.active_device_id;
+      // PC やスピーカーなど、ほかの端末が再生する端末になっているときは、止まっていても奪わない
+      if (act && act !== c.self && (cl.devices || {})[act]) return skip('other-device');
+      var p = service('PlayerAPI'), st = p.getState();
+      if (!st || !st.item) return skip('no-track');
+      if (!st.isPaused) return skip('playing');
+      if (isAd(st.item)) return skip('ad');
+      return audioEl().then(function (el) {
+        if (!el) return skip('no-element');
+        var pos = st.positionAsOfTimestamp || 0;
+        // muted なら音は出ず、ほかのアプリの音も止めない（音の出ない再生は音声フォーカスを取らない）
+        warming = true; warmTaken = false; warmEl = el; el.muted = true;
+        return new Promise(function (resolve) {
+          var timer = setTimeout(function () { resolve('timeout'); }, 8000);
+          el.addEventListener('playing', function () { clearTimeout(timer); resolve('ok'); }, { once: true });
+          Promise.resolve(p.resume()).catch(function () { clearTimeout(timer); resolve('failed'); });
+        }).then(function (result) {
+          if (warmTaken) return skip('tapped');
+          return Promise.resolve(p.pause()).catch(function () {}).then(function () {
+            return Promise.resolve(p.seekTo(pos)).catch(function () {});
+          }).then(function () {
+            if (warmTaken) return skip('tapped');
+            endWarm();
+            pageDebug('play.prewarm', result + ' ms=' + (Date.now() - started));
+            return result === 'ok';
+          });
+        });
+      });
+    });
+  }
+
   // 続きから再生する。起動直後はこのスマホが再生する端末としてまだ登録されておらず、
   // resume が「No such device」で断られるので、登録されるまで少し待って送り直す
   function resumeHere() {
@@ -851,6 +904,8 @@
   var lastKey = '';
   function pushState() {
     handleAdPlayback();
+    // 先読みの一瞬の再生は、画面にも通知にも出さない
+    if (warming) return;
     var s = snapshot();
     var key = JSON.stringify([s.uri, s.device, s.liked, s.playing, s.shuffle, s.repeat, s.buffering, Math.round(s.pos / 5000)]);
     if (key === lastKey) return;

@@ -117,6 +117,8 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     SwitchRow(tr("バックグラウンド再生", "Background playback"), tr("アプリを閉じても再生を続ける", "Keep playing after closing the app"), bg) { bg = it; host.setSetting("background", it.toString()) }
                     var ads by remember { mutableStateOf(host.setting("adblock", "true") == "true") }
                     SwitchRow(tr("広告をブロック", "Handle ads"), tr("広告マネージャーを停止し、広告をミュートして早送りする", "Stops the ad managers, and mutes and fast-forwards ads"), ads) { ads = it; host.setSetting("adblock", it.toString()) }
+                    var pw by remember { mutableStateOf(host.setting("prewarm", "true") == "true") }
+                    SwitchRow(tr("起動時に再生の準備をする", "Get ready to play at launch"), tr("起動したとき音を消して一瞬だけ再生し、最初の再生をすぐ始められるようにする（ほかの端末で再生中のときはしない）", "Briefly plays muted at launch so the first play starts right away (skipped when another device is playing)"), pw) { pw = it; host.setSetting("prewarm", it.toString()) }
                     var gl by remember { mutableStateOf(host.setting("gapless", "true") == "true") }
                     SwitchRow(tr("ギャップレス再生", "Gapless playback"), tr("曲と曲のあいだの無音をなくして、続けて再生する", "Removes the silence between songs"), gl) { gl = it; host.setSetting("gapless", it.toString()) }
                     // クロスフェード：公式アプリと同じく、オンにするとスライダーで 1〜12 秒を選ぶ
