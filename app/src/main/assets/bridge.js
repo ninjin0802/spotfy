@@ -5,6 +5,9 @@
   if (window.__mb) return;
   var send = function (m) { if (window.__native && __native.send) __native.send(m); };
   var pageDebug = function (event, detail) { send({ type: 'debug', event: event, detail: detail || '' }); };
+  // デバッグモード（アプリの「このアプリについて」で切り替え）のときだけ残す細かい記録
+  var verbose = false;
+  var vlog = function (event, detail) { if (verbose) pageDebug(event, detail); };
   // 表示の言語（端末の言語が日本語なら日本語、それ以外は英語）。アプリ側の tr() と同じ決め方
   var JA = /^ja\b/i.test(navigator.language || '');
   function T(ja, en) { return JA ? ja : en; }
@@ -589,9 +592,10 @@
       });
     },
     // クロスフェード（秒。0 でオフ）
-    crossfade: function (a) { xfSec = a.sec | 0; xfWatch(); gapWatch(); return true; },
-    gapless: function (a) { gapOn = !!a.on; gapWatch(); return true; },
+    crossfade: function (a) { xfSec = a.sec | 0; xfWatch(); gapWatch(); seamSet(gapOn || xfSec > 0); return true; },
+    gapless: function (a) { gapOn = !!a.on; gapWatch(); seamSet(gapOn || xfSec > 0); return true; },
     prewarm: function () { return prewarm(); },
+    debug: function (a) { verbose = !!a.on; return true; },
     library: function () {
       var lib = service('LibraryAPI');
       return Promise.resolve(lib.getContents({ limit: 300, offset: 0 })).then(function (c) {
@@ -681,15 +685,72 @@
     toggle: function () {
       // 先読みで鳴らしている途中に押されたら、止めずにそのまま本当の再生にする
       if (warming) { claimPlayback(); return true; }
-      if (playingNow()) return Promise.resolve(service('PlayerAPI').pause()).then(function () { return true; });
+      if (playingNow()) return methods.pause();
       return resumeHere();
     },
-    pause: function () { return Promise.resolve(service('PlayerAPI').pause()).then(function () { return true; }); },
+    // つなぎ目の途中（次の曲が鳴っている）なら、Web Player も次の曲のその位置で止める。
+    // 前の曲のまま止めると、再生し直したときに前の曲の終わりに戻ったり、次の曲が頭から鳴り直したりする
+    pause: function () {
+      var e2 = seam.tp && seam.tp._player, p = service('PlayerAPI');
+      var shown = e2 && (seam.phase === 'handoff' || seam.phase === 'swap' || seam.phase === 'playing2' && seam.lead) ? seam.uri : '';
+      var ms = shown ? e2.currentTime * 1000 : 0, g = ++cmdGen;
+      seekTarget = '';
+      seamDrop('user');
+      if (!shown) return Promise.resolve(p.pause()).then(function () { return true; });
+      seam.joined = shown;
+      // 止めたまま合わせられなかったら（次の曲の読み込み中はシークが無視される）、再生し直すときに合わせる
+      resumeAt = { uri: shown, ms: ms };
+      return audioEl().then(function (el) {
+        // 次の曲へ進めて位置を合わせる間は音を出さない
+        if (el) el.muted = true;
+        var st = p.getState();
+        return Promise.resolve(st && st.item && st.item.uri === shown ? null : p.skipToNext()).then(function () {
+          if (g === cmdGen) return p.pause();
+        }).then(function () {
+          return (function wait(n) {
+            var st = p.getState();
+            if (g !== cmdGen || n >= 60) return null;
+            if (!st || !st.item || st.item.uri !== shown || !st.isPaused) {
+              // 次の曲へ進んだあとで Web Player が鳴らし始めたら、止め直す
+              if (st && st.item && st.item.uri === shown && n % 10 === 9) p.pause();
+              return sleep(50).then(function () { return wait(n + 1); });
+            }
+            if (Math.abs((st.positionAsOfTimestamp || 0) - ms) < 1500) { resumeAt = null; return null; }
+            return Promise.resolve(p.seekTo(ms)).then(function () { return sleep(300); }).then(function () { return wait(n + 6); });
+          })(0);
+        }).then(function () { return audioEl(); }, function () { return null; }).then(function (el2) {
+          if (el) el.muted = false;
+          if (el2) el2.muted = false;
+          return true;
+        });
+      });
+    },
     resume: function () { return resumeHere(); },
     // 先読みの途中に操作されたら、先読みが後で止めたり位置を戻したりしないよう、先に終わらせる
-    next: function () { claimPlayback(); return Promise.resolve(service('PlayerAPI').skipToNext()).then(function () { return true; }); },
+    // クロスフェード中は次の曲を表示しているが、Web Player はまだ前の曲なので、表示中の曲へ進むのを待ってからもう一度進める
+    next: function () {
+      var shown = seam.phase === 'playing2' && seam.lead ? seam.uri : '', p = service('PlayerAPI');
+      claimPlayback();
+      var g = cmdGen;
+      return Promise.resolve(p.skipToNext()).then(function () {
+        return shown && untilPlaying(shown, g).then(function (ok) { if (ok) return p.skipToNext(); });
+      }).then(function () { return true; });
+    },
     prev: function () { claimPlayback(); return Promise.resolve(service('PlayerAPI').skipToPrevious()).then(function () { return true; }); },
-    seek: function (a) { claimPlayback(); return Promise.resolve(service('PlayerAPI').seekTo(a.ms)).then(function () { return true; }); },
+    seek: function (a) {
+      // クロスフェード中は次の曲を表示している。その曲の位置として扱い、次の曲へ進めてから合わせる（前の曲を動かさない）
+      // 前のシークで次の曲へ進めている途中（seekTarget）なら、もう一度進めずに同じ曲の位置として合わせ直す
+      var pending = seekTarget, shown = seam.phase === 'playing2' && seam.lead ? seam.uri : pending, p = service('PlayerAPI');
+      claimPlayback();
+      // 位置を合わせている途中にほかの操作（続けてシークなど）が来たら、そちらを優先してやめる
+      var g = cmdGen;
+      if (!shown) return Promise.resolve(p.seekTo(a.ms)).then(function () { return true; });
+      seekTarget = shown;
+      return Promise.resolve(shown === pending ? null : p.skipToNext()).then(function () { return seekWhenPlaying(shown, a.ms, g); }).then(function () {
+        if (g === cmdGen) seekTarget = '';
+        return true;
+      });
+    },
     shuffle: function (a) { return Promise.resolve(service('PlayerAPI').setShuffle(!!a.on)).then(function () { return true; }); },
     repeat: function (a) { return Promise.resolve(service('PlayerAPI').setRepeat(a.mode | 0)).then(function () { return true; }); },
     // お気に入りの曲に追加／削除
@@ -697,6 +758,7 @@
       var lib = service('LibraryAPI');
       return Promise.resolve(a.on ? lib.add({ uris: [a.uri] }) : lib.remove({ uris: [a.uri] })).then(function () {
         if (a.uri === likedFor) { liked = !!a.on; lastKey = ''; pushState(); }
+        if (a.uri === seam.uri) { seam.nextLiked = !!a.on; lastKey = ''; pushState(); }
         return true;
       });
     },
@@ -722,7 +784,7 @@
   // 代わりに、曲の終わりと次の曲の始まりを、それぞれ指定秒数の半分ずつで小さく／大きくする。
   // 小さくなりきる直前に次の曲へ進め（ギャップレスと同じ仕組み）、切り替えの無音を挟まない。
   // 音量は耳に自然に聞こえるよう、直線ではなく正弦の曲線で変える
-  var xfSec = 0, xfTimer = null, xfBase = null;
+  var xfSec = 0, xfTimer = null, xfBase = null, xfLogged = -1;
   function audioEl() {
     var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
     if (!st || !st._playerPromise) return Promise.resolve(null);
@@ -732,17 +794,30 @@
     if (xfTimer) return;
     xfTimer = setInterval(function () {
       if (!xfSec && xfBase == null) return;
+      // 2 台目の再生器が引き受けた曲のつなぎ目はそちらがやる（引き受けなかった曲・失敗した曲は、ここで音量を上げ下げする）
+      // ただし、引き受ける前（先読み中）に前の曲から続く大きくする途中なら、それは最後までやる（短い曲だとすぐ先読みが始まる）
+      if (seamClaimed() && !(seam.fadeIn && (seam.phase === 'loading' || seam.phase === 'ready'))) return;
       // 広告のミュート中に音量を拾うと、広告後の曲がミュートの音量のままになる
       if (adBreakActive) return;
       audioEl().then(function (el) {
         if (!el || adBreakActive) return;
+        // 次の曲の長さがまだ分からないうちは、上げ始めるまで小さいままにする
+        if (seam.fadeIn && xfSec && xfBase != null && !el.paused && !isFinite(el.duration)) { el.volume = 0; return; }
         if (!xfSec || el.paused || !isFinite(el.duration) || el.duration < xfSec * 3) {
+          seam.fadeIn = false;
           if (xfBase != null) { el.volume = xfBase; xfBase = null; }
           return;
         }
         if (xfBase == null) xfBase = el.volume > 0.01 ? el.volume : 1;
         var half = xfSec / 2, t = el.currentTime, rest = el.duration - t;
+        if (seam.fadeIn && t >= half) { seam.fadeIn = false; el.volume = xfBase; return; }
+        // 2 台目でつないだ曲の始まりは、2 台目で大きくし終えているので、もう一度大きくしない
+        var cur = service('PlayerAPI').getState();
+        if (!seam.fadeIn && t < half && rest >= half && seam.joined && cur && cur.item && cur.item.uri === seam.joined) { xfBase = null; return; }
         var x = Math.max(0, Math.min(1, t / half, rest / half));
+        // 曲の途中は触らない（音量を変えられても上書きしない）。上げ下げが終わったら元の音量に戻し、次は改めて拾う
+        if (x >= 1) { seam.fadeIn = false; el.volume = xfBase; xfBase = null; return; }
+        if (verbose && Math.floor(t * 2) !== xfLogged) { xfLogged = Math.floor(t * 2); vlog('xf.fade', (rest < half ? 'out' : 'in') + ' t=' + t.toFixed(1) + ' v=' + (xfBase * Math.sin(x * Math.PI / 2)).toFixed(2)); }
         el.volume = Math.max(0, Math.min(1, xfBase * Math.sin(x * Math.PI / 2)));
       });
     }, 100);
@@ -774,22 +849,368 @@
           if (!el.paused && el.currentTime > 0 && el.currentTime < 2) {
             var took = Math.max(0, waited - el.currentTime);
             if (took < 3) gapLatency = Math.min(1.5, Math.max(0.1, gapLatency * 0.6 + took * 0.4));
+            vlog('gap.took', 's=' + took.toFixed(2) + ' latency=' + gapLatency.toFixed(2));
             gapSkippedAt = 0;
           } else if (waited > 5) gapSkippedAt = 0;
           return;
         }
         if (el.paused || !isFinite(el.duration) || el.duration < 10 || st.repeat === 2 || adBreakActive) return;
+        // 2 台目の再生器がつなぐ曲では、早めに次へ送らない（曲の最後まで鳴らす）
+        if (seamClaimed()) return;
         var rest = el.duration - el.currentTime;
         if (rest > 0 && rest <= gapLatency && !(st.restrictions && st.restrictions.canSkipNext === false)) {
           gapSkippedAt = performance.now();
+          vlog('gap.skip', 'rest=' + rest.toFixed(2) + ' latency=' + gapLatency.toFixed(2));
           Promise.resolve(p.skipToNext()).catch(function () {});
         }
       });
     }, 100);
   }
 
+  // ---- 通信の見張り ----
+  // Canvas（曲の裏で流れる短い動画）は画面に出さないのに、曲が変わるたびに動画を落として再生している。
+  // 取りに行く問い合わせ（canvas）に「Canvas なし」と答え、通信と動画の再生（端末の再生器を 1 本使う）をなくす。
+  // デバッグモードのときは通信を記録する：fetch は状態と時間、GraphQL は操作名だけ（変数は残さない）。
+  // WebSocket は送受信の頭だけ。クエリにはトークンなどが入るので残さない
+  function netWatch() {
+    var short = function (u) { try { var x = new URL(u, location.href); return x.host + x.pathname; } catch (e) { return String(u).split('?')[0]; } };
+    var gqlOp = function (u, body) {
+      var m = /[?&]operationName=([^&]+)/.exec(u);
+      if (m) return ' op=' + decodeURIComponent(m[1]);
+      if (typeof body === 'string' && body.indexOf('operationName') >= 0) { try { return ' op=' + JSON.parse(body).operationName; } catch (e) {} }
+      return '';
+    };
+    var of = window.fetch;
+    if (of) window.fetch = function (input, init) {
+      var body = init && init.body;
+      if (typeof body === 'string' && body.indexOf('"operationName":"canvas"') >= 0) {
+        var uri = ''; try { uri = JSON.parse(body).variables.trackUri || ''; } catch (e) {}
+        vlog('net.canvas', 'skipped ' + uri.slice(-22));
+        return Promise.resolve(new Response(JSON.stringify({ data: { trackUnion: { __typename: 'Track', canvas: null, uri: uri } } }), { status: 200, headers: { 'content-type': 'application/json' } }));
+      }
+      var p = of.apply(this, arguments);
+      if (!verbose) return p;
+      var t0 = performance.now(), url = typeof input === 'string' ? input : (input && input.url) || String(input);
+      var label = ((init && init.method) || (input && input.method) || 'GET') + ' ' + short(url) + gqlOp(url, init && init.body);
+      p.then(function (r) { vlog('net.fetch', label + ' ' + r.status + ' ' + Math.round(performance.now() - t0) + 'ms'); },
+        function (e) { vlog('net.fetch', label + ' error ' + (e && e.message)); });
+      return p;
+    };
+    if (!window.XMLHttpRequest || !window.WebSocket) return;
+    var xo = XMLHttpRequest.prototype.open, xs = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (m, u) { this.__mbNet = m + ' ' + short(u); return xo.apply(this, arguments); };
+    XMLHttpRequest.prototype.send = function () {
+      if (verbose && this.__mbNet) {
+        var x = this, t0 = performance.now();
+        x.addEventListener('loadend', function () { vlog('net.xhr', x.__mbNet + ' ' + x.status + ' ' + Math.round(performance.now() - t0) + 'ms'); });
+      }
+      return xs.apply(this, arguments);
+    };
+    // 端末の状態の知らせ（cluster）は長いので、再生中の端末・曲・位置・一時停止だけにまとめる
+    var wsHead = function (d) {
+      if (typeof d !== 'string') return '[binary ' + (d && (d.byteLength || d.size) || 0) + ']';
+      try {
+        var m = JSON.parse(d), c = m.payloads && m.payloads[0] && m.payloads[0].cluster;
+        if (c) {
+          var ps = c.player_state || {};
+          return 'cluster reason=' + (m.payloads[0].update_reason || '') + ' active=' + String(c.active_device_id || '').slice(0, 8) +
+            ' track=' + String(ps.track && ps.track.uri || '').slice(-22) + ' pos=' + (ps.position_as_of_timestamp || 0) +
+            ' paused=' + !!ps.is_paused + ' playing=' + !!ps.is_playing + ' devices=' + Object.keys(c.devices || {}).length;
+        }
+        // ほかの知らせは種類と宛先だけ。宛先に入る接続 ID などの長い値は伏せる（中身は残さない）
+        return (m.type || '') + ' ' + String(m.uri || '').replace(/[A-Za-z0-9+\/=_-]{20,}/g, '*').slice(0, 120);
+      } catch (e) {}
+      return '[text ' + d.length + ']';
+    };
+    var wo = WebSocket.prototype.send;
+    WebSocket.prototype.send = function (d) {
+      // 中身をまとめるのも手間なので、デバッグモードでないときは作らない
+      if (verbose) vlog('ws.out', short(this.url) + ' ' + wsHead(d));
+      if (!this.__mbNet) {
+        this.__mbNet = true;
+        this.addEventListener('message', function (e) { if (verbose) vlog('ws.in', wsHead(e.data)); });
+        this.addEventListener('close', function (e) { vlog('ws.close', 'code=' + e.code); });
+      }
+      return wo.apply(this, arguments);
+    };
+  }
+  netWatch();
+
+  // ---- シームレス再生（2 台目の再生器で、次の曲を先に鳴らす） ----
+  // Web Player は再生要素が 1 つで、曲ごとに作り直すので 0.3 秒ほど途切れる。次の曲を 2 台目の再生器に先に読み込んでおき、
+  // 曲の終わりに 2 台目で鳴らし始める（クロスフェードなら重ねる）。曲の管理は Web Player（1 台目）のままなので、
+  // 1 台目が次の曲へ進んだら音を消したまま位置を 2 台目に合わせ、そろったら音を 1 台目に戻して 2 台目を片付ける。
+  // phase: '' → loading → ready → playing2（2 台目が鳴っている）→ handoff（1 台目を 2 台目に合わせる）→ swap（音を 1 台目へ移す）→ ''。
+  // 引き受けない曲（短い・1 曲リピート）と失敗した曲は failed にして、今までの見張り（xfWatch・gapWatch）に任せる
+  // ギャップレス再生かクロスフェードがオンのとき使う。2 台目は鍵の仕組み（emeManager）も別に持つ（共有すると 1 台目の鍵が外れて止まる）
+  // base：クロスフェードを始めたときの 1 台目の音量、gain2：2 台目と、入れ替えたあとの 1 台目の音量（base と同じ）
+  // gen：やめるたびに増やし、途中の先読みが古くなったと分かるようにする。nextLiked：表示する次の曲がお気に入りか
+  // joined：2 台目でつなぎ終えた曲（始まりはもう大きくしてあるので、crossfade の見張りが大きくし直さない）
+  var seam = {
+    on: false, timer: null, tp: null, eme: null, uri: '', forUri: '', phase: '', gen: 0, loadAt: 0, startAt: 0, lead: 0, base: 1, gain2: 1,
+    main: null, mutedMain: null, fadeIn: false, nextLiked: false, joined: '',
+    seekedAt: 0, seeks: 0, seekLead: 0.25, e2Last: -1, e2StillAt: 0, swapAt: 0, tracedPhase: '', tracedAt: 0
+  };
+  var SEAM_BUSY = ['loading', 'ready', 'playing2', 'handoff', 'swap'];
+  // 2 台目の再生器がこの曲のつなぎ目を引き受けているか
+  function seamClaimed() { return seam.on && SEAM_BUSY.indexOf(seam.phase) >= 0; }
+  var SEAM_PRELOAD = 15;
+  // 1 台目へ音を移す長さ。同じ曲を数十 ms ずらして重ねると音がこもる（くし形のゆがみ）ので短くする。0 にするとぶつっと鳴る
+  var SEAM_SWAP_MS = 150;
+  // 2 台目の再生は Spotify に報告しない（再生回数などは 1 台目が報告する）
+  var seamTracker = (function () {
+    var f = new Proxy(function () {}, { get: function (o, k) { return k === 'then' ? undefined : f; }, apply: function () { return f; } });
+    return new Proxy({}, { get: function (o, k) { return k === 'then' ? undefined : k === 'getPlaybackMetadataStore' ? function () { return {}; } : f; } });
+  })();
+  function seamListPlayer() {
+    var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
+    return st && st._listPlayer;
+  }
+  function seamSet(on) {
+    seam.on = on;
+    if (!on) { seamDrop(); seam.phase = ''; clearInterval(seam.timer); seam.timer = null; return; }
+    if (!seam.timer) seam.timer = setInterval(seamTick, 50);
+  }
+  function seamDrop(reason) {
+    seam.gen++;
+    if (!seam.tp && !seam.mutedMain) return;
+    if (reason) pageDebug('seamless.abort', reason + ' phase=' + seam.phase);
+    var tp = seam.tp, main = seam.mutedMain, moved = !!main || seam.phase === 'swap';
+    if (moved) seam.joined = seam.uri;
+    seam.tp = null; seam.mutedMain = null; seam.uri = '';
+    if (seam.phase !== 'failed') seam.phase = '';
+    if (main) { main.muted = false; main.playbackRate = 1; }
+    // 1 台目の音量を戻す（次の曲へ進んでいれば次の曲の音量、まだ前の曲ならクロスフェードで下げた分を戻す）
+    if (seam.main && moved) seam.main.volume = seam.gain2;
+    else if (seam.main && seam.lead) seam.main.volume = seam.base;
+    seam.main = null;
+    if (tp) {
+      // 片付けるだけでは要素が鳴り続けることがあるので、要素も止めて空にする
+      var e2 = tp._player;
+      if (e2) { try { e2.muted = true; e2.pause(); e2.removeAttribute('src'); e2.load(); } catch (e) {} }
+      try { Promise.resolve(tp.destroy()).catch(function () {}); } catch (e) {}
+      // 2 台目の鍵のセッションも閉じる（残ると曲ごとに溜まって、再生が止まりやすくなる）
+      if (seam.eme) { try { Promise.resolve(seam.eme.destroySessions()).catch(function () {}); } catch (e) {} }
+    }
+  }
+  // この曲は 2 台目でつなぐのをやめ、今までのつなぎ方（crossfade・gapless の見張り）に任せる
+  function seamFail(reason) { seamDrop(reason); seam.phase = 'failed'; }
+  function seamPreload(curUri) {
+    var lp = seamListPlayer();
+    if (!lp || !lp._loadedList) { seam.phase = 'failed'; return; }
+    seam.phase = 'loading';
+    var started = Date.now(), gen = seam.gen;
+    seam.loadAt = started;
+    // 途中でやめた（曲が変わった・機能をオフにした）先読みは続けない
+    var stale = function () { return gen !== seam.gen || !seam.on || seam.forUri !== curUri || seam.phase !== 'loading'; };
+    var fail = function (e) {
+      if (stale()) return;
+      seamDrop('preload ' + String(e && (e.message || e)));
+      seam.phase = 'failed';
+    };
+    seamPeekNext(lp._loadedList).then(function (next) {
+      if (!next || typeof next !== 'object' || !next.fileId || next.isAd || next.playable === false) throw new Error('no-next');
+      // Web Player が実際に次に流す曲と違うことがある（シャッフルやキューの変化）。違えば使わない
+      if (seamUpcoming() !== next.uri) throw new Error('mismatch');
+      return lp._getTrackPlayer().then(function (tp) {
+        if (!seam.eme) {
+          var m = tp._emeManager;
+          var m2 = new m.constructor({ transport: m._transport, emeImpl: m._emeImpl, disallowCodecs: m._disallowCodecs, preferredKeySystems: m._preferredKeySystems, unauthServerCertificateBase: m._unauthServerCertificateBase });
+          return Promise.resolve(m2.init()).then(function () { seam.eme = m2; return tp; });
+        }
+        return tp;
+      }).then(function (tp) {
+        if (stale()) return;
+        var tp2 = new tp.constructor({
+          audioResolver: tp._audioResolver, videoResolver: tp._videoResolver, transport: tp._transport, tracker: seamTracker,
+          emeManager: seam.eme, licenseURLResolver: tp._licenseURLResolver, newBufferPerTrack: true, createPlayer: tp._createPlayer,
+          audioPlayerContainer: tp._audioPlayerContainer, videoPlayerContainer: tp._videoPlayerContainer, playabilityChecker: tp._playabilityChecker,
+          cubicVolume: tp._cubicVolume
+        });
+        seam.tp = tp2; seam.uri = next.uri; seam.nextLiked = false;
+        var lib = service('LibraryAPI');
+        if (lib) Promise.resolve(lib.contains(next.uri)).then(function (x) { if (seam.uri === next.uri) seam.nextLiked = !!(x && x[0]); }, function () {});
+        return tp2.load(next, { position: 0, paused: true, muted: true, initialPosition: 0, playbackSpeed: 1, duration: -1 }).then(function () {
+          var e2 = tp2._player;
+          if (!e2) throw new Error('no-element');
+          // 読み込むと鳴り始めるので、再生器ごと止めて頭に戻しておく（要素だけ止めても再生器が鳴らし直す）
+          e2.muted = true;
+          return Promise.resolve(tp2.pause()).then(function () { return tp2.seek(0); }).then(function () {
+          if (seam.tp !== tp2) return;
+          seam.phase = 'ready';
+          pageDebug('seamless.preload', 'ms=' + (Date.now() - started));
+          });
+        });
+      });
+    }).catch(fail);
+  }
+  // 次に読み込む曲。曲の終わりの行き先が中身の無い広告の枠（noManifest）のことがあり、Web Player はその枠を飛ばして次の曲へ進む。
+  // 枠の先は決まっていない（枠のあとで並びを取り直す）ので、そのときは「次へ」ボタンの行き先（次の曲）を読む
+  function seamPeekNext(list) {
+    var opts = { reason: 'trackdone', listConstants: {} };
+    return Promise.resolve(list.peekNext(opts)).then(function (next) {
+      if (!next || !next.isAd || !next.noManifest) return next;
+      var cur = list._currentState, skip = cur && cur.transitions && cur.transitions.skip_next;
+      return skip ? list._transitionTo(opts, skip, true) : next;
+    });
+  }
+  // Web Player が次に流す曲
+  function seamUpcoming() {
+    var st = service('PlayerAPI').getState(), n = st && st.nextItems && st.nextItems[0];
+    return n ? n.uri : '';
+  }
+  function seamStart(el, rest) {
+    var e2 = seam.tp._player;
+    seam.base = xfBase != null ? xfBase : (el.volume > 0.01 ? el.volume : 1);
+    // 2 台目は音量 1 で作られるので、1 台目の音量（Web Player の音量）にそろえる。ずれていると、入れ替えたときに大きさが変わる
+    seam.gain2 = seam.base;
+    // 曲の終わり近くへ飛ばしたなどで残りが短いときは、残りの長さで重ねる（重ね終わる前に今の曲が切れないように）
+    seam.lead = xfSec ? Math.max(0.5, Math.min(xfSec, rest)) : 0;
+    seam.main = el;
+    e2.volume = seam.lead ? 0 : seam.gain2;
+    e2.muted = false;
+    Promise.resolve(seam.tp.resume()).catch(function (e) { seamDrop('play ' + (e && e.message)); seam.phase = 'failed'; });
+    seam.phase = 'playing2'; seam.startAt = Date.now();
+    // 1 台目が次の曲に切り替わった瞬間に音を消す（見張りの間隔を待つと、頭が一瞬重なる）
+    var onEmptied = function () {
+      el.removeEventListener('emptied', onEmptied);
+      if (seam.phase !== 'playing2') return;
+      el.muted = true; seam.mutedMain = el; seam.phase = 'handoff'; seam.startAt = Date.now();
+      seam.seekedAt = 0; seam.seeks = 0; seam.seekLead = seam.seekLead || 0.25; seam.e2Last = -1; seam.e2StillAt = Date.now();
+    };
+    el.addEventListener('emptied', onEmptied);
+    pageDebug('seamless.start', 'lead=' + seam.lead);
+    // クロスフェードでは次の曲が聞こえ始めたので、画面と通知も次の曲にする
+    if (seam.lead) { lastKey = ''; pushState(); }
+  }
+  // 1 台目を音なしのまま 2 台目の位置に合わせ、ずれが 20ms 未満になったら音を 1 台目に戻す。
+  // 合わせ方はシークだけ（速さを変えると Web Player が位置を戻してくる）。シークにかかる時間を見込んで先へ飛ばし、ずれた分だけ見込みを直して数回やり直す
+  function seamHandoff(el) {
+    var e2 = seam.tp && seam.tp._player;
+    if (!e2) return seamDrop('lost');
+    // 位置合わせの間も、2 台目の音量がずれないよう付け直す（ずれていたらログに残す）
+    if (Math.abs(e2.volume - seam.gain2) > 0.01) { pageDebug('seamless.volume', 'fixed ' + e2.volume.toFixed(2) + ' -> ' + seam.gain2.toFixed(2)); e2.volume = seam.gain2; }
+    // 2 台目が止まったら（読み込みが追いつかないなど）、無音にならないようすぐ 1 台目の音を戻す
+    if (e2.currentTime === seam.e2Last) {
+      if (Date.now() - seam.e2StillAt > 300) { pageDebug('seamless.handoff', 'stalled'); return seamDrop(); }
+    } else { seam.e2Last = e2.currentTime; seam.e2StillAt = Date.now(); }
+    if (Date.now() - seam.startAt > 10000) {
+      pageDebug('seamless.handoff', 'timeout off=' + Math.round((el.currentTime - e2.currentTime) * 1000) + 'ms');
+      return seamDrop();
+    }
+    if (el.paused || el.readyState < 3 || el.seeking) return;
+    if (seam.seekedAt) {
+      var off = el.currentTime - e2.currentTime;
+      if (Math.abs(off) < 0.02 || (seam.seeks >= 5 && Math.abs(off) < 0.06)) {
+        // 一瞬で入れ替えるとぶつっと鳴るので、SEAM_SWAP_MS かけて 2 台目から 1 台目へ音を移す
+        pageDebug('seamless.handoff', 'off=' + Math.round(off * 1000) + 'ms seeks=' + seam.seeks + ' ms=' + (Date.now() - seam.startAt));
+        el.volume = 0; el.muted = false;
+        seam.mutedMain = null; seam.main = el;
+        seam.phase = 'swap'; seam.swapAt = Date.now();
+        return;
+      }
+      if (seam.seeks >= 5) { pageDebug('seamless.handoff', 'unaligned off=' + Math.round(off * 1000) + 'ms'); return seamDrop(); }
+      // 先に行き過ぎたら見込みを減らし、遅れたら増やす
+      seam.seekLead = Math.max(0, Math.min(1, seam.seekLead - off));
+    }
+    el.currentTime = e2.currentTime + seam.seekLead;
+    seam.seekedAt = Date.now(); seam.seeks++;
+  }
+  // デバッグモードの記録：段階が変わったときと、つなぎ目の最中は 0.5 秒ごとに、2 台の位置と音量を残す
+  function seamTrace(el) {
+    if (!verbose) return;
+    var e2 = seam.tp && seam.tp._player, now = Date.now();
+    var busy = seam.phase === 'playing2' || seam.phase === 'handoff' || seam.phase === 'swap';
+    if (seam.phase === seam.tracedPhase && !(busy && now - (seam.tracedAt || 0) >= 500)) return;
+    var d = function (e) { return e ? (e.paused ? 'p' : '') + e.currentTime.toFixed(2) + '/' + (isFinite(e.duration) ? e.duration.toFixed(0) : '-') + ' v' + e.volume.toFixed(2) + (e.muted ? 'm' : '') : '-'; };
+    vlog(seam.phase === seam.tracedPhase ? 'seam.tick' : 'seam.phase', (seam.tracedPhase || '-') + '>' + (seam.phase || '-') + ' main=' + d(el) + ' p2=' + d(e2) + ' next=' + seam.uri.slice(-22));
+    seam.tracedPhase = seam.phase; seam.tracedAt = now;
+  }
+  function seamTick() {
+    if (!seam.on) return;
+    var p = service('PlayerAPI'), st = p && p.getState();
+    if (!st || !st.item) return;
+    audioEl().then(function (el) {
+      if (!el || !seam.on) return;
+      seamTrace(el);
+      // 1 台目に戻している途中に一時停止・曲送りされたら、2 台目をすぐやめる
+      if (seam.phase === 'handoff' || seam.phase === 'swap') {
+        if (st.isPaused) return seamDrop('paused');
+        if (st.item.uri !== seam.uri && st.item.uri !== seam.forUri) return seamDrop('track-changed');
+      }
+      if (seam.phase === 'handoff') return seamHandoff(el);
+      if (seam.phase === 'swap') {
+        // 同じ曲の同じ位置を重ねるので、足して一定になる直線で移す（sin/cos だと途中で 1.4 倍に大きくなる）
+        var s2 = seam.tp && seam.tp._player, y = Math.min(1, (Date.now() - seam.swapAt) / SEAM_SWAP_MS);
+        el.volume = seam.gain2 * y;
+        if (s2) s2.volume = seam.gain2 * (1 - y);
+        if (y >= 1) seamDrop();
+        return;
+      }
+      if (seam.phase === 'playing2') {
+        var e2 = seam.tp && seam.tp._player;
+        if (!e2) return seamFail('lost');
+        // 2 台目が止まったら（読み込みが追いつかないなど）、無音にならないようすぐやめて 1 台目に任せる
+        if (e2.currentTime === seam.e2Last) { if (Date.now() - seam.e2StillAt > 400) return seamFail('stalled'); }
+        else { seam.e2Last = e2.currentTime; seam.e2StillAt = Date.now(); }
+        // クロスフェード：今の曲を少しずつ小さく、次の曲を少しずつ大きくする
+        if (seam.lead) {
+          var x = Math.min(1, (Date.now() - seam.startAt) / (seam.lead * 1000));
+          e2.volume = seam.gain2 * Math.sin(x * Math.PI / 2);
+          if (!seam.mutedMain) el.volume = seam.base * Math.cos(x * Math.PI / 2);
+        }
+        if (st.isPaused) seamDrop('paused');
+        else if (st.item.uri !== seam.uri && st.item.uri !== seam.forUri) seamDrop('track-changed');
+        else if (Date.now() - seam.startAt > (seam.lead + 10) * 1000) seamFail('no-advance');
+        return;
+      }
+      var cur = st.item.uri;
+      if (seam.forUri !== cur) {
+        // 2 台目でつなげなかった曲のあとは、次の曲の始まりを crossfade の見張りが大きくする（しないと小さいまま鳴る）
+        seam.fadeIn = seam.phase === 'failed' && xfSec > 0;
+        seamDrop(seam.tp ? 'track-changed' : ''); seam.forUri = cur; seam.phase = '';
+        if (seam.joined !== cur) seam.joined = '';
+      }
+      if (seam.phase === 'failed' || st.isPaused || el.paused || isAd(st.item) || adBreakActive || !isFinite(el.duration)) return;
+      // 短い曲（先読みの時間が取れない）と 1 曲リピートは引き受けず、今までの見張りに任せる
+      if (el.duration < 20 || st.repeat === 2) { seam.phase = 'failed'; return; }
+      // 先読みが返ってこないときも任せる（引き受けたまま何もしないと、曲の終わりがつながらない）
+      if (seam.phase === 'loading' && Date.now() - seam.loadAt > 8000) return seamFail('preload-timeout');
+      var rest = el.duration - el.currentTime;
+      // 読み込みが進むと 2 台目が勝手に鳴り始めるので、出番まで止めて頭に戻し続ける
+      var w2 = seam.phase === 'ready' && seam.tp._player;
+      // 次の曲も短ければ引き受けない（重ねている途中や 1 台目に戻す前に終わってしまう）
+      if (w2 && isFinite(w2.duration) && w2.duration < 20) { pageDebug('seamless.preload', 'short-next'); return seamFail(); }
+      if (w2 && (!w2.paused || w2.currentTime > 0.05)) { w2.muted = true; Promise.resolve(seam.tp.pause()).catch(function () {}); w2.currentTime = 0; }
+      if (!seam.phase && rest <= SEAM_PRELOAD + xfSec) seamPreload(cur);
+      // 見張りは 50ms ごとなので、残り 60ms を切ったら鳴らし始める（少し重なっても途切れるよりよい）
+      if (seam.phase === 'ready' && rest <= Math.max(xfSec, 0.06)) {
+        // 読み込んだあとで次の曲が変わっていたら（キューに追加したなど）、使わずに今までのつなぎ方にする
+        if (seamUpcoming() !== seam.uri) { pageDebug('seamless.preload', 'stale'); seamDrop(); seam.phase = 'failed'; return; }
+        seamStart(el, rest);
+      }
+    });
+  }
+
   // ---- 再生状態 ----
+  // クロスフェードで次の曲が鳴り始めてから、音が 1 台目に戻るまでは、表示を 2 台目（次の曲）に合わせる
   function snapshot() {
+    var s = snapshotOfPlayer();
+    var e2 = seam.tp && seam.tp._player;
+    if (!s.has || !e2 || !seam.lead || !(seam.phase === 'playing2' || seam.phase === 'handoff' || seam.phase === 'swap')) return s;
+    var pos = { pos: e2.currentTime * 1000, dur: isFinite(e2.duration) ? e2.duration * 1000 : s.dur, playing: true, buffering: false };
+    // Web Player が次の曲へ進んだあとは、曲の情報は本物のまま、位置だけ 2 台目（1 台目はまだ位置合わせ中）
+    if (seam.phase !== 'playing2') return Object.assign({}, s, pos);
+    var st = service('PlayerAPI').getState();
+    var it = (st && st.nextItems || []).filter(function (x) { return x.uri === seam.uri; })[0];
+    if (!it) return s;
+    return Object.assign({}, s, pos, {
+      uri: it.uri, liked: seam.nextLiked, artistUri: it.artists && it.artists[0] && it.artists[0].uri || '',
+      title: it.name || '', artist: (it.artists || []).map(function (a) { return a.name; }).join(', '),
+      album: it.album && it.album.name || '', image: it.images && it.images[0] && it.images[0].url || s.image
+    });
+  }
+  function snapshotOfPlayer() {
     var p = service('PlayerAPI');
     var st = p && p.getState();
     if (!st || !st.item) return { has: false };
@@ -840,11 +1261,40 @@
     lastKey = ''; pushState();
   }
   // 再生の操作が来たら呼ぶ。準備で鳴らしている途中なら、音を戻してそのまま本当の再生にする
+  // cmdGen：再生の操作が来るたびに増やし、前の操作の続き（シークのやり直しなど）が後から上書きしないようにする
+  // resumeAt：つなぎ目の途中で一時停止して、次の曲の位置を合わせられなかったときの曲と位置（再生し直すときに合わせる）
+  // seekTarget：クロスフェード中のシークで、次の曲へ進めて位置を合わせている曲
+  var cmdGen = 0, resumeAt = null, seekTarget = '';
   function claimPlayback() {
+    cmdGen++; resumeAt = null; seekTarget = '';
     playRequested = true;
     endWarm();
+    // 曲のつなぎ目の途中に操作されたら、2 台目をやめて Web Player に任せる
+    if (seam.phase === 'playing2' || seam.phase === 'handoff' || seam.phase === 'swap') seamDrop('user');
   }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // 曲 uri が鳴り始めるまで待つ（鳴り始める前のシーク・曲送りは無視される）。ほかの操作が来たら・4 秒たっても鳴らなければ false
+  function untilPlaying(uri, g) {
+    var p = service('PlayerAPI');
+    return (function wait(n) {
+      return audioEl().then(function (el) {
+        var st = p.getState();
+        if (g !== cmdGen || n >= 80) return false;
+        if (st && st.item && st.item.uri === uri && el && !el.paused && el.currentTime > 0) return true;
+        return sleep(50).then(function () { return wait(n + 1); });
+      });
+    })(0);
+  }
+  // 曲 uri が鳴り始めてから ms へシークする。合うまで数回やり直し、ほかの操作が来たらやめる
+  function seekWhenPlaying(uri, ms, g) {
+    var p = service('PlayerAPI');
+    return (function attempt(n) {
+      return untilPlaying(uri, g).then(function (ok) { return ok && n < 5 && audioEl(); }).then(function (el) {
+        if (!el || Math.abs(el.currentTime * 1000 - ms) < 1500) return null;
+        return Promise.resolve(p.seekTo(ms)).then(function () { return sleep(400); }).then(function () { return attempt(n + 1); });
+      });
+    })(0);
+  }
   function prewarm() {
     var started = Date.now();
     var skip = function (why) { pageDebug('play.prewarm', 'skip ' + why); return false; };
@@ -919,9 +1369,20 @@
     return !!(st && st.item && !st.isPaused);
   }
   function resumeHere() {
+    // 合わせ損ねた位置は、まだ頭のまま（ほかの操作で動いていない）ときだけ使う。合わせ終わるまで音を出さない
+    var at = resumeAt, cur = service('PlayerAPI').getState();
+    if (at && !(cur && cur.item && cur.item.uri === at.uri && (cur.positionAsOfTimestamp || 0) < 1500)) at = null;
     claimPlayback();
-    var started = Date.now();
-    var done = function (tries) { pageDebug('play.resume', 'tries=' + tries + ' ms=' + (Date.now() - started)); return true; };
+    var started = Date.now(), g = cmdGen, muted = at ? audioEl().then(function (el) { if (el) el.muted = true; return el; }) : null;
+    var done = function (tries) {
+      pageDebug('play.resume', 'tries=' + tries + ' ms=' + (Date.now() - started) + (at ? ' at=' + Math.round(at.ms) : ''));
+      // 合わせられなくても（失敗しても）、音は必ず戻す
+      if (muted) muted.then(function (el) {
+        var unmute = function () { return audioEl().then(function (el2) { if (el) el.muted = false; if (el2) el2.muted = false; }); };
+        return seekWhenPlaying(at.uri, at.ms, g).then(unmute, unmute);
+      }).catch(function () {});
+      return true;
+    };
     return (function attempt(n) {
       if (playingNow()) return Promise.resolve(done(n));
       var timer = 0;
@@ -938,7 +1399,10 @@
         if (n >= 9 || !/no such device|timeout/i.test(msg)) throw e;
         return nextClusterOr(1000).then(function () { return attempt(n + 1); });
       });
-    })(0);
+    })(0).catch(function (e) {
+      if (muted) muted.then(function (el) { if (el) el.muted = false; });
+      throw e;
+    });
   }
 
   // 再生中の曲がお気に入りかどうか（曲が変わったときに一度だけ調べる）
@@ -968,11 +1432,13 @@
   window.__mMedia = function (action, pos) {
     var p = service('PlayerAPI');
     if (!p) return;
+    // 画面のボタンと同じ処理を通す（曲のつなぎ目の途中なら 2 台目をやめるなど）
+    var done = function (x) { Promise.resolve(x).catch(function () {}); };
     if (action === 'play') resumeHere().catch(function () {});
-    else if (action === 'pause') p.pause();
-    else if (action === 'next') p.skipToNext();
-    else if (action === 'prev') p.skipToPrevious();
-    else if (action === 'seek') p.seekTo(pos);
+    else if (action === 'pause') done(methods.pause());
+    else if (action === 'next') done(methods.next());
+    else if (action === 'prev') done(methods.prev());
+    else if (action === 'seek') done(methods.seek({ ms: pos }));
   };
 
   window.__mb = {

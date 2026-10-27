@@ -1,6 +1,13 @@
 package com.ninjin.spotifyweb
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -31,11 +38,24 @@ private val Faint = Color(0x80FFFFFF)
 
 /** 設定の「このアプリについて」。アイコンと版、作者のクレジット、リンク、注意書き */
 @Composable
-internal fun AboutPage() {
+internal fun AboutPage(host: AppHost) {
     val uri = LocalUriHandler.current
+    val context = LocalContext.current
+    var taps by remember { mutableIntStateOf(0) }
+    val toast = remember { arrayOfNulls<Toast>(1) }
     val repo = "https://github.com/${Updater.REPO}"
     Column(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(96.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF121212))) {
+        // アイコンを 10 回続けて押すと、デバッグモードを切り替える（7 回目から残りの回数を出す）
+        Box(Modifier.size(96.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF121212)).clickable(remember { MutableInteractionSource() }, null) {
+            taps++
+            val msg = when {
+                taps >= 10 -> { taps = 0; host.debugMode = !host.debugMode
+                    if (host.debugMode) tr("デバッグモードをオンにしました（設定に項目が出ます）", "Debug mode on (see Settings)") else tr("デバッグモードをオフにしました", "Debug mode off") }
+                taps >= 7 -> tr("あと ${10 - taps} 回でデバッグモード${if (host.debugMode) "をオフ" else ""}", "${10 - taps} more taps to turn debug mode ${if (host.debugMode) "off" else "on"}")
+                else -> null
+            }
+            if (msg != null) { toast[0]?.cancel(); toast[0] = Toast.makeText(context, msg, Toast.LENGTH_SHORT).also { it.show() } }
+        }) {
             Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize())
         }
         Text("spotfy", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))

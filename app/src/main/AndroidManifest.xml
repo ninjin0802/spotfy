@@ -42,6 +42,11 @@
             android:name=".MediaControls$Receiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".DebugModeReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+
         <service
             android:name=".PlaybackService"
             android:exported="false"

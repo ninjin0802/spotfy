@@ -76,9 +76,13 @@ Crossfade  ♪♪♪♪♪♪♪♪＼ ／♪♪♪♪♪♪♪♪♪♪
            fades the current song out, then the next one in
 ```
 
-- **Gapless playback** shortens the silence between songs. Great for live albums and albums where tracks run into each other. Because of how the Web Player works, a very short break can remain.
-- **Crossfade** smoothly lowers and raises the volume at the join, like a radio station.
-  - The seconds are the length of the fade (half at the end of one song, half at the start of the next). Longer means a slower change.
+- **Gapless playback** removes the silence between songs, so one runs straight into the next. Great for live albums and albums where tracks run into each other.
+  - How it works: near the end of a song, the next one is prepared on a second player and starts the moment the current one ends. Shortly after the next song starts, sound moves back to the usual player.
+  - If the next song can't be prepared in time, the app moves on the usual way (a very short break can remain).
+- **Crossfade** smoothly lowers and raises the volume at the join, like a radio station. The two songs really overlap.
+  - The artwork and title switch to the next song as soon as it starts playing.
+  - The seconds are how long the two songs overlap (the start of the next song plays over the last seconds of the current one). Longer means a slower change.
+  - If the next song can't be prepared in time, the current song fades out and then the next fades in (half the seconds each).
   - **We recommend 5–6 seconds.**
 
     | Seconds | Feel | Good for |
@@ -122,6 +126,8 @@ The app also checks on its own when you open it (at most once every 6 hours).
 
 Shares a record of what the app did (ad handling, playback commands, errors and so on).
 Sending it when something goes wrong helps track down the cause. It contains no passwords or login details.
+
+**Debug mode**: tap the icon on the About page 10 times in a row to turn it on. It records every network destination and detailed playback events such as crossfade, and "Share full log" in Settings sends it as a file. It turns off automatically when the app restarts.
 
 ### About this app
 

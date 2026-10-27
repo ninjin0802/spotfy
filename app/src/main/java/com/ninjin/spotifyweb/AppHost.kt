@@ -11,7 +11,12 @@ interface AppHost {
     fun outputSwitch()
     /** このスマホの出力先（Bluetooth イヤホンなど。スピーカーなら空） */
     fun outputName(): String
+    /** デバッグモード中は、全部の記録をファイルで共有する */
     fun shareDebugLog()
+    /** デバッグモード（「このアプリについて」のアイコンを 10 回押すと切り替わる。起動し直すとオフ） */
+    var debugMode: Boolean
+    /** デバッグモードの記録ファイルの場所（adb pull で取り出せる） */
+    val fullLogPath: String
     fun logout()
     /** アプリ内アップデート（GitHub Releases から新しい版を落としてインストール） */
     val updater: Updater
