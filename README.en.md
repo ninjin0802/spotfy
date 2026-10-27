@@ -203,6 +203,7 @@ The version lives only in the `VERSION` file at the repository root (`major.mino
 GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every PR and every push to main. Changes reach main only through PRs that pass CI.
 
 - Syntax checks for `bridge.js`, `polyfill.js` and the scripts
+- Ad-handling tests (`scripts/ad-test.mjs`: plays ads through a fake Web Player and checks muting, 16× speed, the failsafe and the logs)
 - A build with the release configuration (signed with the debug key, since CI has no signing key)
 - Smoke tests on emulators (Android 15 and Android 8)
 
