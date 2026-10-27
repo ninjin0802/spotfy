@@ -732,18 +732,22 @@
     if (xfTimer) return;
     xfTimer = setInterval(function () {
       if (!xfSec && xfBase == null) return;
-      // 曲のつなぎ目は 2 台目の再生器がやる（失敗した曲だけ、ここで音量を上げ下げする）
-      if (seam.on && seam.phase !== 'failed') return;
+      // 曲のつなぎ目は 2 台目の再生器がやる（失敗した曲だけ、ここで音量を上げ下げする。その次の曲の始まりも上げる）
+      if (seam.on && seam.phase !== 'failed' && !seam.fadeIn) return;
       // 広告のミュート中に音量を拾うと、広告後の曲がミュートの音量のままになる
       if (adBreakActive) return;
       audioEl().then(function (el) {
         if (!el || adBreakActive) return;
+        // 次の曲の長さがまだ分からないうちは、上げ始めるまで小さいままにする
+        if (seam.fadeIn && xfSec && xfBase != null && !el.paused && !isFinite(el.duration)) { el.volume = 0; return; }
         if (!xfSec || el.paused || !isFinite(el.duration) || el.duration < xfSec * 3) {
+          seam.fadeIn = false;
           if (xfBase != null) { el.volume = xfBase; xfBase = null; }
           return;
         }
         if (xfBase == null) xfBase = el.volume > 0.01 ? el.volume : 1;
         var half = xfSec / 2, t = el.currentTime, rest = el.duration - t;
+        if (seam.fadeIn && t >= half) { seam.fadeIn = false; el.volume = xfBase; return; }
         var x = Math.max(0, Math.min(1, t / half, rest / half));
         el.volume = Math.max(0, Math.min(1, xfBase * Math.sin(x * Math.PI / 2)));
       });
@@ -799,7 +803,7 @@
   // phase: '' → loading → ready → playing2（2 台目が鳴っている）→ handoff（1 台目に戻す）→ ''。失敗した曲は failed（今までの処理に任せる）
   // ギャップレス再生かクロスフェードがオンのとき使う。2 台目は鍵の仕組み（emeManager）も別に持つ（共有すると 1 台目の鍵が外れて止まる）
   // base：クロスフェードを始めたときの 1 台目の音量、gain2：2 台目と、入れ替えたあとの 1 台目の音量（base と同じ）
-  var seam = { on: false, timer: null, tp: null, eme: null, uri: '', forUri: '', phase: '', startAt: 0, lead: 0, base: 1, gain2: 1, main: null, mutedMain: null, seekedAt: 0 };
+  var seam = { on: false, timer: null, tp: null, eme: null, uri: '', forUri: '', phase: '', startAt: 0, lead: 0, base: 1, gain2: 1, main: null, mutedMain: null, seekedAt: 0, fadeIn: false };
   var SEAM_PRELOAD = 15;
   // 2 台目の再生は Spotify に報告しない（再生回数などは 1 台目が報告する）
   var seamTracker = (function () {
@@ -835,6 +839,8 @@
       if (seam.eme) { try { Promise.resolve(seam.eme.destroySessions()).catch(function () {}); } catch (e) {} }
     }
   }
+  // この曲は 2 台目でつなぐのをやめ、今までのつなぎ方（crossfade・gapless の見張り）に任せる
+  function seamFail(reason) { seamDrop(reason); seam.phase = 'failed'; }
   function seamPreload(curUri) {
     var lp = seamListPlayer();
     if (!lp || !lp._loadedList) { seam.phase = 'failed'; return; }
@@ -845,7 +851,7 @@
       seamDrop('preload ' + String(e && (e.message || e)));
       seam.phase = 'failed';
     };
-    Promise.resolve(lp._loadedList.peekNext({ reason: 'trackdone', listConstants: {} })).then(function (next) {
+    seamPeekNext(lp._loadedList).then(function (next) {
       if (!next || typeof next !== 'object' || !next.fileId || next.isAd || next.playable === false) throw new Error('no-next');
       // Web Player が実際に次に流す曲と違うことがある（シャッフルやキューの変化）。違えば使わない
       if (seamUpcoming() !== next.uri) throw new Error('mismatch');
@@ -878,6 +884,16 @@
         });
       });
     }).catch(fail);
+  }
+  // 次に読み込む曲。曲の終わりの行き先が中身の無い広告の枠（noManifest）のことがあり、Web Player はその枠を飛ばして次の曲へ進む。
+  // 枠の先は決まっていない（枠のあとで並びを取り直す）ので、そのときは「次へ」ボタンの行き先（次の曲）を読む
+  function seamPeekNext(list) {
+    var opts = { reason: 'trackdone', listConstants: {} };
+    return Promise.resolve(list.peekNext(opts)).then(function (next) {
+      if (!next || !next.isAd || !next.noManifest) return next;
+      var cur = list._currentState, skip = cur && cur.transitions && cur.transitions.skip_next;
+      return skip ? list._transitionTo(opts, skip, true) : next;
+    });
   }
   // Web Player が次に流す曲
   function seamUpcoming() {
@@ -958,9 +974,9 @@
       if (seam.phase === 'playing2') {
         // クロスフェード：2 台目を少しずつ大きくする（1 台目は crossfade の見張りが小さくしていく）
         var e2 = seam.tp && seam.tp._player;
-        if (!e2) return seamDrop('lost');
+        if (!e2) return seamFail('lost');
         // 2 台目が止まったら（読み込みが追いつかないなど）、無音にならないようすぐやめて 1 台目に任せる
-        if (e2.currentTime === seam.e2Last) { if (Date.now() - seam.e2StillAt > 400) return seamDrop('stalled'); }
+        if (e2.currentTime === seam.e2Last) { if (Date.now() - seam.e2StillAt > 400) return seamFail('stalled'); }
         else { seam.e2Last = e2.currentTime; seam.e2StillAt = Date.now(); }
         // クロスフェード：今の曲を少しずつ小さく、次の曲を少しずつ大きくする
         if (seam.lead) {
@@ -970,11 +986,15 @@
         }
         if (st.isPaused) seamDrop('paused');
         else if (st.item.uri !== seam.uri && st.item.uri !== seam.forUri) seamDrop('track-changed');
-        else if (Date.now() - seam.startAt > (seam.lead + 10) * 1000) seamDrop('no-advance');
+        else if (Date.now() - seam.startAt > (seam.lead + 10) * 1000) seamFail('no-advance');
         return;
       }
       var cur = st.item.uri;
-      if (seam.forUri !== cur) { seamDrop(seam.tp ? 'track-changed' : ''); seam.forUri = cur; seam.phase = ''; }
+      if (seam.forUri !== cur) {
+        // 2 台目でつなげなかった曲のあとは、次の曲の始まりを crossfade の見張りが大きくする（しないと小さいまま鳴る）
+        seam.fadeIn = seam.phase === 'failed' && xfSec > 0;
+        seamDrop(seam.tp ? 'track-changed' : ''); seam.forUri = cur; seam.phase = '';
+      }
       if (seam.phase === 'failed' || st.isPaused || el.paused || isAd(st.item) || adBreakActive || st.repeat === 2) return;
       if (!isFinite(el.duration) || el.duration < 20) return;
       var rest = el.duration - el.currentTime;
