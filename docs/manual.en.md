@@ -76,8 +76,11 @@ Crossfade  ♪♪♪♪♪♪♪♪＼ ／♪♪♪♪♪♪♪♪♪♪
            fades the current song out, then the next one in
 ```
 
-- **Gapless playback** shortens the silence between songs. Great for live albums and albums where tracks run into each other. Because of how the Web Player works, a very short break can remain.
-- **Crossfade** smoothly lowers and raises the volume at the join, like a radio station.
+- **Gapless playback** removes the silence between songs, so one runs straight into the next. Great for live albums and albums where tracks run into each other.
+  - How it works: near the end of a song, the next one is prepared on a second player and starts the moment the current one ends. Shortly after the next song starts, sound moves back to the usual player.
+  - If the next song can't be prepared in time, the app moves on the usual way (a very short break can remain).
+- **Crossfade** smoothly lowers and raises the volume at the join, like a radio station. The two songs really overlap.
+  - The artwork and title switch to the next song as soon as it starts playing.
   - The seconds are the length of the fade (half at the end of one song, half at the start of the next). Longer means a slower change.
   - **We recommend 5–6 seconds.**
 
