@@ -202,6 +202,7 @@ keyPassword=...
 GitHub Actions（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）が、PR と main への push のたびに次を行います。main へは PR で入れ、CI が通ったものだけマージします。
 
 - `bridge.js`・`polyfill.js`・スクリプトの構文チェック
+- 広告の処理のテスト（`scripts/ad-test.mjs`。偽物の Web Player で広告を流し、ミュート・16 倍速・安全装置・ログを確かめる）
 - リリース設定でのビルド（CI には署名鍵が無いのでデバッグ鍵で署名）
 - エミュレーターでのスモークテスト（Android 15 と Android 8）
 
