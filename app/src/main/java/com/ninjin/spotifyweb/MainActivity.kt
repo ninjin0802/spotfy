@@ -75,7 +75,9 @@ class MainActivity : ComponentActivity() {
             bridge.ready.collect { ready ->
                 // ログインが切れていたら、アプリの画面は出さずにログインページへ
                 if (ready && !isLoggedIn()) { bridge.reset(); webView.loadUrl(LOGIN_URL); updateSurface(); return@collect }
-                if (ready) { applyQuality(); lifecycleScope.launch { runCatching { bridge.crossfade(settings.getString("crossfade", "0")?.toIntOrNull() ?: 0); bridge.gapless(settings.getString("gapless", "true") == "true") } } }
+                if (ready) { applyQuality(); lifecycleScope.launch { runCatching { bridge.crossfade(settings.getString("crossfade", "0")?.toIntOrNull() ?: 0); bridge.gapless(settings.getString("gapless", "true") == "true") } }
+                    if (settings.getString("prewarm", "true") == "true") lifecycleScope.launch { runCatching { bridge.prewarm() } }
+                }
                 updateSurface()
             }
         }
