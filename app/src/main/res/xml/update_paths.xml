@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- アプリ内アップデートで落とした APK を、インストーラーに渡すための場所 -->
+<!-- アプリ内アップデートで落とした APK を、インストーラーに渡すための場所。デバッグモードの記録ファイルを共有するときにも使う -->
 <paths>
     <cache-path name="updates" path="updates/" />
+    <external-files-path name="logs" path="logs/" />
 </paths>

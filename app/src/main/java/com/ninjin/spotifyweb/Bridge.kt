@@ -221,6 +221,7 @@ class Bridge(
     suspend fun quality(level: String) = call("quality", JSONObject().put("level", level)) == true
     suspend fun gapless(on: Boolean) = call("gapless", JSONObject().put("on", on))
     suspend fun prewarm() = call("prewarm")
+    suspend fun debug(on: Boolean) = call("debug", JSONObject().put("on", on))
     suspend fun crossfade(sec: Int) = call("crossfade", JSONObject().put("sec", sec))
     suspend fun bitrate(): Int = (call("bitrate") as? Number)?.toInt() ?: 0
 

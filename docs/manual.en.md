@@ -126,6 +126,8 @@ The app also checks on its own when you open it (at most once every 6 hours).
 Shares a record of what the app did (ad handling, playback commands, errors and so on).
 Sending it when something goes wrong helps track down the cause. It contains no passwords or login details.
 
+**Debug mode**: tap the icon on the About page 10 times in a row to turn it on. It records every network destination and detailed playback events such as crossfade, and "Share full log" in Settings sends it as a file. It turns off automatically when the app restarts.
+
 ### About this app
 
 The version number, the author, and links to the source code and license.

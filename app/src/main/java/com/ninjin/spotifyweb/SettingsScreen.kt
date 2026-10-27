@@ -84,11 +84,17 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     SettingRow(tr("再生", "Playback"), tr("バックグラウンド再生・広告抑制・クロスフェード", "Background playback, ad handling, crossfade")) { page = "playback" }
                     SettingRow(tr("メディアの音質", "Media quality"), tr("Wi-Fi・モバイルデータ通信でのストリーミング", "Streaming on Wi-Fi and mobile data")) { page = "quality" }
                     SettingRow(tr("言語", "Language"), LANGUAGES.first { it.first == AppLanguage.get(context) }.second) { page = "language" }
-                    SettingRow(tr("デバッグログを共有", "Share debug log"), tr("直近の広告の検出・ミュート・早送りなどの記録", "Recent ad detection, muting and fast-forward events")) { host.shareDebugLog() }
+                    var dbg by remember { mutableStateOf(host.debugMode) }
+                    if (dbg) {
+                        // デバッグモード中だけ出す（「このアプリについて」のアイコンを 10 回押すとオン。起動し直すとオフ）
+                        Section(tr("デバッグモード", "Debug mode"))
+                        SwitchRow(tr("デバッグモード", "Debug mode"), tr("すべての通信・クロスフェードなどの細かい動きを記録し、PC から WebView を調べられるようにする。アプリを起動し直すとオフに戻る", "Records all network requests and detailed playback events (crossfade and more), and lets a PC inspect the WebView. Turns off when the app restarts"), true) { dbg = it; host.debugMode = it }
+                        SettingRow(tr("全部のログを共有", "Share full log"), tr("デバッグモードにしてからの記録をファイルで送る。PC からは adb pull ", "Sends everything recorded since debug mode was turned on, as a file. From a PC: adb pull ") + host.fullLogPath) { host.shareDebugLog() }
+                    } else SettingRow(tr("デバッグログを共有", "Share debug log"), tr("直近の広告の検出・ミュート・早送りなどの記録", "Recent ad detection, muting and fast-forward events")) { host.shareDebugLog() }
                     UpdateRow(host.updater)
                     SettingRow(tr("このアプリについて", "About this app"), tr("Spotify Web Player を使った非公式のアプリです。曲は端末に保存しません", "An unofficial app built on the Spotify Web Player. Nothing is saved to your device")) { page = "about" }
                 }
-                "about" -> AboutPage()
+                "about" -> AboutPage(host)
                 "language" -> LANGUAGES.forEach { l ->
                     RadioRow(l, AppLanguage.get(context) == l.first) { AppLanguage.set(context, l.first) }
                 }

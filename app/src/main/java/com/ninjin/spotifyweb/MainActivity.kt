@@ -78,6 +78,7 @@ class MainActivity : ComponentActivity() {
                 if (ready && !isLoggedIn()) { bridge.reset(); webView.loadUrl(LOGIN_URL); updateSurface(); return@collect }
                 if (ready) { applyQuality(); lifecycleScope.launch { runCatching { bridge.crossfade(settings.getString("crossfade", "0")?.toIntOrNull() ?: 0); bridge.gapless(settings.getString("gapless", "true") == "true") } }
                     if (settings.getString("prewarm", "true") == "true") lifecycleScope.launch { runCatching { bridge.prewarm() } }
+                    if (DebugMode.on) lifecycleScope.launch { runCatching { bridge.debug(true) } }
                 }
                 updateSurface()
             }
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
         registerReceiver(noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
         runCatching { connectivity.registerDefaultNetworkCallback(networkCallback) }
         // 設定の「開発者向けデバッグ」をオンにしたときだけ、PC から WebView を調べられるようにする
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG || settings.getString("webdebug", "false") == "true")
+        applyDebugMode()
         // targetSdk 35+ は edge-to-edge 強制なので、ステータスバー/ナビバー分の余白を確保する
         // 上はステータスバーの裏までページを描き（公式アプリと同じ）、その高さをページに伝える
         root.setOnApplyWindowInsetsListener { v, insets ->
@@ -129,7 +130,7 @@ class MainActivity : ComponentActivity() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
                 if (!nativeUi) return null
                 val host = request.url.host ?: return null
-                debug.traceRequest(host, request.url)
+                debug.traceRequest(host, request.url, request.method)
                 val skip = host == "i.scdn.co" || host == "mosaic.scdn.co" || host == "image-cdn-ak.spotifycdn.com" || host == "image-cdn-fa.spotifycdn.com" ||
                     host == "pickasso.spotifycdn.com" || host == "canvaz.scdn.co" || host.endsWith("video.spotifycdn.com") || host == "seed-mix-image.spotifycdn.com"
                 return if (skip) android.webkit.WebResourceResponse("text/plain", "utf-8", 204, "No Content", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0))) else null
@@ -332,7 +333,20 @@ class MainActivity : ComponentActivity() {
         }
         override fun outputSwitch() = showOutputSwitcher()
         override fun outputName() = currentOutputName()
+        override var debugMode: Boolean
+            get() = DebugMode.on
+            set(value) = setDebugMode(value)
+        override val fullLogPath get() = fullLogFile().absolutePath
         override fun shareDebugLog() {
+            // デバッグモードでは、全部の記録をファイルで送る（文字で送ると大きすぎて送れない）
+            val file = if (DebugMode.on) debug.fullLogFile() else null
+            if (file != null) {
+                val uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "$packageName.updates", file)
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_STREAM, uri)
+                    .putExtra(Intent.EXTRA_SUBJECT, "spotfy ${BuildConfig.VERSION_NAME} full debug log").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                runCatching { startActivity(Intent.createChooser(send, tr("全部のログを共有", "Share full log"))) }
+                return
+            }
             val log = debug.lines().joinToString("\n").ifBlank { "No playback debug events recorded." }
             shareText("spotfy ${BuildConfig.VERSION_NAME} debug log\n$log", tr("デバッグログを共有", "Share debug log"), subject = "spotfy debug log")
         }
@@ -483,14 +497,33 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** adb から `am start --ez dumpDebugLog true` で起こされたら、保存済みのログ全体を logcat に流す */
+    /**
+     * adb から起こされたときの開発用の指示。
+     * `am start --ez dumpDebugLog true`：保存済みのログ全体を logcat に流す。
+     * `am start --ez debugMode true|false`：デバッグモードを切り替える（アイコンを 10 回押すのと同じ）
+     */
     private fun dumpDebugLogIfAsked(intent: Intent?): Boolean {
+        if (intent?.hasExtra("debugMode") == true) { setDebugMode(intent.getBooleanExtra("debugMode", false)); return true }
         if (intent?.getBooleanExtra("dumpDebugLog", false) != true) return false
         debug.dumpToLogcat()
         return true
     }
 
+    private fun setDebugMode(value: Boolean) {
+        DebugMode.on = value
+        recordDebug("debug.mode", if (value) "on" else "off")
+        applyDebugMode()
+        lifecycleScope.launch { runCatching { bridge.debug(value) } }
+    }
+
     private val debug by lazy { DebugLog(settings) }
+    private fun fullLogFile() = java.io.File(getExternalFilesDir(null), "logs/debug-full.log")
+
+    /** デバッグモードなら、PC から WebView を調べられるようにし、全部の記録をファイルにも残す */
+    private fun applyDebugMode() {
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG || DebugMode.on || settings.getString("webdebug", "false") == "true")
+        debug.fullLog = if (DebugMode.on) fullLogFile() else null
+    }
     private val updater by lazy { Updater(applicationContext, ::recordDebug) }
     private fun recordDebug(event: String, detail: String = "") = debug.record(event, detail)
 
