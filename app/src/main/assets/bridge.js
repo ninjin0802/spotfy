@@ -856,9 +856,6 @@
       // このスマホの ID は、端末一覧のキーの先頭部分だけが取れている（前方一致で比べる）
       // PC やスピーカーなど、ほかの端末が再生する端末になっているときは、止まっていても奪わない
       if (act && act.indexOf(c.self) !== 0 && (cl.devices || {})[act]) return skip('other-device');
-      // 端末の一覧に載らない端末（Alexa など）で再生中のこともあるので、どこかで鳴っていれば奪わない
-      var ps = cl.player_state || {};
-      if (ps.is_playing && !ps.is_paused) return skip('playing-elsewhere');
       var p = service('PlayerAPI'), st = p.getState();
       if (!st || !st.item) return skip('no-track');
       if (!st.isPaused) return skip('playing');
@@ -890,36 +887,37 @@
     });
   }
 
-  // 続きから再生する。起動直後はこのスマホが再生する端末としてまだ登録されておらず、resume が「No such device」で断られる。
-  // 裏に回るとタイマーが遅れて送り直しが止まることがあるので、時間ではなく「端末の一覧にこのスマホが載った」知らせを待ってから送る
+  // 続きから再生する。起動直後はこのスマホが再生する端末としてまだ登録されておらず、resume が「No such device」で断られたり、
+  // 返事が来ないまま止まったりする。断られても返事が無くても、端末の一覧の知らせか 1 秒のどちらか早いほうで送り直す
   function registered() {
     var c = window.__mConnect ? __mConnect.get() : {}, devs = c.cluster && c.cluster.devices;
     return !!(c.self && devs && Object.keys(devs).some(function (k) { return k.indexOf(c.self) === 0; }));
   }
-  var registeredWaiters = [];
-  function whenRegistered() {
-    if (registered()) return Promise.resolve();
-    return new Promise(function (resolve) {
-      registeredWaiters.push(resolve);
-      // 知らせが来ないときのため、10 秒で諦めてそのまま送る
-      setTimeout(resolve, 10000);
-    });
+  var clusterWaiters = [];
+  function nextClusterOr(ms) {
+    return new Promise(function (resolve) { clusterWaiters.push(resolve); setTimeout(resolve, ms); });
   }
-  if (window.__mConnect) __mConnect.onChange(function () {
-    if (!registeredWaiters.length || !registered()) return;
-    registeredWaiters.splice(0).forEach(function (r) { r(); });
-  });
+  if (window.__mConnect) __mConnect.onChange(function () { clusterWaiters.splice(0).forEach(function (r) { r(); }); });
+  function playingNow() {
+    var st = service('PlayerAPI').getState();
+    return !!(st && st.item && !st.isPaused);
+  }
   function resumeHere() {
     playRequested = true;
     var started = Date.now();
     return (function attempt(n) {
-      return whenRegistered().then(function () { return service('PlayerAPI').resume(); }).then(function () {
-        pageDebug('play.resume', 'tries=' + (n + 1) + ' ms=' + (Date.now() - started));
-        return true;
-      }, function (e) {
-        pageDebug('play.resume.retry', 'try=' + (n + 1) + ' ' + String(e && (e.message || e)));
-        if (n >= 8 || !/no such device/i.test(String(e && (e.message || e)))) throw e;
-        return new Promise(function (r) { setTimeout(r, 1000); }).then(function () { return attempt(n + 1); });
+      if (playingNow()) { pageDebug('play.resume', 'tries=' + n + ' ms=' + (Date.now() - started)); return Promise.resolve(true); }
+      var sent = Promise.resolve().then(function () { return service('PlayerAPI').resume(); });
+      // 4 秒たっても返事が無ければ、届かなかったとみなして送り直す
+      var timeout = new Promise(function (r) { setTimeout(function () { r('timeout'); }, 4000); });
+      return Promise.race([sent.then(function () { return 'ok'; }), timeout]).then(function (r) {
+        if (r === 'ok' || playingNow()) { pageDebug('play.resume', 'tries=' + (n + 1) + ' ms=' + (Date.now() - started)); return true; }
+        throw new Error('timeout');
+      }).catch(function (e) {
+        var msg = String(e && (e.message || e));
+        pageDebug('play.resume.retry', 'try=' + (n + 1) + ' registered=' + registered() + ' ' + msg);
+        if (n >= 9 || !/no such device|timeout/i.test(msg)) throw e;
+        return nextClusterOr(1000).then(function () { return attempt(n + 1); });
       });
     })(0);
   }
