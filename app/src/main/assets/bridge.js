@@ -673,6 +673,7 @@
       return Promise.resolve(a.on ? lib.add({ uris: [a.uri] }) : lib.remove({ uris: [a.uri] })).then(function () { return true; });
     },
     play: function (a) {
+      playRequested = true;
       var p = service('PlayerAPI');
       var opts = a.track ? { skipTo: { uri: a.track } } : {};
       return Promise.resolve(p.play({ uri: a.uri }, {}, opts)).then(function () { return true; });
@@ -685,7 +686,10 @@
       return resumeHere();
     },
     pause: function () { return Promise.resolve(service('PlayerAPI').pause()).then(function () { return true; }); },
-    resume: function () { return resumeHere(); },
+    resume: function () {
+      if (warming) { warmTaken = true; endWarm(); return true; }
+      return resumeHere();
+    },
     next: function () { return Promise.resolve(service('PlayerAPI').skipToNext()).then(function () { return true; }); },
     prev: function () { return Promise.resolve(service('PlayerAPI').skipToPrevious()).then(function () { return true; }); },
     seek: function (a) { return Promise.resolve(service('PlayerAPI').seekTo(a.ms)).then(function () { return true; }); },
@@ -830,7 +834,8 @@
 
   // 起動直後の 1 回目の再生は、曲の場所・暗号の鍵・データを順に取るので 1 秒ほどかかる。
   // ほかの端末が再生する端末になっていなければ、音を消して一瞬だけ再生して止め、押したらすぐ鳴るようにしておく
-  var warming = false, warmTaken = false, warmEl = null;
+  // playRequested：準備の前や途中に再生が頼まれた（そのときは準備で止めてはいけない）
+  var warming = false, warmTaken = false, warmEl = null, playRequested = false;
   function endWarm() {
     if (warmEl) warmEl.muted = false;
     warming = false; warmEl = null;
@@ -858,8 +863,10 @@
       if (!st || !st.item) return skip('no-track');
       if (!st.isPaused) return skip('playing');
       if (isAd(st.item)) return skip('ad');
+      if (playRequested) return skip('tapped');
       return audioEl().then(function (el) {
         if (!el) return skip('no-element');
+        if (playRequested) return skip('tapped');
         var pos = st.positionAsOfTimestamp || 0;
         // muted なら音は出ず、ほかのアプリの音も止めない（音の出ない再生は音声フォーカスを取らない）
         warming = true; warmTaken = false; warmEl = el; el.muted = true;
@@ -869,6 +876,7 @@
           Promise.resolve(p.resume()).catch(function () { clearTimeout(timer); resolve('failed'); });
         }).then(function (result) {
           if (warmTaken) return skip('tapped');
+          if (playRequested) { endWarm(); return skip('tapped'); }
           return Promise.resolve(p.pause()).catch(function () {}).then(function () {
             return Promise.resolve(p.seekTo(pos)).catch(function () {});
           }).then(function () {
@@ -882,15 +890,34 @@
     });
   }
 
-  // 続きから再生する。起動直後はこのスマホが再生する端末としてまだ登録されておらず、
-  // resume が「No such device」で断られるので、登録されるまで少し待って送り直す
+  // 続きから再生する。起動直後はこのスマホが再生する端末としてまだ登録されておらず、resume が「No such device」で断られる。
+  // 裏に回るとタイマーが遅れて送り直しが止まることがあるので、時間ではなく「端末の一覧にこのスマホが載った」知らせを待ってから送る
+  function registered() {
+    var c = window.__mConnect ? __mConnect.get() : {}, devs = c.cluster && c.cluster.devices;
+    return !!(c.self && devs && Object.keys(devs).some(function (k) { return k.indexOf(c.self) === 0; }));
+  }
+  var registeredWaiters = [];
+  function whenRegistered() {
+    if (registered()) return Promise.resolve();
+    return new Promise(function (resolve) {
+      registeredWaiters.push(resolve);
+      // 知らせが来ないときのため、10 秒で諦めてそのまま送る
+      setTimeout(resolve, 10000);
+    });
+  }
+  if (window.__mConnect) __mConnect.onChange(function () {
+    if (!registeredWaiters.length || !registered()) return;
+    registeredWaiters.splice(0).forEach(function (r) { r(); });
+  });
   function resumeHere() {
+    playRequested = true;
     var started = Date.now();
     return (function attempt(n) {
-      return Promise.resolve(service('PlayerAPI').resume()).then(function () {
+      return whenRegistered().then(function () { return service('PlayerAPI').resume(); }).then(function () {
         pageDebug('play.resume', 'tries=' + (n + 1) + ' ms=' + (Date.now() - started));
         return true;
       }, function (e) {
+        pageDebug('play.resume.retry', 'try=' + (n + 1) + ' ' + String(e && (e.message || e)));
         if (n >= 8 || !/no such device/i.test(String(e && (e.message || e)))) throw e;
         return new Promise(function (r) { setTimeout(r, 1000); }).then(function () { return attempt(n + 1); });
       });

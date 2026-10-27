@@ -135,8 +135,10 @@ class Bridge(
                 val v = m.optJSONObject("value") ?: JSONObject()
                 // 起動直後の Web Player はまだ曲を読み込んでおらず「曲なし」と言ってくる。
                 // そのたびにミニプレーヤーを消すと、出て→消えて→また出るので、前の曲を一時停止のまま出しておく
-                if (!v.optBoolean("has") && _player.value.has) _player.value = _player.value.copy(playing = false)
-                else _player.value = parseState(v)
+                // 押した結果を待っている間は、Web Player の古い状態で表示を戻さない（▶ → ⏸ → ▶ → ⏸ とちらつく）
+                val expect = expectPlaying
+                if (!v.optBoolean("has") && _player.value.has) _player.value = _player.value.copy(playing = expect ?: false)
+                else _player.value = parseState(v).let { if (expect != null) it.copy(playing = expect) else it }
                 // 次の起動ですぐミニプレーヤーを出せるよう、曲名と画像だけ覚えておく（一時停止の状態で出す）
                 if (v.optBoolean("has")) cache.edit().putString("player", v.put("playing", false).toString()).apply()
             }
@@ -180,16 +182,25 @@ class Bridge(
     }
 
     suspend fun play(uri: String, track: String? = null) = call("play", JSONObject().put("uri", uri).apply { if (track != null) put("track", track) })
-    /** 再生／一時停止。結果を待たずに表示だけ先に切り替え、失敗したら戻す */
+    /** 押されたあと、結果が出るまで表示しておく再生状態（起動直後に押すと、準備ができるまで数秒かかる） */
+    @Volatile private var expectPlaying: Boolean? = null
+
+    /**
+     * 再生／一時停止。結果を待たずに表示だけ先に切り替え、失敗したら戻す。
+     * 押したときに見えていた表示で「再生」か「一時停止」かを決めて送る（待っている間に状態が変わっても、押した意図どおりにする）
+     */
     suspend fun toggle(): Any? {
         val before = _player.value
-        val now = SystemClock.elapsedRealtime()
-        _player.value = before.copy(playing = !before.playing, pos = before.positionNow(), receivedAt = now)
+        val want = !before.playing
+        expectPlaying = want
+        _player.value = before.copy(playing = want, pos = before.positionNow(), receivedAt = SystemClock.elapsedRealtime())
         return try {
-            call("toggle")
+            call(if (want) "resume" else "pause")
         } catch (e: Exception) {
-            if (_player.value.receivedAt == now) _player.value = before.copy(pos = before.positionNow(), receivedAt = SystemClock.elapsedRealtime())
+            if (_player.value.playing == want) _player.value = _player.value.copy(playing = before.playing, pos = before.positionNow(), receivedAt = SystemClock.elapsedRealtime())
             throw e
+        } finally {
+            expectPlaying = null
         }
     }
     suspend fun next() = call("next")
