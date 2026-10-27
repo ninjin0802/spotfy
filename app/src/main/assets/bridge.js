@@ -85,7 +85,7 @@
       md.is_advertisement === 'true' || !!md.ad_id);
   }
   var mutedAdUri = '', mutedAdVolume = 1, mutedAdElements = [], adMuteAppliedAt = 0, adMuteTimedOut = false, lastAdLogUri = '';
-  var adBreakActive = false, AD_RATE = 16, adSpeedLoggedUri = '', adSkipTried = false;
+  var adBreakActive = false, AD_RATE = 16, adSpeedLoggedUri = '', adSkipTried = false, adBreakStartedAt = 0, adCount = 0, adItemStartedAt = 0, adRateResets = 0;
   // 一部の広告はサーバー側キューから挿入され、広告 manager の停止だけでは外れないのでスキップも送る。
   // 無料プランでは大抵 restricted で断られるので、広告ブレイクにつき 1 回だけ
   function trySkipAd(p) {
@@ -135,9 +135,15 @@
       pageDebug(event, 'fallback volume=' + restore);
     });
   }
+  // 広告 1 本ごとのまとめ。かかった秒数と、Web Player に速度を戻されて付け直した回数
+  function logAdItemDone() {
+    if (lastAdLogUri) pageDebug('ad.item.done', 'n=' + adCount + ' secs=' + ((Date.now() - adItemStartedAt) / 1000).toFixed(1) + ' resets=' + adRateResets);
+  }
   function endAdBreak(event) {
-    if (lastAdLogUri) pageDebug(event);
+    logAdItemDone();
+    if (lastAdLogUri) pageDebug(event, 'ads=' + adCount + ' secs=' + Math.round((Date.now() - adBreakStartedAt) / 1000));
     lastAdLogUri = '';
+    adCount = 0;
     restoreAdVolume('ad.mute.restored');
     adMuteTimedOut = false;
     adBreakActive = false;
@@ -151,12 +157,26 @@
     var item = state && state.item;
     if (!isAd(item)) return endAdBreak('ad.state.ended');
     var uri = item.uri || item.metadata && item.metadata.ad_id || 'advertisement';
+    if (!adBreakActive) adBreakStartedAt = Date.now();
     adBreakActive = true;
-    if (uri !== lastAdLogUri) pageDebug('ad.detected', 'type=' + (item.type || 'unknown') + ' id=' + (item.uri ? 'uri' : item.metadata && item.metadata.ad_id ? 'metadata' : 'fallback'));
+    if (uri !== lastAdLogUri) {
+      logAdItemDone();
+      adCount++;
+      adItemStartedAt = Date.now();
+      adRateResets = 0;
+      pageDebug('ad.detected', 'type=' + (item.type || 'unknown') + ' id=' + (item.uri ? 'uri' : item.metadata && item.metadata.ad_id ? 'metadata' : 'fallback') + ' n=' + adCount);
+      // 速くなっているかを後でログから確かめられるように、2 秒後の再生位置を残す（16 倍速なら 30 秒ほど進む）
+      setTimeout(function () {
+        audioEl().then(function (el) {
+          if (el && lastAdLogUri === uri) pageDebug('ad.media', 'pos=' + Math.round(el.currentTime) + ' dur=' + (isFinite(el.duration) ? Math.round(el.duration) : '?') + ' rate=' + el.playbackRate + ' paused=' + el.paused);
+        });
+      }, 2000);
+    }
     lastAdLogUri = uri;
     if (uri !== mutedAdUri && !adMuteTimedOut) {
       mutedAdUri = uri;
-      if (!mutedAdElements.length) adMuteAppliedAt = 0;
+      // 広告が何本も続くときは、1 本ごとに安全装置の時間を数え直す（続けて数えると 3 本目の途中で音が戻る）
+      adMuteAppliedAt = 0;
     }
     if (!adMuteTimedOut) audioEl().then(function (el) {
       if (!el || mutedAdUri !== uri) return;
@@ -173,6 +193,7 @@
       el.volume = 0.001;
       // スキップは断られ、音声を止めると先へ進めなくなるので、広告を速く最後まで再生させる
       if (el.playbackRate < AD_RATE) {
+        if (adSpeedLoggedUri === uri) adRateResets++;
         try { el.playbackRate = AD_RATE; } catch (e) { try { el.playbackRate = 4; } catch (e2) {} }
         // Web Player が速度を何度も戻してくるので付け直すが、ログは広告 1 本につき 1 回だけ
         if (adSpeedLoggedUri !== uri) {
