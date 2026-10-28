@@ -56,7 +56,7 @@ Open them from the top-left icon → Settings.
 | Item | Default | What it does |
 |:--|:--|:--|
 | Background playback | On | Keeps playing when you close the app or switch to another app. When off, playback pauses when you leave the app |
-| Handle ads | On | Mutes ads and plays them to the end at 16× speed (a 30-second ad is over in 2–3 seconds). This may violate Spotify's Terms of Use |
+| Handle ads | On | Mutes ads and plays them to the end at 16× speed (a 30-second ad is over in 2–3 seconds). If an ad comes between songs after the next song has started (gapless or crossfade), the next song keeps playing while the ad finishes silently in the background. This may violate Spotify's Terms of Use |
 | Get ready to play at launch | On | When the app opens, it briefly plays muted and pauses, so your first ▶ starts right away (about 1.2 s → about 0.15 s). Skipped when another device such as a PC or speaker is playing |
 | Gapless playback | On | Shortens the silence between songs. See [Gapless playback and crossfade](#gapless-playback-and-crossfade) below |
 | Crossfade | Off | Fades the end of one song out and the start of the next in. When on, choose the length (1–12 s) |
@@ -93,6 +93,7 @@ Crossfade  ♪♪♪♪♪♪♪♪＼ ／♪♪♪♪♪♪♪♪♪♪
 
   - Shorter suits songs with hard endings; longer suits songs that fade out slowly.
 - You can turn both on.
+- An ad can come between songs after the next song has already started. The next song keeps playing on the second player; when the ad is over, sound moves back to the usual player from where you are (the song doesn't start over). With "Handle ads" off, the next song pauses during the ad.
 
 ### Media quality
 
