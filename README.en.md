@@ -206,6 +206,7 @@ GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on 
 
 - Syntax checks for `bridge.js`, `polyfill.js` and the scripts
 - Ad-handling tests (`scripts/ad-test.mjs`: plays ads through a fake Web Player and checks muting, 16× speed, the failsafe and the logs)
+- Song-join tests (`scripts/seam-test.mjs`: a fake Web Player mimics the real media elements' quirks — lagging when sound starts, uneven seek times, the playing element stalling when DRM work piles up — and checks that crossfade and gapless joins never cut out, rewind or switch abruptly)
 - A build with the release configuration (signed with the debug key, since CI has no signing key)
 - Smoke tests on emulators (Android 15 and Android 8)
 
