@@ -45,6 +45,7 @@ Home, Search, Library and the player look and behave the way a phone app should.
 ### ⏩ Ads end in 2–3 seconds
 During an ad the app mutes it and plays it to the end at 16× speed.
 A 30-second ad is over almost instantly (toggle in Settings).
+With gapless or crossfade on, the next song keeps playing even when an ad comes between songs.
 
 </td>
 </tr>
@@ -78,7 +79,7 @@ Share a debug log with a single tap.
 | 🎧 **Player** | Mini and full-screen players tinted by the artwork, lyrics, About the artist, Next up |
 | 📋 **Queue** | Drag to reorder, remove, shuffle / repeat, sleep timer |
 | 🔀 **Playback** | Gapless playback, crossfade (1–12 s), background playback |
-| ⏩ **Ad handling** | Disables the Web Player's ad managers, then mutes ads and plays them at 16× |
+| ⏩ **Ad handling** | Disables the Web Player's ad managers, then mutes ads and plays them at 16× (an ad between songs plays silently while the next song keeps going) |
 | 📡 **Cast** | Spotify Connect to PCs, speakers and TVs; switch between phone speaker and Bluetooth |
 | 🧭 **Menu** | Recents (grouped by day), What's new (releases and episodes from what you follow) |
 | 👥 **Social** | Edit your profile, followers / following, follow other users |
