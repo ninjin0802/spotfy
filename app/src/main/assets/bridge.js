@@ -1033,7 +1033,10 @@
           audioResolver: tp._audioResolver, videoResolver: tp._videoResolver, transport: tp._transport, tracker: seamTracker,
           emeManager: seam.eme, licenseURLResolver: tp._licenseURLResolver, newBufferPerTrack: true, createPlayer: tp._createPlayer,
           audioPlayerContainer: tp._audioPlayerContainer, videoPlayerContainer: tp._videoPlayerContainer, playabilityChecker: tp._playabilityChecker,
-          cubicVolume: tp._cubicVolume
+          cubicVolume: tp._cubicVolume,
+          // 音の加工（音量の正規化）は 1 台目に合わせる。指定しないと 2 台目だけ正規化されて小さく鳴り、1 台目に戻した瞬間に大きくなる。
+          // 1 台目が加工しないなら 2 台目もしない（先読みのたびに AudioContext を作らずに済む）。加工するなら同じ AudioContext を使う
+          audioProcessorOptions: tp._audioProcessor && tp._audioProcessor._audioContext ? { audioContext: tp._audioProcessor._audioContext } : { disable: true }
         });
         seam.tp = tp2; seam.uri = next.uri; seam.nextLiked = false;
         var lib = service('LibraryAPI');
