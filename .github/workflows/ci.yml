@@ -30,6 +30,8 @@ jobs:
         run: bash -n scripts/*.sh
       - name: 広告の処理のテスト（偽物の Web Player で広告を流す）
         run: node scripts/ad-test.mjs
+      - name: つなぎ目のテスト（偽物の Web Player でクロスフェード・ギャップレスを流す）
+        run: node scripts/seam-test.mjs
       - name: ビルド（リリース設定、CI ではデバッグ鍵で署名）
         run: ./gradlew assembleRelease
       - uses: actions/upload-artifact@v4

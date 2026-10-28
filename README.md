@@ -205,6 +205,7 @@ GitHub Actions（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）が、
 
 - `bridge.js`・`polyfill.js`・スクリプトの構文チェック
 - 広告の処理のテスト（`scripts/ad-test.mjs`。偽物の Web Player で広告を流し、ミュート・16 倍速・安全装置・ログを確かめる）
+- つなぎ目のテスト（`scripts/seam-test.mjs`。偽物の Web Player で実機の再生要素のくせ（音を出し始めると遅れる・シークの時間がばらつく・鍵の処理が重いと鳴っている方が止まる）をまね、クロスフェード・ギャップレスで聞こえる音が途切れない・巻き戻らない・ぶつっと切り替わらないことを確かめる）
 - リリース設定でのビルド（CI には署名鍵が無いのでデバッグ鍵で署名）
 - エミュレーターでのスモークテスト（Android 15 と Android 8）
 
