@@ -189,11 +189,11 @@ The version lives only in the `VERSION` file at the repository root (`major.mino
 `versionName` is that value and `versionCode` is derived from it (`2.1.0` → `20100`), so there is nothing to edit by hand.
 
 1. Bump `VERSION` (patch for fixes, minor for features)
-2. Add a `## <version>` section at the top of [`CHANGELOG.md`](CHANGELOG.md)
+2. Add a `## <version>` section at the top of [`CHANGELOG.md`](CHANGELOG.md), split under ✨ / 🐛 / 🔧 headings (the format is at the top of CHANGELOG.md)
 3. Open a PR from your branch and merge it into main once CI passes
 4. Run `scripts/release.sh` on the latest main
-   - Builds a signed APK, pushes a `v<version>` tag and publishes the APK with that changelog section to GitHub Releases
-   - Stops if the tag already exists, there are uncommitted changes, HEAD is not the latest main, or the changelog section is missing
+   - Builds a signed APK, pushes a `v<version>` tag and publishes the APK with that changelog section to GitHub Releases (adding a download link and a compare link to the previous version)
+   - Stops if the tag already exists, there are uncommitted changes, HEAD is not the latest main, or the changelog section is missing or has no `###` headings
    - Runs `scripts/smoke-test.sh` before tagging and stops on failure (`SKIP_SMOKE=1` only when in a hurry)
 
 </details>
