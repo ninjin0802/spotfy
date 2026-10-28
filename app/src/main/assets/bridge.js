@@ -704,24 +704,32 @@
         // 次の曲へ進めて位置を合わせる間は音を出さない
         if (el) el.muted = true;
         var st = p.getState();
-        return Promise.resolve(st && st.item && st.item.uri === shown ? null : p.skipToNext()).then(function () {
-          if (g === cmdGen) return p.pause();
-        }).then(function () {
-          return (function wait(n) {
-            var st = p.getState();
-            if (g !== cmdGen || n >= 60) return null;
-            if (!st || !st.item || st.item.uri !== shown || !st.isPaused) {
-              // 次の曲へ進んだあとで Web Player が鳴らし始めたら、止め直す
-              if (st && st.item && st.item.uri === shown && n % 10 === 9) p.pause();
-              return sleep(50).then(function () { return wait(n + 1); });
-            }
-            if (Math.abs((st.positionAsOfTimestamp || 0) - ms) < 1500) { resumeAt = null; return null; }
-            return Promise.resolve(p.seekTo(ms)).then(function () { return sleep(300); }).then(function () { return wait(n + 6); });
-          })(0);
-        }).then(function () { return audioEl(); }, function () { return null; }).then(function (el2) {
-          if (el) el.muted = false;
-          if (el2) el2.muted = false;
-          return true;
+        var moved = st && st.item && st.item.uri === shown ? Promise.resolve(true) : Promise.resolve().then(function () { return p.skipToNext(); }).then(function () { return true; }, function (e) {
+          // 次の曲へ進められなかったら、前の曲のまま止める（位置は合わせない）
+          pageDebug('seamless.pause', 'skip failed ' + String(e && (e.message || e)));
+          resumeAt = null; seam.joined = '';
+          return false;
+        });
+        var unmute = function () { return audioEl().then(function (el2) { if (el) el.muted = false; if (el2) el2.muted = false; }, function () { if (el) el.muted = false; }); };
+        return moved.then(function (ok) {
+          if (g !== cmdGen) return null;
+          // 進めるのに失敗しても、止めるのは必ずやる
+          return Promise.resolve(p.pause()).then(function () {
+            if (!ok) return null;
+            return (function wait(n) {
+              var st = p.getState();
+              if (g !== cmdGen || n >= 60) return null;
+              if (!st || !st.item || st.item.uri !== shown || !st.isPaused) {
+                // 次の曲へ進んだあとで Web Player が鳴らし始めたら、止め直す
+                if (st && st.item && st.item.uri === shown && n % 10 === 9) p.pause();
+                return sleep(50).then(function () { return wait(n + 1); });
+              }
+              if (Math.abs((st.positionAsOfTimestamp || 0) - ms) < 1500) { resumeAt = null; return null; }
+              return Promise.resolve(p.seekTo(ms)).then(function () { return sleep(300); }).then(function () { return wait(n + 6); });
+            })(0);
+          });
+        }).then(function () { return unmute().then(function () { return true; }); }, function (e) {
+          return unmute().then(function () { throw e; });
         });
       });
     },
