@@ -974,10 +974,10 @@
   // 2 台目がこの長さ進まなければ止まったと見なす（鳴らし始めたあと・位置合わせの最中）
   var SEAM_STALL_PLAYING_MS = 400;
   var SEAM_STALL_HANDOFF_MS = 300;
-  // 位置合わせを諦めるまでの時間とシークの回数。シークにかかる時間はばらつくので、何回かやっても 20ms 以内にそろわないことがある。
+  // 位置合わせを諦めるまでの時間とシークの回数（1 回に 1〜1.5 秒かかる）。シークにかかる時間はばらつくので、何回かやっても 20ms 以内にそろわないことがある。
   // 諦めたときのずれが SEAM_LOOSE_OFF 未満なら、そのまま SEAM_SWAP_MS かけて音を移す（一瞬で 1 台目へ切り替えると、
   // ずれた分だけ飛ぶか繰り返して、ぶつっと鳴る）。それより大きくずれていたら、1 台目に任せる
-  var SEAM_HANDOFF_MAX_MS = 15000;
+  var SEAM_HANDOFF_MAX_MS = 20000;
   var SEAM_MAX_SEEKS = 8;
   var SEAM_LOOSE_OFF = 0.15;
   // 曲と曲のあいだの広告を、2 台目を鳴らしたまま待つ長さの上限
@@ -1186,8 +1186,8 @@
       if (seam.elLast < 0 || t - seam.elLast < (now - seam.elLastAt) / 2000) seam.smoothAt = now;
       seam.elLast = t; seam.elLastAt = now;
       if (now - seam.smoothAt < SEAM_SMOOTH_MS) return;
-      var off = el.currentTime - e2.currentTime, loose = seam.seeks >= SEAM_MAX_SEEKS && Math.abs(off) < SEAM_LOOSE_OFF;
-      if (Math.abs(off) < 0.02 || loose) {
+      var off = el.currentTime - e2.currentTime, aligned = Math.abs(off) < 0.02, loose = !aligned && seam.seeks >= SEAM_MAX_SEEKS && Math.abs(off) < SEAM_LOOSE_OFF;
+      if (aligned || loose) {
         // 一瞬で入れ替えるとぶつっと鳴るので、SEAM_SWAP_MS かけて 2 台目から 1 台目へ音を移す
         pageDebug('seamless.handoff', (loose ? 'loose ' : '') + 'off=' + Math.round(off * 1000) + 'ms seeks=' + seam.seeks + ' ms=' + (Date.now() - seam.startAt));
         el.volume = SEAM_QUIET; el.muted = false;
