@@ -694,7 +694,7 @@
     // つなぎ目の途中（次の曲が鳴っている）なら、Web Player も次の曲のその位置で止める。
     // 前の曲のまま止めると、再生し直したときに前の曲の終わりに戻ったり、次の曲が頭から鳴り直したりする
     pause: function () {
-      var e2 = seam.tp && seam.tp._player, p = service('PlayerAPI');
+      var e2 = seamE2(), p = service('PlayerAPI');
       var shown = e2 && (seam.phase === 'handoff' || seam.phase === 'swap' || seam.phase === 'playing2' && seam.lead) ? seam.uri : '';
       var ms = shown ? e2.currentTime * 1000 : 0, g = ++cmdGen;
       seekTarget = '';
@@ -960,19 +960,59 @@
   // adAt：曲と曲のあいだに入った広告を、2 台目を鳴らしたまま待ち始めた時刻（待っていなければ 0）
   var seam = {
     on: false, timer: null, tp: null, eme: null, uri: '', forUri: '', phase: '', gen: 0, loadAt: 0, startAt: 0, lead: 0, base: 1, gain2: 1,
-    main: null, mutedMain: null, fadeIn: false, nextLiked: false, joined: '', adAt: 0,
+    main: null, mutedMain: null, fadeIn: false, nextLiked: false, joined: '', adAt: 0, emeInit: null, emeWarmed: false,
     seekedAt: 0, seeks: 0, seekLead: 0.25, e2Last: -1, e2StillAt: 0, elLast: -1, elLastAt: 0, smoothAt: 0, swapAt: 0, tracedPhase: '', tracedAt: 0
   };
   var SEAM_BUSY = ['loading', 'ready', 'playing2', 'handoff', 'swap'];
   // 2 台目の再生器がこの曲のつなぎ目を引き受けているか
   function seamClaimed() { return seam.on && SEAM_BUSY.indexOf(seam.phase) >= 0; }
+  // 曲の終わりの何秒前に次の曲を読み込むか（クロスフェードの秒数に足す）。読み込みが返ってこなければ SEAM_PRELOAD_MAX_MS で諦める
   var SEAM_PRELOAD = 15;
+  var SEAM_PRELOAD_MAX_MS = 8000;
+  // これより短い曲は、重ねている途中や 1 台目に戻す前に終わってしまうので引き受けない（秒）
+  var SEAM_MIN_TRACK = 20;
+  // 2 台目がこの長さ進まなければ止まったと見なす（鳴らし始めたあと・位置合わせの最中）
+  var SEAM_STALL_PLAYING_MS = 400;
+  var SEAM_STALL_HANDOFF_MS = 300;
+  // 位置合わせを諦めるまでの時間とシークの回数
+  var SEAM_HANDOFF_MAX_MS = 15000;
+  var SEAM_MAX_SEEKS = 5;
+  // 曲と曲のあいだの広告を、2 台目を鳴らしたまま待つ長さの上限
+  var SEAM_AD_MAX_MS = 60000;
   // 1 台目へ音を移す長さ。同じ曲を数十 ms ずらして重ねると音がこもる（くし形のゆがみ）ので短くする。0 にするとぶつっと鳴る
   var SEAM_SWAP_MS = 150;
   // 1 台目がこの長さ止まらずに進んだら、位置合わせのずれを測る
   var SEAM_SMOOTH_MS = 500;
   // 位置合わせ中の 1 台目の音量。0 にすると音を出す要素として止められ、戻したときにまた止まる
   var SEAM_QUIET = 0.001;
+  // 鍵（DRM）の処理は、2 台の再生器が同じ所を順番に使う。鍵の要求と登録（それぞれ 0.2〜0.4 秒）が続けて走ると、
+  // 鳴っている方の再生器が音を作れなくなり、0.3〜1 秒途切れる（曲の終わりの 25 秒前に、2 台目が次の曲を読み込んだとき）。
+  // 音を出していない側の鍵は、要求と登録のあいだをこれだけ空けて、鳴っている側が追いつけるようにする
+  var SEAM_LICENSE_GAP_MS = 1000;
+  function seamSpaceLicense(m, name, when) {
+    if (!m || m.__seamSpaced) return;
+    m.__seamSpaced = true;
+    var handle = m._handleLicenseResponse;
+    m._handleLicenseResponse = function () {
+      var self = this, args = arguments;
+      if (!when()) return handle.apply(self, args);
+      vlog('seam.license', name + ' wait=' + SEAM_LICENSE_GAP_MS);
+      setTimeout(function () { handle.apply(self, args); }, SEAM_LICENSE_GAP_MS);
+    };
+  }
+  // 2 台目の鍵の仕組み（emeManager）。作るときにも鳴っている音が 1.7 秒ほど途切れるので、止まっているあいだに作っておく（seamTick）
+  function seamEme(tp) {
+    var m = tp._emeManager;
+    // 1 台目の鍵も、次の曲へ進んだあと（2 台目が鳴っていて、1 台目は音なしで読み込み中）は間を空ける
+    seamSpaceLicense(m, 'main', function () { return seam.phase === 'playing2' || seam.phase === 'handoff'; });
+    if (seam.eme) return Promise.resolve(seam.eme);
+    if (!seam.emeInit) {
+      var m2 = new m.constructor({ transport: m._transport, emeImpl: m._emeImpl, disallowCodecs: m._disallowCodecs, preferredKeySystems: m._preferredKeySystems, unauthServerCertificateBase: m._unauthServerCertificateBase });
+      seamSpaceLicense(m2, 'p2', function () { return true; });
+      seam.emeInit = Promise.resolve(m2.init()).then(function () { seam.eme = m2; return m2; }, function (e) { seam.emeInit = null; throw e; });
+    }
+    return seam.emeInit;
+  }
   // 2 台目の再生は Spotify に報告しない（再生回数などは 1 台目が報告する）
   var seamTracker = (function () {
     var f = new Proxy(function () {}, { get: function (o, k) { return k === 'then' ? undefined : f; }, apply: function () { return f; } });
@@ -981,6 +1021,30 @@
   function seamListPlayer() {
     var sdk = service('PlayerSDK'), st = sdk && sdk.harmony && sdk.harmony._streamer;
     return st && st._listPlayer;
+  }
+  // 2 台目の再生要素
+  function seamE2() { return seam.tp && seam.tp._player; }
+  // 2 台目が ms より長く進んでいないか（読み込みが追いつかないなど）
+  function seamE2Stalled(e2, ms) {
+    if (e2.currentTime !== seam.e2Last) { seam.e2Last = e2.currentTime; seam.e2StillAt = Date.now(); return false; }
+    return Date.now() - seam.e2StillAt > ms;
+  }
+  // 1 台目の位置合わせを始めからやり直す。grace：2 台目が鳴り始めるまで、止まったと見なさない時間
+  function seamRestartAlign(grace) {
+    var now = Date.now();
+    seam.startAt = now; seam.seekedAt = 0; seam.seeks = 0; seam.e2Last = -1; seam.e2StillAt = now + grace; seam.elLast = -1;
+  }
+  // 次の曲を読み込む 2 台目の再生器。1 台目と同じ部品で作り、鍵の仕組みだけ別に持つ
+  function seamNewPlayer(tp) {
+    return new tp.constructor({
+      audioResolver: tp._audioResolver, videoResolver: tp._videoResolver, transport: tp._transport, tracker: seamTracker,
+      emeManager: seam.eme, licenseURLResolver: tp._licenseURLResolver, newBufferPerTrack: true, createPlayer: tp._createPlayer,
+      audioPlayerContainer: tp._audioPlayerContainer, videoPlayerContainer: tp._videoPlayerContainer, playabilityChecker: tp._playabilityChecker,
+      cubicVolume: tp._cubicVolume,
+      // 音の加工（音量の正規化）は 1 台目に合わせる。指定しないと 2 台目だけ正規化されて小さく鳴り、1 台目に戻した瞬間に大きくなる。
+      // 1 台目が加工しないなら 2 台目もしない（先読みのたびに AudioContext を作らずに済む）。加工するなら同じ AudioContext を使う
+      audioProcessorOptions: tp._audioProcessor && tp._audioProcessor._audioContext ? { audioContext: tp._audioProcessor._audioContext } : { disable: true }
+    });
   }
   function seamSet(on) {
     seam.on = on;
@@ -993,6 +1057,12 @@
     if (reason) pageDebug('seamless.abort', reason + ' phase=' + seam.phase);
     var tp = seam.tp, main = seam.mutedMain, moved = !!main || seam.phase === 'swap';
     if (moved) seam.joined = seam.uri;
+    // 1 台目がまだ頭のまま（次の曲を読み込んだ直後など）で音を戻すと、2 台目で聞いた所を頭から鳴り直すので、2 台目の位置へ進める
+    // （曲送りなどでやめたときは、1 台目はもう別の曲なので触らない）
+    var e2 = tp && tp._player, p = service('PlayerAPI'), st = p && p.getState();
+    if (!reason && main && e2 && st && st.item && st.item.uri === seam.uri && main.currentTime < e2.currentTime - 1) {
+      Promise.resolve(p.seekTo(Math.round(e2.currentTime * 1000))).catch(function () {});
+    }
     seam.tp = null; seam.mutedMain = null; seam.uri = ''; seam.adAt = 0;
     if (seam.phase !== 'failed') seam.phase = '';
     if (main) { main.muted = false; main.playbackRate = 1; }
@@ -1002,7 +1072,6 @@
     seam.main = null;
     if (tp) {
       // 片付けるだけでは要素が鳴り続けることがあるので、要素も止めて空にする
-      var e2 = tp._player;
       if (e2) { try { e2.muted = true; e2.pause(); e2.removeAttribute('src'); e2.load(); } catch (e) {} }
       try { Promise.resolve(tp.destroy()).catch(function () {}); } catch (e) {}
       // 2 台目の鍵のセッションも閉じる（残ると曲ごとに溜まって、再生が止まりやすくなる）
@@ -1029,23 +1098,10 @@
       // Web Player が実際に次に流す曲と違うことがある（シャッフルやキューの変化）。違えば使わない
       if (seamUpcoming() !== next.uri) throw new Error('mismatch');
       return lp._getTrackPlayer().then(function (tp) {
-        if (!seam.eme) {
-          var m = tp._emeManager;
-          var m2 = new m.constructor({ transport: m._transport, emeImpl: m._emeImpl, disallowCodecs: m._disallowCodecs, preferredKeySystems: m._preferredKeySystems, unauthServerCertificateBase: m._unauthServerCertificateBase });
-          return Promise.resolve(m2.init()).then(function () { seam.eme = m2; return tp; });
-        }
-        return tp;
+        return seamEme(tp).then(function () { return tp; });
       }).then(function (tp) {
         if (stale()) return;
-        var tp2 = new tp.constructor({
-          audioResolver: tp._audioResolver, videoResolver: tp._videoResolver, transport: tp._transport, tracker: seamTracker,
-          emeManager: seam.eme, licenseURLResolver: tp._licenseURLResolver, newBufferPerTrack: true, createPlayer: tp._createPlayer,
-          audioPlayerContainer: tp._audioPlayerContainer, videoPlayerContainer: tp._videoPlayerContainer, playabilityChecker: tp._playabilityChecker,
-          cubicVolume: tp._cubicVolume,
-          // 音の加工（音量の正規化）は 1 台目に合わせる。指定しないと 2 台目だけ正規化されて小さく鳴り、1 台目に戻した瞬間に大きくなる。
-          // 1 台目が加工しないなら 2 台目もしない（先読みのたびに AudioContext を作らずに済む）。加工するなら同じ AudioContext を使う
-          audioProcessorOptions: tp._audioProcessor && tp._audioProcessor._audioContext ? { audioContext: tp._audioProcessor._audioContext } : { disable: true }
-        });
+        var tp2 = seamNewPlayer(tp);
         seam.tp = tp2; seam.uri = next.uri; seam.nextLiked = false;
         var lib = service('LibraryAPI');
         if (lib) Promise.resolve(lib.contains(next.uri)).then(function (x) { if (seam.uri === next.uri) seam.nextLiked = !!(x && x[0]); }, function () {});
@@ -1055,9 +1111,9 @@
           // 読み込むと鳴り始めるので、再生器ごと止めて頭に戻しておく（要素だけ止めても再生器が鳴らし直す）
           e2.muted = true;
           return Promise.resolve(tp2.pause()).then(function () { return tp2.seek(0); }).then(function () {
-          if (seam.tp !== tp2) return;
-          seam.phase = 'ready';
-          pageDebug('seamless.preload', 'ms=' + (Date.now() - started));
+            if (seam.tp !== tp2) return;
+            seam.phase = 'ready';
+            pageDebug('seamless.preload', 'ms=' + (Date.now() - started));
           });
         });
       });
@@ -1079,7 +1135,7 @@
     return n ? n.uri : '';
   }
   function seamStart(el, rest) {
-    var e2 = seam.tp._player;
+    var e2 = seamE2();
     seam.base = xfBase != null ? xfBase : (el.volume > 0.01 ? el.volume : 1);
     // 2 台目は音量 1 で作られるので、1 台目の音量（Web Player の音量）にそろえる。ずれていると、入れ替えたときに大きさが変わる
     seam.gain2 = seam.base;
@@ -1094,8 +1150,8 @@
     var onEmptied = function () {
       el.removeEventListener('emptied', onEmptied);
       if (seam.phase !== 'playing2') return;
-      el.muted = true; seam.mutedMain = el; seam.phase = 'handoff'; seam.startAt = Date.now();
-      seam.seekedAt = 0; seam.seeks = 0; seam.seekLead = seam.seekLead || 0.25; seam.e2Last = -1; seam.e2StillAt = Date.now(); seam.elLast = -1;
+      el.muted = true; seam.mutedMain = el; seam.phase = 'handoff';
+      seam.seekLead = seam.seekLead || 0.25; seamRestartAlign(0);
     };
     el.addEventListener('emptied', onEmptied);
     pageDebug('seamless.start', 'lead=' + seam.lead);
@@ -1105,15 +1161,13 @@
   // 1 台目を音なしのまま 2 台目の位置に合わせ、ずれが 20ms 未満になったら音を 1 台目に戻す。
   // 合わせ方はシークだけ（速さを変えると Web Player が位置を戻してくる）。シークにかかる時間を見込んで先へ飛ばし、ずれた分だけ見込みを直して数回やり直す
   function seamHandoff(el) {
-    var e2 = seam.tp && seam.tp._player;
+    var e2 = seamE2();
     if (!e2) return seamDrop('lost');
     // 位置合わせの間も、2 台目の音量がずれないよう付け直す（ずれていたらログに残す）
     if (Math.abs(e2.volume - seam.gain2) > 0.01) { pageDebug('seamless.volume', 'fixed ' + e2.volume.toFixed(2) + ' -> ' + seam.gain2.toFixed(2)); e2.volume = seam.gain2; }
     // 2 台目が止まったら（読み込みが追いつかないなど）、無音にならないようすぐ 1 台目の音を戻す
-    if (e2.currentTime === seam.e2Last) {
-      if (Date.now() - seam.e2StillAt > 300) { pageDebug('seamless.handoff', 'stalled'); return seamDrop(); }
-    } else { seam.e2Last = e2.currentTime; seam.e2StillAt = Date.now(); }
-    if (Date.now() - seam.startAt > 15000) {
+    if (seamE2Stalled(e2, SEAM_STALL_HANDOFF_MS)) { pageDebug('seamless.handoff', 'stalled'); return seamDrop(); }
+    if (Date.now() - seam.startAt > SEAM_HANDOFF_MAX_MS) {
       pageDebug('seamless.handoff', 'timeout off=' + Math.round((el.currentTime - e2.currentTime) * 1000) + 'ms');
       return seamDrop();
     }
@@ -1130,7 +1184,7 @@
       seam.elLast = t; seam.elLastAt = now;
       if (now - seam.smoothAt < SEAM_SMOOTH_MS) return;
       var off = el.currentTime - e2.currentTime;
-      if (Math.abs(off) < 0.02 || (seam.seeks >= 5 && Math.abs(off) < 0.06)) {
+      if (Math.abs(off) < 0.02 || (seam.seeks >= SEAM_MAX_SEEKS && Math.abs(off) < 0.06)) {
         // 一瞬で入れ替えるとぶつっと鳴るので、SEAM_SWAP_MS かけて 2 台目から 1 台目へ音を移す
         pageDebug('seamless.handoff', 'off=' + Math.round(off * 1000) + 'ms seeks=' + seam.seeks + ' ms=' + (Date.now() - seam.startAt));
         el.volume = SEAM_QUIET; el.muted = false;
@@ -1138,7 +1192,7 @@
         seam.phase = 'swap'; seam.swapAt = Date.now();
         return;
       }
-      if (seam.seeks >= 5) { pageDebug('seamless.handoff', 'unaligned off=' + Math.round(off * 1000) + 'ms'); return seamDrop(); }
+      if (seam.seeks >= SEAM_MAX_SEEKS) { pageDebug('seamless.handoff', 'unaligned off=' + Math.round(off * 1000) + 'ms'); return seamDrop(); }
       // 先に行き過ぎたら見込みを減らし、遅れたら増やす
       seam.seekLead = Math.max(0, Math.min(1, seam.seekLead - off));
     }
@@ -1148,7 +1202,6 @@
   // 曲と曲のあいだに広告が入ったら、2 台目で次の曲を鳴らしたまま待つ。やめると、広告のあとで次の曲が 1 台目で頭から鳴り直す
   // （クロスフェードで 10 秒ほど聞いた曲が、広告の数秒後に巻き戻ったように聞こえる）。
   // 広告をブロックしていないときは広告の音と重なるので、2 台目を止めて待つ。広告が終わって次の曲に戻ったら、位置合わせからやり直す
-  var SEAM_AD_MAX_MS = 60000;
   function seamAdHold(el, ad) {
     var tp = seam.tp, e2 = tp && tp._player;
     if (!e2) return seamDrop('lost');
@@ -1167,12 +1220,12 @@
     el.muted = true; el.playbackRate = 1; seam.mutedMain = el;
     if (e2.paused) { e2.volume = seam.gain2; Promise.resolve(tp.resume()).catch(function () {}); }
     // 止めていた 2 台目が鳴り始めるまでは、止まったと見なさない
-    seam.startAt = Date.now(); seam.seekedAt = 0; seam.seeks = 0; seam.e2Last = -1; seam.e2StillAt = Date.now() + 1000; seam.elLast = -1;
+    seamRestartAlign(1000);
   }
   // デバッグモードの記録：段階が変わったときと、つなぎ目の最中は 0.5 秒ごとに、2 台の位置と音量を残す
   function seamTrace(el) {
     if (!verbose) return;
-    var e2 = seam.tp && seam.tp._player, now = Date.now();
+    var e2 = seamE2(), now = Date.now();
     var busy = seam.phase === 'playing2' || seam.phase === 'handoff' || seam.phase === 'swap';
     if (seam.phase === seam.tracedPhase && !(busy && now - (seam.tracedAt || 0) >= 500)) return;
     var d = function (e) { return e ? (e.paused ? 'p' : '') + e.currentTime.toFixed(2) + '/' + (isFinite(e.duration) ? e.duration.toFixed(0) : '-') + ' v' + e.volume.toFixed(2) + (e.muted ? 'm' : '') : '-'; };
@@ -1194,65 +1247,75 @@
       }
       if (seam.adAt) seamAdHold(el, false);
       if (seam.phase === 'handoff') return seamHandoff(el);
-      if (seam.phase === 'swap') {
-        // 同じ曲の同じ位置を重ねるので、足して一定になる直線で移す（sin/cos だと途中で 1.4 倍に大きくなる）
-        var s2 = seam.tp && seam.tp._player, y = Math.min(1, (Date.now() - seam.swapAt) / SEAM_SWAP_MS);
-        el.volume = Math.max(SEAM_QUIET, seam.gain2 * y);
-        if (s2) s2.volume = seam.gain2 * (1 - y);
-        if (y >= 1) seamDrop();
-        return;
-      }
-      if (seam.phase === 'playing2') {
-        var e2 = seam.tp && seam.tp._player;
-        if (!e2) return seamFail('lost');
-        // 2 台目が止まったら（読み込みが追いつかないなど）、無音にならないようすぐやめて 1 台目に任せる
-        if (e2.currentTime === seam.e2Last) { if (Date.now() - seam.e2StillAt > 400) return seamFail('stalled'); }
-        else { seam.e2Last = e2.currentTime; seam.e2StillAt = Date.now(); }
-        // クロスフェード：今の曲を少しずつ小さく、次の曲を少しずつ大きくする
-        if (seam.lead) {
-          var x = Math.min(1, (Date.now() - seam.startAt) / (seam.lead * 1000));
-          e2.volume = seam.gain2 * Math.sin(x * Math.PI / 2);
-          if (!seam.mutedMain) el.volume = seam.base * Math.cos(x * Math.PI / 2);
-        }
-        if (st.isPaused) seamDrop('paused');
-        else if (isAd(st.item)) seamAdHold(el, true);
-        else if (st.item.uri !== seam.uri && st.item.uri !== seam.forUri) seamDrop('track-changed');
-        else if (Date.now() - seam.startAt > (seam.lead + 10) * 1000) seamFail('no-advance');
-        return;
-      }
-      var cur = st.item.uri;
-      if (seam.forUri !== cur) {
-        // 2 台目でつなげなかった曲のあとは、次の曲の始まりを crossfade の見張りが大きくする（しないと小さいまま鳴る）
-        seam.fadeIn = seam.phase === 'failed' && xfSec > 0;
-        seamDrop(seam.tp ? 'track-changed' : ''); seam.forUri = cur; seam.phase = '';
-        if (seam.joined !== cur) seam.joined = '';
-      }
-      if (seam.phase === 'failed' || st.isPaused || el.paused || isAd(st.item) || adBreakActive || !isFinite(el.duration)) return;
-      // 短い曲（先読みの時間が取れない）と 1 曲リピートは引き受けず、今までの見張りに任せる
-      if (el.duration < 20 || st.repeat === 2) { seam.phase = 'failed'; return; }
-      // 先読みが返ってこないときも任せる（引き受けたまま何もしないと、曲の終わりがつながらない）
-      if (seam.phase === 'loading' && Date.now() - seam.loadAt > 8000) return seamFail('preload-timeout');
-      var rest = el.duration - el.currentTime;
-      // 読み込みが進むと 2 台目が勝手に鳴り始めるので、出番まで止めて頭に戻し続ける
-      var w2 = seam.phase === 'ready' && seam.tp._player;
-      // 次の曲も短ければ引き受けない（重ねている途中や 1 台目に戻す前に終わってしまう）
-      if (w2 && isFinite(w2.duration) && w2.duration < 20) { pageDebug('seamless.preload', 'short-next'); return seamFail(); }
-      if (w2 && (!w2.paused || w2.currentTime > 0.05)) { w2.muted = true; Promise.resolve(seam.tp.pause()).catch(function () {}); w2.currentTime = 0; }
-      if (!seam.phase && rest <= SEAM_PRELOAD + xfSec) seamPreload(cur);
-      // 見張りは 50ms ごとなので、残り 60ms を切ったら鳴らし始める（少し重なっても途切れるよりよい）
-      if (seam.phase === 'ready' && rest <= Math.max(xfSec, 0.06)) {
-        // 読み込んだあとで次の曲が変わっていたら（キューに追加したなど）、使わずに今までのつなぎ方にする
-        if (seamUpcoming() !== seam.uri) { pageDebug('seamless.preload', 'stale'); seamDrop(); seam.phase = 'failed'; return; }
-        seamStart(el, rest);
-      }
+      if (seam.phase === 'swap') return seamSwap(el);
+      if (seam.phase === 'playing2') return seamPlaying2(el, st);
+      seamWatch(el, st);
     });
+  }
+  // 2 台目から 1 台目へ音を移す。同じ曲の同じ位置を重ねるので、足して一定になる直線で移す（sin/cos だと途中で 1.4 倍に大きくなる）
+  function seamSwap(el) {
+    var s2 = seamE2(), y = Math.min(1, (Date.now() - seam.swapAt) / SEAM_SWAP_MS);
+    el.volume = Math.max(SEAM_QUIET, seam.gain2 * y);
+    if (s2) s2.volume = seam.gain2 * (1 - y);
+    if (y >= 1) seamDrop();
+  }
+  // 2 台目が鳴っているあいだ（1 台目はまだ今の曲の終わり）
+  function seamPlaying2(el, st) {
+    var e2 = seamE2();
+    if (!e2) return seamFail('lost');
+    // 2 台目が止まったら（読み込みが追いつかないなど）、無音にならないようすぐやめて 1 台目に任せる
+    if (seamE2Stalled(e2, SEAM_STALL_PLAYING_MS)) return seamFail('stalled');
+    // クロスフェード：今の曲を少しずつ小さく、次の曲を少しずつ大きくする
+    if (seam.lead) {
+      var x = Math.min(1, (Date.now() - seam.startAt) / (seam.lead * 1000));
+      e2.volume = seam.gain2 * Math.sin(x * Math.PI / 2);
+      if (!seam.mutedMain) el.volume = seam.base * Math.cos(x * Math.PI / 2);
+    }
+    if (st.isPaused) seamDrop('paused');
+    else if (isAd(st.item)) seamAdHold(el, true);
+    else if (st.item.uri !== seam.uri && st.item.uri !== seam.forUri) seamDrop('track-changed');
+    else if (Date.now() - seam.startAt > (seam.lead + 10) * 1000) seamFail('no-advance');
+  }
+  // つなぎ目の前：曲が変わったら片付け、曲の終わりが近づいたら次の曲を読み込み、時間になったら 2 台目を鳴らし始める
+  function seamWatch(el, st) {
+    var cur = st.item.uri;
+    if (seam.forUri !== cur) {
+      // 2 台目でつなげなかった曲のあとは、次の曲の始まりを crossfade の見張りが大きくする（しないと小さいまま鳴る）
+      seam.fadeIn = seam.phase === 'failed' && xfSec > 0;
+      seamDrop(seam.tp ? 'track-changed' : ''); seam.forUri = cur; seam.phase = '';
+      if (seam.joined !== cur) seam.joined = '';
+    }
+    if (st.isPaused || el.paused) {
+      // 2 台目の鍵の仕組みは、作るときに鳴っている音が途切れるので、止まっているあいだに作っておく
+      var lp = !seam.emeInit && !seam.emeWarmed && seamListPlayer();
+      if (lp) { seam.emeWarmed = true; Promise.resolve(lp._getTrackPlayer()).then(seamEme).catch(function () {}); }
+      return;
+    }
+    if (seam.phase === 'failed' || isAd(st.item) || adBreakActive || !isFinite(el.duration)) return;
+    // 短い曲（先読みの時間が取れない）と 1 曲リピートは引き受けず、今までの見張りに任せる
+    if (el.duration < SEAM_MIN_TRACK || st.repeat === 2) { seam.phase = 'failed'; return; }
+    // 先読みが返ってこないときも任せる（引き受けたまま何もしないと、曲の終わりがつながらない）
+    if (seam.phase === 'loading' && Date.now() - seam.loadAt > SEAM_PRELOAD_MAX_MS) return seamFail('preload-timeout');
+    var rest = el.duration - el.currentTime;
+    // 読み込みが進むと 2 台目が勝手に鳴り始めるので、出番まで止めて頭に戻し続ける
+    var w2 = seam.phase === 'ready' && seamE2();
+    // 次の曲も短ければ引き受けない（重ねている途中や 1 台目に戻す前に終わってしまう）
+    if (w2 && isFinite(w2.duration) && w2.duration < SEAM_MIN_TRACK) { pageDebug('seamless.preload', 'short-next'); return seamFail(); }
+    if (w2 && (!w2.paused || w2.currentTime > 0.05)) { w2.muted = true; Promise.resolve(seam.tp.pause()).catch(function () {}); w2.currentTime = 0; }
+    if (!seam.phase && rest <= SEAM_PRELOAD + xfSec) seamPreload(cur);
+    // 見張りは 50ms ごとなので、残り 60ms を切ったら鳴らし始める（少し重なっても途切れるよりよい）
+    if (seam.phase === 'ready' && rest <= Math.max(xfSec, 0.06)) {
+      // 読み込んだあとで次の曲が変わっていたら（キューに追加したなど）、使わずに今までのつなぎ方にする
+      if (seamUpcoming() !== seam.uri) { pageDebug('seamless.preload', 'stale'); seamDrop(); seam.phase = 'failed'; return; }
+      seamStart(el, rest);
+    }
   }
 
   // ---- 再生状態 ----
   // クロスフェードで次の曲が鳴り始めてから、音が 1 台目に戻るまでは、表示を 2 台目（次の曲）に合わせる
   function snapshot() {
     var s = snapshotOfPlayer();
-    var e2 = seam.tp && seam.tp._player;
+    var e2 = seamE2();
     if (!s.has || !e2 || !seam.lead || !(seam.phase === 'playing2' || seam.phase === 'handoff' || seam.phase === 'swap')) return s;
     // 広告をブロックせずに流しているあいだは、広告を表示する
     if (seam.adAt && !adBlockingEnabled()) return s;
