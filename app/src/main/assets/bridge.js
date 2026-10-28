@@ -105,7 +105,9 @@
     } catch (e) {}
   }
   function unmuteEl(el, volume) {
-    try { el.muted = false; el.volume = volume; el.playbackRate = 1; } catch (e) {}
+    // 広告のあいだ 2 台目で次の曲を鳴らし続けていたら、1 台目は位置を合わせ終えるまで音を消したままにする（頭から重なって鳴る）
+    var held = seam.adAt && seam.mutedMain === el;
+    try { el.muted = !!held; el.volume = volume; el.playbackRate = 1; } catch (e) {}
   }
   // 広告のあとで Web Player が音量を小さいまま付け直すことがあるので、しばらく見張って戻す。
   // クロスフェード中は曲の始まりがわざと小さいので、そのときは見張らない
@@ -115,7 +117,8 @@
     var started = Date.now();
     adVolumeGuardTimer = setInterval(function () {
       if (Date.now() - started > 15000 || mutedAdUri) { clearInterval(adVolumeGuardTimer); adVolumeGuardTimer = 0; return; }
-      if (xfSec) return;
+      // 2 台目が鳴らしている間は、1 台目の音をわざと消している
+      if (xfSec || seamClaimed()) return;
       audioEl().then(function (el) {
         if (!el || mutedAdUri || !(el.muted || el.volume < restore * 0.5)) return;
         pageDebug('ad.volume.fixed', 'volume=' + el.volume + ' muted=' + el.muted + ' -> ' + restore);
@@ -954,10 +957,11 @@
   // base：クロスフェードを始めたときの 1 台目の音量、gain2：2 台目と、入れ替えたあとの 1 台目の音量（base と同じ）
   // gen：やめるたびに増やし、途中の先読みが古くなったと分かるようにする。nextLiked：表示する次の曲がお気に入りか
   // joined：2 台目でつなぎ終えた曲（始まりはもう大きくしてあるので、crossfade の見張りが大きくし直さない）
+  // adAt：曲と曲のあいだに入った広告を、2 台目を鳴らしたまま待ち始めた時刻（待っていなければ 0）
   var seam = {
     on: false, timer: null, tp: null, eme: null, uri: '', forUri: '', phase: '', gen: 0, loadAt: 0, startAt: 0, lead: 0, base: 1, gain2: 1,
-    main: null, mutedMain: null, fadeIn: false, nextLiked: false, joined: '',
-    seekedAt: 0, seeks: 0, seekLead: 0.25, e2Last: -1, e2StillAt: 0, swapAt: 0, tracedPhase: '', tracedAt: 0
+    main: null, mutedMain: null, fadeIn: false, nextLiked: false, joined: '', adAt: 0,
+    seekedAt: 0, seeks: 0, seekLead: 0.25, e2Last: -1, e2StillAt: 0, elLast: -1, elLastAt: 0, smoothAt: 0, swapAt: 0, tracedPhase: '', tracedAt: 0
   };
   var SEAM_BUSY = ['loading', 'ready', 'playing2', 'handoff', 'swap'];
   // 2 台目の再生器がこの曲のつなぎ目を引き受けているか
@@ -965,6 +969,10 @@
   var SEAM_PRELOAD = 15;
   // 1 台目へ音を移す長さ。同じ曲を数十 ms ずらして重ねると音がこもる（くし形のゆがみ）ので短くする。0 にするとぶつっと鳴る
   var SEAM_SWAP_MS = 150;
+  // 1 台目がこの長さ止まらずに進んだら、位置合わせのずれを測る
+  var SEAM_SMOOTH_MS = 500;
+  // 位置合わせ中の 1 台目の音量。0 にすると音を出す要素として止められ、戻したときにまた止まる
+  var SEAM_QUIET = 0.001;
   // 2 台目の再生は Spotify に報告しない（再生回数などは 1 台目が報告する）
   var seamTracker = (function () {
     var f = new Proxy(function () {}, { get: function (o, k) { return k === 'then' ? undefined : f; }, apply: function () { return f; } });
@@ -985,7 +993,7 @@
     if (reason) pageDebug('seamless.abort', reason + ' phase=' + seam.phase);
     var tp = seam.tp, main = seam.mutedMain, moved = !!main || seam.phase === 'swap';
     if (moved) seam.joined = seam.uri;
-    seam.tp = null; seam.mutedMain = null; seam.uri = '';
+    seam.tp = null; seam.mutedMain = null; seam.uri = ''; seam.adAt = 0;
     if (seam.phase !== 'failed') seam.phase = '';
     if (main) { main.muted = false; main.playbackRate = 1; }
     // 1 台目の音量を戻す（次の曲へ進んでいれば次の曲の音量、まだ前の曲ならクロスフェードで下げた分を戻す）
@@ -1087,7 +1095,7 @@
       el.removeEventListener('emptied', onEmptied);
       if (seam.phase !== 'playing2') return;
       el.muted = true; seam.mutedMain = el; seam.phase = 'handoff'; seam.startAt = Date.now();
-      seam.seekedAt = 0; seam.seeks = 0; seam.seekLead = seam.seekLead || 0.25; seam.e2Last = -1; seam.e2StillAt = Date.now();
+      seam.seekedAt = 0; seam.seeks = 0; seam.seekLead = seam.seekLead || 0.25; seam.e2Last = -1; seam.e2StillAt = Date.now(); seam.elLast = -1;
     };
     el.addEventListener('emptied', onEmptied);
     pageDebug('seamless.start', 'lead=' + seam.lead);
@@ -1105,17 +1113,27 @@
     if (e2.currentTime === seam.e2Last) {
       if (Date.now() - seam.e2StillAt > 300) { pageDebug('seamless.handoff', 'stalled'); return seamDrop(); }
     } else { seam.e2Last = e2.currentTime; seam.e2StillAt = Date.now(); }
-    if (Date.now() - seam.startAt > 10000) {
+    if (Date.now() - seam.startAt > 15000) {
       pageDebug('seamless.handoff', 'timeout off=' + Math.round((el.currentTime - e2.currentTime) * 1000) + 'ms');
       return seamDrop();
     }
-    if (el.paused || el.readyState < 3 || el.seeking) return;
+    if (el.paused || el.readyState < 3 || el.seeking) { seam.elLast = -1; return; }
     if (seam.seekedAt) {
+      // 音を消した要素（muted か音量 0）は、音を出し始めた瞬間に 0.5 秒ほど止まる（その分 1 台目が遅れ、聞いたばかりの音が繰り返して聞こえる）。
+      // 最初のシークが済んだら、聞こえないほど小さい音で鳴らし始め、止まるのを位置合わせの間に済ませておく
+      if (el.muted) { el.volume = SEAM_QUIET; el.muted = false; seam.elLast = -1; }
+      else if (Math.abs(el.volume - SEAM_QUIET) > 0.0001) el.volume = SEAM_QUIET;
+      // シークのあと 1 台目は 0.5 秒ほど、進んだり止まったりする。その途中でずれを測って音を移すと、
+      // 移したあとに止まった分だけ 1 台目が遅れ、聞いたばかりの音が繰り返して聞こえる。止まらずに進み続けるようになってから測る
+      var now = Date.now(), t = el.currentTime;
+      if (seam.elLast < 0 || t - seam.elLast < (now - seam.elLastAt) / 2000) seam.smoothAt = now;
+      seam.elLast = t; seam.elLastAt = now;
+      if (now - seam.smoothAt < SEAM_SMOOTH_MS) return;
       var off = el.currentTime - e2.currentTime;
       if (Math.abs(off) < 0.02 || (seam.seeks >= 5 && Math.abs(off) < 0.06)) {
         // 一瞬で入れ替えるとぶつっと鳴るので、SEAM_SWAP_MS かけて 2 台目から 1 台目へ音を移す
         pageDebug('seamless.handoff', 'off=' + Math.round(off * 1000) + 'ms seeks=' + seam.seeks + ' ms=' + (Date.now() - seam.startAt));
-        el.volume = 0; el.muted = false;
+        el.volume = SEAM_QUIET; el.muted = false;
         seam.mutedMain = null; seam.main = el;
         seam.phase = 'swap'; seam.swapAt = Date.now();
         return;
@@ -1125,7 +1143,31 @@
       seam.seekLead = Math.max(0, Math.min(1, seam.seekLead - off));
     }
     el.currentTime = e2.currentTime + seam.seekLead;
-    seam.seekedAt = Date.now(); seam.seeks++;
+    seam.seekedAt = Date.now(); seam.seeks++; seam.elLast = -1;
+  }
+  // 曲と曲のあいだに広告が入ったら、2 台目で次の曲を鳴らしたまま待つ。やめると、広告のあとで次の曲が 1 台目で頭から鳴り直す
+  // （クロスフェードで 10 秒ほど聞いた曲が、広告の数秒後に巻き戻ったように聞こえる）。
+  // 広告をブロックしていないときは広告の音と重なるので、2 台目を止めて待つ。広告が終わって次の曲に戻ったら、位置合わせからやり直す
+  var SEAM_AD_MAX_MS = 60000;
+  function seamAdHold(el, ad) {
+    var tp = seam.tp, e2 = tp && tp._player;
+    if (!e2) return seamDrop('lost');
+    if (ad) {
+      if (!seam.adAt) { seam.adAt = Date.now(); pageDebug('seamless.ad', 'hold phase=' + seam.phase); }
+      if (Date.now() - seam.adAt > SEAM_AD_MAX_MS) return seamDrop('ad-timeout');
+      seam.phase = 'handoff'; seam.mutedMain = el;
+      if (adBlockingEnabled()) {
+        e2.volume = seam.gain2;
+        if (e2.paused) Promise.resolve(tp.resume()).catch(function () {});
+      } else if (!e2.paused) Promise.resolve(tp.pause()).catch(function () {});
+      return;
+    }
+    pageDebug('seamless.ad', 'done ms=' + (Date.now() - seam.adAt));
+    seam.adAt = 0;
+    el.muted = true; el.playbackRate = 1; seam.mutedMain = el;
+    if (e2.paused) { e2.volume = seam.gain2; Promise.resolve(tp.resume()).catch(function () {}); }
+    // 止めていた 2 台目が鳴り始めるまでは、止まったと見なさない
+    seam.startAt = Date.now(); seam.seekedAt = 0; seam.seeks = 0; seam.e2Last = -1; seam.e2StillAt = Date.now() + 1000; seam.elLast = -1;
   }
   // デバッグモードの記録：段階が変わったときと、つなぎ目の最中は 0.5 秒ごとに、2 台の位置と音量を残す
   function seamTrace(el) {
@@ -1147,13 +1189,15 @@
       // 1 台目に戻している途中に一時停止・曲送りされたら、2 台目をすぐやめる
       if (seam.phase === 'handoff' || seam.phase === 'swap') {
         if (st.isPaused) return seamDrop('paused');
+        if (seam.phase === 'handoff' && isAd(st.item)) return seamAdHold(el, true);
         if (st.item.uri !== seam.uri && st.item.uri !== seam.forUri) return seamDrop('track-changed');
       }
+      if (seam.adAt) seamAdHold(el, false);
       if (seam.phase === 'handoff') return seamHandoff(el);
       if (seam.phase === 'swap') {
         // 同じ曲の同じ位置を重ねるので、足して一定になる直線で移す（sin/cos だと途中で 1.4 倍に大きくなる）
         var s2 = seam.tp && seam.tp._player, y = Math.min(1, (Date.now() - seam.swapAt) / SEAM_SWAP_MS);
-        el.volume = seam.gain2 * y;
+        el.volume = Math.max(SEAM_QUIET, seam.gain2 * y);
         if (s2) s2.volume = seam.gain2 * (1 - y);
         if (y >= 1) seamDrop();
         return;
@@ -1171,6 +1215,7 @@
           if (!seam.mutedMain) el.volume = seam.base * Math.cos(x * Math.PI / 2);
         }
         if (st.isPaused) seamDrop('paused');
+        else if (isAd(st.item)) seamAdHold(el, true);
         else if (st.item.uri !== seam.uri && st.item.uri !== seam.forUri) seamDrop('track-changed');
         else if (Date.now() - seam.startAt > (seam.lead + 10) * 1000) seamFail('no-advance');
         return;
@@ -1209,9 +1254,12 @@
     var s = snapshotOfPlayer();
     var e2 = seam.tp && seam.tp._player;
     if (!s.has || !e2 || !seam.lead || !(seam.phase === 'playing2' || seam.phase === 'handoff' || seam.phase === 'swap')) return s;
+    // 広告をブロックせずに流しているあいだは、広告を表示する
+    if (seam.adAt && !adBlockingEnabled()) return s;
     var pos = { pos: e2.currentTime * 1000, dur: isFinite(e2.duration) ? e2.duration * 1000 : s.dur, playing: true, buffering: false };
-    // Web Player が次の曲へ進んだあとは、曲の情報は本物のまま、位置だけ 2 台目（1 台目はまだ位置合わせ中）
-    if (seam.phase !== 'playing2') return Object.assign({}, s, pos);
+    // Web Player が次の曲へ進んだあとは、曲の情報は本物のまま、位置だけ 2 台目（1 台目はまだ位置合わせ中）。
+    // 広告を待っているあいだは、鳴っている次の曲を表示する
+    if (seam.phase !== 'playing2' && !seam.adAt) return Object.assign({}, s, pos);
     var st = service('PlayerAPI').getState();
     var it = (st && st.nextItems || []).filter(function (x) { return x.uri === seam.uri; })[0];
     if (!it) return s;
