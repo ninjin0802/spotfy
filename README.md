@@ -188,11 +188,11 @@ keyPassword=...
 `versionName` はこの値、`versionCode` はここから計算（`2.1.0` → `20100`）するので、手で書き換える場所はありません。
 
 1. `VERSION` を上げる（不具合の修正はパッチ、機能追加はマイナー）
-2. [`CHANGELOG.md`](CHANGELOG.md) の先頭に `## <版>` の節を書く
+2. [`CHANGELOG.md`](CHANGELOG.md) の先頭に `## <版>` の節を書く（✨ 新しく・🐛 直したこと・🔧 開発まわりの見出しに分ける。形は CHANGELOG.md の先頭）
 3. 作業ブランチで PR を作り、CI が通ったら main にマージする
 4. main の最新で `scripts/release.sh` を実行する
-   - 署名付きでビルドし、`v<版>` のタグを付けて push、GitHub Releases に APK とその節の内容を上げます
-   - 同じ版のタグがある・コミットしていない変更がある・今のコミットが main の最新でない・CHANGELOG に節がない、のどれかなら止まります
+   - 署名付きでビルドし、`v<版>` のタグを付けて push、GitHub Releases に APK とその節の内容を上げます（最後に APK の案内と、前の版からの差分のリンクを足します）
+   - 同じ版のタグがある・コミットしていない変更がある・今のコミットが main の最新でない・CHANGELOG に節がない（見出し `###` が無い）、のどれかなら止まります
    - タグを付ける前に `scripts/smoke-test.sh` を実行し、失敗したら止まります（急ぐときだけ `SKIP_SMOKE=1`）
 
 </details>

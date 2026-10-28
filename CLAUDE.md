@@ -19,7 +19,7 @@ Spotify Web Player を見えない WebView で動かし、画面は Jetpack Comp
 5. **セキュリティレビュー：`/security-review`。** 通信・ログ（トークンなどを残さない）・WebView と Kotlin の橋・権限・設定・外から受け取る値に触れたときは必ずやる。文書だけの変更では省いてよい
 6. **PR を作る。** 説明には「何が起きていたか・原因・直したこと・確かめたこと」を書く。最後に `🤖 Generated with [Claude Code](https://claude.com/claude-code)` を付ける
 7. **CI が全部通ったら、聞かずにマージしてよい**（build と、エミュレーターのスモークテスト 2 つ）。失敗したらマージせずに直す
-8. **リリースするとき**は、`VERSION` を上げて `CHANGELOG.md` に「## <版>」の節を書き、それも PR で main に入れる。main の最新で `scripts/release.sh`（ビルド → スモークテスト → タグ → GitHub Releases に APK）
+8. **リリースするとき**は、`VERSION` を上げて `CHANGELOG.md` に「## <版>」の節を書き（✨ 新しく・🐛 直したこと・🔧 開発まわりに分け、原因は「くわしく」へ。形は `CHANGELOG.md` の先頭）、それも PR で main に入れる。main の最新で `scripts/release.sh`（ビルド → スモークテスト → タグ → GitHub Releases に APK）
 
 リリースと、元に戻せない操作（削除・入れ直しなど）は、利用者に聞いてから進める。
 

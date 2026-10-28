@@ -23,9 +23,11 @@ private val currentVersion get() = tr("いまの版: ${BuildConfig.VERSION_NAME}
 private fun available(version: String) = tr("新しい版 $version があります", "Version $version is available")
 private fun downloading(progress: Float) = (progress * 100).toInt().let { tr("ダウンロード中… $it%", "Downloading… $it%") }
 
-/** リリースノート（CHANGELOG の節）。Markdown の記号は見出しと箇条書きだけ軽く整える */
+/** リリースノート（CHANGELOG の節）。「くわしく」（<details>）とダウンロードの案内（--- のあと）は出さず、Markdown の記号は軽く整える */
 private fun plainNotes(md: String) =
-    md.lines().joinToString("\n") { it.replace(Regex("^#+\\s*"), "").replace(Regex("^[-*]\\s+"), "・") }
+    md.lines().takeWhile { !it.startsWith("<details") && it.trim() != "---" }
+        .joinToString("\n") { it.replace(Regex("^#+\\s*"), "").replace(Regex("^[-*]\\s+"), "・").replace("**", "").replace("`", "") }
+        .trim()
 
 /** 設定の「アップデート」。いまの状態を出し、押すと確認・インストールする */
 @Composable
