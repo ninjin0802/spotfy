@@ -990,18 +990,25 @@
   var SEAM_QUIET = 0.001;
   // 鍵（DRM）の処理は、2 台の再生器が同じ所を順番に使う。鍵の要求と登録（それぞれ 0.2〜0.4 秒）が続けて走ると、
   // 鳴っている方の再生器が音を作れなくなり、0.3〜1 秒途切れる（曲の終わりの 25 秒前に、2 台目が次の曲を読み込んだとき）。
-  // 音を出していない側の鍵は、要求と登録のあいだをこれだけ空けて、鳴っている側が追いつけるようにする
+  // 再生器を組み立てる処理（再生要素・MediaSource を作って鍵の仕組みに付ける。0.2〜0.4 秒）のすぐあとに鍵の要求が続いても同じで、
+  // 端末が忙しい（ほかのアプリを使っている）と、つながって 0.8 秒ほどになり、鳴っている側が 1 秒ほど途切れる。
+  // 音を出していない側の鍵は、組み立てと要求、要求と登録のあいだをこれだけ空けて、鳴っている側が追いつけるようにする
   var SEAM_LICENSE_GAP_MS = 1000;
   function seamSpaceLicense(m, name, when) {
     if (!m || m.__seamSpaced) return;
     m.__seamSpaced = true;
-    var handle = m._handleLicenseResponse;
-    m._handleLicenseResponse = function () {
-      var self = this, args = arguments;
-      if (!when()) return handle.apply(self, args);
-      vlog('seam.license', name + ' wait=' + SEAM_LICENSE_GAP_MS);
-      setTimeout(function () { handle.apply(self, args); }, SEAM_LICENSE_GAP_MS);
+    var later = function (method) {
+      var f = m[method];
+      if (typeof f !== 'function') return;
+      m[method] = function () {
+        var self = this, args = arguments;
+        if (!when()) return f.apply(self, args);
+        vlog('seam.license', name + ' ' + method + ' wait=' + SEAM_LICENSE_GAP_MS);
+        return new Promise(function (resolve) { setTimeout(resolve, SEAM_LICENSE_GAP_MS); }).then(function () { return f.apply(self, args); });
+      };
     };
+    later('createSessionWithParams');
+    later('_handleLicenseResponse');
   }
   // 2 台目の鍵の仕組み（emeManager）。作るときにも鳴っている音が 1.7 秒ほど途切れるので、止まっているあいだに作っておく（seamTick）
   function seamEme(tp) {

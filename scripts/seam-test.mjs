@@ -23,6 +23,8 @@ const VOLUME = 0.8;
 //   skipAt: Web Player が次の曲へ進んでからこの ms 後に、利用者が「次へ」を押す
 //   adBefore: { index, secs }：Web Player が index の曲へ進む前に、この長さの広告を流す（並びには出てこない。曲の終わりに差し込まれる）
 //   adblock: false なら、設定の「広告の処理」をオフにする
+//   setupMs: 2 台目の再生器を組み立てる処理（再生要素・MediaSource を作って鍵の仕組みに付ける）の重さ。終わるとすぐ鍵の要求を作る
+//   genMs: 鍵の要求を作る処理の重さ（端末が忙しいと 0.4 秒を超える）
 function run(opts = {}) {
   const W = Object.assign({ xf: 10, secs: 40, startPausedMs: 1000, seekMs: 150, postSeekStallMs: 200, unmuteSlowMs: 500, mainLoadMs: 300 }, opts);
   let now = 1_700_000_000_000;
@@ -89,15 +91,18 @@ function run(opts = {}) {
   class FakeEme {
     constructor(o) { this.main = !o; this.inits = []; }
     init() { this.inits.push(now); drmOp(1700, 'init'); return new Promise((r) => later(1700, r)); }
-    // 鍵の応答を受け取って登録する（bridge.js が間を空けるためにこれを包む）
+    // 鍵の要求を作る。応答が届いたら登録する（bridge.js が間を空けるために、どちらも包む）
+    createSessionWithParams(t) {
+      drmOp(W.genMs || DRM_OP_MS, (this.main ? 'main' : 'p2') + '.generate');
+      later((W.genMs || DRM_OP_MS) + 100, () => this._handleLicenseResponse({ el: t.el }, { status: 200, body: 1 }));
+      return Promise.resolve();
+    }
     _handleLicenseResponse(t) { drmOp(DRM_OP_MS, (this.main ? 'main' : 'p2') + '.update'); later(DRM_OP_MS, () => { t.el.keyReady = true; }); }
     destroySessions() { return Promise.resolve(); }
   }
-  // 鍵の要求を出して、応答が届いたら登録する
   function license(eme, el) {
     el.keyReady = false;
-    drmOp(DRM_OP_MS, (eme.main ? 'main' : 'p2') + '.generate');
-    later(DRM_OP_MS + 100, () => eme._handleLicenseResponse({ el }, { status: 200, body: 1 }));
+    eme.createSessionWithParams({ el });
   }
   const mainEme = new FakeEme();
   const p2s = [];
@@ -112,7 +117,7 @@ function run(opts = {}) {
       const el = new FakeMedia('p2'); this._player = el; p2s.push(el); el.gain = this.gain;
       el.track = next.uri; el.duration = next.secs; el.readyState = 4; el._muted = true; el._t = 0;
       if (W.p2StallAt) el.p2Stall = W.p2StallAt;
-      license(this._emeManager, el);
+      if (W.setupMs) { drmOp(W.setupMs, 'p2.setup'); later(W.setupMs, () => license(this._emeManager, el)); } else license(this._emeManager, el);
       // 読み込むと勝手に鳴り始める（bridge.js が止めて頭に戻す）
       el.paused = false;
       return Promise.resolve();
@@ -332,6 +337,15 @@ await test('鍵：2 台目の鍵の仕組みは、止まっているあいだに
   assert(inits.length === 1, `鍵の仕組みを ${inits.length} 回作った（1 回のはず）`);
   assert(inits[0].at - s.samples[0].t < 2000, `鍵の仕組みを作ったのが再生中（${at(s, inits[0].at)}）`);
   assertNoGap(s);
+});
+
+// 実機（Pixel 9a、Instagram を使いながら）で、組み立てと鍵の要求が続けて 0.8 秒ほどかかり、鳴っている曲が 1 秒途切れた
+await test('鍵：端末が忙しく 2 台目の組み立てと鍵の要求が重くても、鳴っている曲が途切れない', async () => {
+  const s = run({ setupMs: 350, genMs: 450 });
+  await s.until(() => s.index === 2 && s.main._t > 20, 120);
+  const ops = s.drm.ops, setup = ops.find((o) => o.label === 'p2.setup'), gen = ops.find((o) => o.label === 'p2.generate');
+  assert(setup && gen && gen.at - setup.at >= 1000, `2 台目の組み立てから鍵の要求まで ${setup && gen ? gen.at - setup.at : '?'}ms`);
+  assertJoined(s, 2); assertNoGap(s); assertContinuous(s); assertNoClick(s);
 });
 
 await test('1 台目に戻した直後に遅れて、聞いた所が繰り返されない（音を出し始めた要素は遅れる）', async () => {
