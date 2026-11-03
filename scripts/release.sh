@@ -18,7 +18,8 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then echo "$tag はも
 [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || { echo "今のコミットが origin/main と違います。PR を main にマージしてから、main の最新でリリースしてください" >&2; exit 1; }
 
 # CHANGELOG の「## 2.0.9」から次の「## 」までをリリースノートにする
-notes=$(awk -v v="$version" '$0 ~ "^## " { if (found) exit; found = ($2 == v); next } found' CHANGELOG.md | sed '/./,$!d')
+# 先頭の書き方の見本（``` で囲んだ所）にある見出しは数えない
+notes=$(awk -v v="$version" '/^```/ { fence = !fence } !fence && $0 ~ "^## " { if (found) exit; found = ($2 == v); next } found' CHANGELOG.md | sed '/./,$!d')
 [[ -n "$notes" ]] || { echo "CHANGELOG.md に「## $version」の節がありません" >&2; exit 1; }
 grep -q '^### ' <<<"$notes" || { echo "CHANGELOG.md の「## $version」に「### 🐛 直したこと」などの見出しがありません（書き方は CHANGELOG.md の先頭）" >&2; exit 1; }
 # 最後にダウンロードの案内と、前の版からの差分のリンクを足す
