@@ -86,8 +86,11 @@ launch
 check "初回起動でログイン画面" 'text="Continue"' 90
 adb -s $serial shell cmd connectivity airplane-mode enable
 # 重いエミュレーターでは機内モードが遅れて効き、通信できたまま起動してしまうので、切れるまで待つ
-for _ in $(seq 30); do
-  adb -s $serial shell dumpsys connectivity | grep -q 'Active default network: none' && break
+for i in $(seq 30); do
+  # grep -q で途中で読むのをやめると pipefail で失敗扱いになるので、全部受け取ってから調べる
+  net=$(adb -s $serial shell dumpsys connectivity)
+  grep -q 'Active default network: none' <<<"$net" && break
+  (( i == 30 )) && echo "  （30 秒たっても通信が切れないまま起動する）"
   sleep 1
 done
 launch
