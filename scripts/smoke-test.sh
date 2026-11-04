@@ -19,6 +19,7 @@ port=5584
 serial=${SMOKE_SERIAL:-emulator-$port}
 cases=${SMOKE_CASES:-modern old}
 failures=0
+ui=
 
 [[ -f "$apk" ]] || { echo "APK がありません: $apk" >&2; exit 1; }
 
@@ -51,7 +52,7 @@ expect_text() {
   local deadline=$((SECONDS + $2))
   while (( SECONDS < deadline )); do
     adb -s $serial shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    local ui; ui=$(adb -s $serial shell cat /sdcard/ui.xml 2>/dev/null)
+    ui=$(adb -s $serial shell cat /sdcard/ui.xml 2>/dev/null)
     grep -qE -- "$1" <<<"$ui" && return 0
     # 重いエミュレーターではシステムの「応答していません」が出て画面をふさぐので、「Wait」を押して閉じる
     local wait_btn; wait_btn=$(grep -oE 'text="Wait"[^>]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' <<<"$ui" | grep -oE '[0-9]+' | tail -4 | tr '\n' ' ')
@@ -67,7 +68,11 @@ expect_text() {
 check() {
   local name=$1 text=$2 wait=$3
   if expect_text "$text" "$wait"; then echo "PASS  $name"
-  else echo "FAIL  $name（「$text」が出ない）"; failures=$((failures + 1)); fi
+  else
+    echo "FAIL  $name（「$text」が出ない）"; failures=$((failures + 1))
+    echo "  画面の文字: $(grep -oE 'text="[^"]+"' <<<"$ui" | head -10 | tr '\n' ' ')"
+    echo "  $(adb -s $serial shell dumpsys connectivity | grep -m1 'Active default network' | tr -d '\r')"
+  fi
   if adb -s $serial logcat -d -b crash 2>/dev/null | grep -q "$pkg"; then
     echo "FAIL  $name（アプリが落ちた）"; failures=$((failures + 1))
     adb -s $serial logcat -d -b crash | grep -A5 "FATAL" | head -20
@@ -80,7 +85,14 @@ boot "$avd"
 launch
 check "初回起動でログイン画面" 'text="Continue"' 90
 adb -s $serial shell cmd connectivity airplane-mode enable
-sleep 3
+# 重いエミュレーターでは機内モードが遅れて効き、通信できたまま起動してしまうので、切れるまで待つ
+for i in $(seq 30); do
+  # grep -q で途中で読むのをやめると pipefail で失敗扱いになるので、全部受け取ってから調べる
+  net=$(adb -s $serial shell dumpsys connectivity)
+  grep -q 'Active default network: none' <<<"$net" && break
+  (( i == 30 )) && echo "  （30 秒たっても通信が切れないまま起動する）"
+  sleep 1
+done
 launch
 # 端末の言語で表示が変わる（CI のエミュレーターは英語）ので、どちらでも通す
 check "通信できないときの案内" "Spotify に接続できません|Can.t connect to Spotify" 60
