@@ -961,7 +961,7 @@
   var seam = {
     on: false, timer: null, tp: null, eme: null, uri: '', forUri: '', phase: '', gen: 0, loadAt: 0, startAt: 0, lead: 0, base: 1, gain2: 1,
     main: null, mutedMain: null, fadeIn: false, nextLiked: false, joined: '', adAt: 0, emeInit: null, emeWarmed: false,
-    seekedAt: 0, seeks: 0, seekLead: 0.25, e2Last: -1, e2StillAt: 0, elLast: -1, elLastAt: 0, smoothAt: 0, swapAt: 0, tracedPhase: '', tracedAt: 0
+    rest: Infinity, seekedAt: 0, seeks: 0, seekLead: 0.25, e2Last: -1, e2StillAt: 0, elLast: -1, elLastAt: 0, smoothAt: 0, swapAt: 0, tracedPhase: '', tracedAt: 0
   };
   var SEAM_BUSY = ['loading', 'ready', 'playing2', 'handoff', 'swap'];
   // 2 台目の再生器がこの曲のつなぎ目を引き受けているか
@@ -973,6 +973,10 @@
   var SEAM_MIN_TRACK = 20;
   // 2 台目がこの長さ進まなければ止まったと見なす（鳴らし始めたあと・位置合わせの最中）
   var SEAM_STALL_PLAYING_MS = 400;
+  // クロスフェードで重ねているあいだは前の曲が鳴っているので、2 台目が遅れても無音にならない。すぐやめると重ならずに切り替わるので、長めに待つ
+  var SEAM_STALL_OVERLAP_MS = 2000;
+  // 鳴らし始める合図を逃しても、前の曲の残りがこれより短かったなら、遅れて 2 台目を鳴らす（秒）
+  var SEAM_LATE_REST = 1;
   var SEAM_STALL_HANDOFF_MS = 300;
   // 位置合わせを諦めるまでの時間とシークの回数（1 回に 1〜1.5 秒かかる）。シークにかかる時間はばらつくので、何回かやっても 20ms 以内にそろわないことがある。
   // 諦めたときのずれが SEAM_LOOSE_OFF 未満なら、そのまま SEAM_SWAP_MS かけて音を移す（一瞬で 1 台目へ切り替えると、
@@ -1144,7 +1148,13 @@
     var st = service('PlayerAPI').getState(), n = st && st.nextItems && st.nextItems[0];
     return n ? n.uri : '';
   }
-  function seamStart(el, rest) {
+  // 1 台目が次の曲に切り替わったら音を消し、位置合わせを始める。grace：2 台目が鳴り始めるまで、止まったと見なさない時間
+  function seamToHandoff(el, grace) {
+    el.muted = true; seam.mutedMain = el; seam.phase = 'handoff';
+    seam.seekLead = seam.seekLead || 0.25; seamRestartAlign(grace);
+  }
+  // late：鳴らし始める合図を逃して、Web Player がもう次の曲へ進んでいる
+  function seamStart(el, rest, late) {
     var e2 = seamE2();
     seam.base = xfBase != null ? xfBase : (el.volume > 0.01 ? el.volume : 1);
     // 2 台目は音量 1 で作られるので、1 台目の音量（Web Player の音量）にそろえる。ずれていると、入れ替えたときに大きさが変わる
@@ -1159,12 +1169,11 @@
     // 1 台目が次の曲に切り替わった瞬間に音を消す（見張りの間隔を待つと、頭が一瞬重なる）
     var onEmptied = function () {
       el.removeEventListener('emptied', onEmptied);
-      if (seam.phase !== 'playing2') return;
-      el.muted = true; seam.mutedMain = el; seam.phase = 'handoff';
-      seam.seekLead = seam.seekLead || 0.25; seamRestartAlign(0);
+      if (seam.phase === 'playing2') seamToHandoff(el, 0);
     };
-    el.addEventListener('emptied', onEmptied);
-    pageDebug('seamless.start', 'lead=' + seam.lead);
+    if (late) seamToHandoff(el, 1000);
+    else el.addEventListener('emptied', onEmptied);
+    pageDebug('seamless.start', 'lead=' + seam.lead + (late ? ' late' : ''));
     // クロスフェードでは次の曲が聞こえ始めたので、画面と通知も次の曲にする
     if (seam.lead) { lastKey = ''; pushState(); }
   }
@@ -1275,7 +1284,7 @@
     var e2 = seamE2();
     if (!e2) return seamFail('lost');
     // 2 台目が止まったら（読み込みが追いつかないなど）、無音にならないようすぐやめて 1 台目に任せる
-    if (seamE2Stalled(e2, SEAM_STALL_PLAYING_MS)) return seamFail('stalled');
+    if (seamE2Stalled(e2, seam.lead ? SEAM_STALL_OVERLAP_MS : SEAM_STALL_PLAYING_MS)) return seamFail('stalled');
     // クロスフェード：今の曲を少しずつ小さく、次の曲を少しずつ大きくする
     if (seam.lead) {
       var x = Math.min(1, (Date.now() - seam.startAt) / (seam.lead * 1000));
@@ -1289,7 +1298,11 @@
   }
   // つなぎ目の前：曲が変わったら片付け、曲の終わりが近づいたら次の曲を読み込み、時間になったら 2 台目を鳴らし始める
   function seamWatch(el, st) {
-    var cur = st.item.uri;
+    var cur = st.item.uri, lastRest = seam.rest;
+    seam.rest = Infinity;
+    // 見張りは 50ms ごとなので、端末が忙しいと残り 60ms の合図を逃し、Web Player が先に次の曲へ進む。
+    // そのまま任せると読み込みのあいだ無音になるので、読み込んである 2 台目を遅れてでも鳴らす（ギャップレスだけ。重ねる分はもう残っていない）
+    if (seam.forUri !== cur && seam.phase === 'ready' && seam.uri === cur && !xfSec && lastRest < SEAM_LATE_REST && !st.isPaused && seamE2()) return seamStart(el, 0, true);
     if (seam.forUri !== cur) {
       // 2 台目でつなげなかった曲のあとは、次の曲の始まりを crossfade の見張りが大きくする（しないと小さいまま鳴る）
       seam.fadeIn = seam.phase === 'failed' && xfSec > 0;
@@ -1307,7 +1320,7 @@
     if (el.duration < SEAM_MIN_TRACK || st.repeat === 2) { seam.phase = 'failed'; return; }
     // 先読みが返ってこないときも任せる（引き受けたまま何もしないと、曲の終わりがつながらない）
     if (seam.phase === 'loading' && Date.now() - seam.loadAt > SEAM_PRELOAD_MAX_MS) return seamFail('preload-timeout');
-    var rest = el.duration - el.currentTime;
+    var rest = seam.rest = el.duration - el.currentTime;
     // 読み込みが進むと 2 台目が勝手に鳴り始めるので、出番まで止めて頭に戻し続ける
     var w2 = seam.phase === 'ready' && seamE2();
     // 次の曲も短ければ引き受けない（重ねている途中や 1 台目に戻す前に終わってしまう）
