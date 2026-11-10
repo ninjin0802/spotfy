@@ -25,9 +25,12 @@ const VOLUME = 0.8;
 //   adblock: false なら、設定の「広告の処理」をオフにする
 //   setupMs: 2 台目の再生器を組み立てる処理（再生要素・MediaSource を作って鍵の仕組みに付ける）の重さ。終わるとすぐ鍵の要求を作る
 //   genMs: 鍵の要求を作る処理の重さ（端末が忙しいと 0.4 秒を超える）
+//   p2StartMs: 2 台目が、鳴らし始めてからこの長さ音を出さない（端末が忙しいと鳴り始めが遅れる）。配列なら、つなぎ目ごとに順番に使う
+//   jank: { at, ms }：始めから at ms たった所で、ページがこの長さ固まる（見張りが動かない。音は別に進む）
 function run(opts = {}) {
   const W = Object.assign({ xf: 10, secs: 40, startPausedMs: 1000, seekMs: 150, postSeekStallMs: 200, unmuteSlowMs: 500, mainLoadMs: 300 }, opts);
   let now = 1_700_000_000_000;
+  const t0 = now;
   const timers = new Map();
   let nextId = 1;
   const addTimer = (fn, ms, repeat) => { const id = nextId++; timers.set(id, { fn, at: now + Math.max(ms || 0, 1), ms: Math.max(ms || 0, 1), repeat }); return id; };
@@ -124,7 +127,11 @@ function run(opts = {}) {
     }
     pause() { if (this._player) this._player.paused = true; return Promise.resolve(); }
     seek(t) { if (this._player) this._player._t = t; return Promise.resolve(); }
-    resume() { if (this._player) this._player.paused = false; return Promise.resolve(); }
+    resume() {
+      const el = this._player;
+      if (el) { el.paused = false; const ms = Array.isArray(W.p2StartMs) ? W.p2StartMs[p2s.indexOf(el)] : W.p2StartMs; if (ms) el.stallUntil = Math.max(el.stallUntil, now + ms); }
+      return Promise.resolve();
+    }
     destroy() { return Promise.resolve(); }
   }
   const mainTp = new FakeTrackPlayer();
@@ -218,9 +225,11 @@ function run(opts = {}) {
   const samples = [];
   const step = async () => {
     now += TICK;
-    for (const [id, t] of [...timers].sort((a, b) => a[1].at - b[1].at)) {
+    const jammed = W.jank && now - t0 >= W.jank.at && now - t0 < W.jank.at + W.jank.ms;
+    for (const [id, t] of jammed ? [] : [...timers].sort((a, b) => a[1].at - b[1].at)) {
       if (!timers.has(id) || t.at > now) continue;
-      if (t.repeat) t.at += t.ms; else timers.delete(id);
+      // 固まって遅れた分を、あとからまとめて呼ばない（ブラウザーと同じ）
+      if (t.repeat) t.at = Math.max(t.at + t.ms, now + t.ms - TICK); else timers.delete(id);
       try { t.fn(); } catch (e) { throw new Error('bridge.js threw: ' + e.stack); }
       await flush();
     }
@@ -252,13 +261,13 @@ function assert(cond, message) { if (!cond) throw new Error(message); }
 const events = (s, name) => s.logs.filter((l) => l.event === name);
 const at = (s, t) => ((t - s.samples[0].t) / 1000).toFixed(2) + ' 秒';
 // 再生中に音が消えない（クロスフェードの重なりでも、2 曲の大きさの合計は十分ある）
-function assertNoGap(s) {
+function assertNoGap(s, maxMs = 60) {
   let silentFrom = null;
   for (const x of s.samples) {
     if (x.paused || x.t - s.samples[0].t < 3000) { silentFrom = null; continue; }
     if (x.total >= VOLUME * 0.25) { silentFrom = null; continue; }
     if (silentFrom === null) silentFrom = x.t;
-    assert(x.t - silentFrom < 60, `${at(s, silentFrom)} から音が途切れた（${x.t - silentFrom}ms 以上）`);
+    assert(x.t - silentFrom < maxMs, `${at(s, silentFrom)} から音が途切れた（${x.t - silentFrom}ms 以上）`);
   }
 }
 // 聞こえている曲の位置が巻き戻らない（聞いた所がもう一度鳴らない）・飛ばない
@@ -378,6 +387,37 @@ await test('つなぎ目の途中で「次へ」を押したら、その曲は�
   await s.until(() => s.index === 2 && s.main._t > 3, 120);
   const c = s.samples.filter((x) => x.track === 'spotify:track:C');
   assert(c.length && c[0].pos < 0.5, `「次へ」で進んだ曲が ${c.length ? c[0].pos.toFixed(2) : '?'} 秒から鳴った`);
+});
+
+// 曲 A は始めから 40.98 秒で終わる。その最後の 60ms（2 台目を鳴らし始める合図）を、ページが固まって逃す
+await test('ギャップレス：曲の終わりにページが 100ms 固まっても、2 台目を遅れて鳴らす（読み込みの無音にならない）', async () => {
+  const s = run({ xf: 0, jank: { at: 40900, ms: 100 } });
+  await s.until(() => s.index === 1 && s.main._t > 20, 120);
+  assert(events(s, 'seamless.start').some((l) => /late/.test(l.detail)), '合図を逃していない（固まらせる時刻がずれた）');
+  assertJoined(s, 1); assertNoGap(s, 150); assertContinuous(s);
+});
+
+await test('クロスフェード：2 台目の鳴り始めが 0.5 秒遅れても、やめずに重ねてつなぐ', async () => {
+  const s = run({ p2StartMs: 500 });
+  await s.until(() => s.index === 1 && s.main._t > 20, 120);
+  assert(!events(s, 'seamless.abort').length, `2 台目をやめた：${events(s, 'seamless.abort').map((l) => l.detail).join(' / ')}`);
+  assertJoined(s, 1); assertNoGap(s); assertContinuous(s); assertNoClick(s);
+});
+
+// 鳴り始める前に止まったと見なした値が残り、次のつなぎ目でも最初の見張りですぐやめていた
+await test('クロスフェード：2 台目が鳴り始めずにやめたあと、次のつなぎ目はふつうにつなぐ', async () => {
+  const s = run({ p2StartMs: [2500, 100] });
+  await s.until(() => s.index === 2 && s.main._t > 20, 120);
+  const aborts = events(s, 'seamless.abort').map((l) => l.detail);
+  assert(aborts.length === 1, `2 台目をやめたのが ${aborts.length} 回（1 回目だけのはず）：${aborts.join(' / ')}`);
+  assertJoined(s, 1);
+});
+
+await test('クロスフェード：重ねている途中に 2 台目が 1 秒止まっても、やめずにつなぐ', async () => {
+  const s = run({ p2StallAt: { secs: 3, ms: 1000 } });
+  await s.until(() => s.index === 1 && s.main._t > 20, 120);
+  assert(!events(s, 'seamless.abort').length, `2 台目をやめた：${events(s, 'seamless.abort').map((l) => l.detail).join(' / ')}`);
+  assertJoined(s, 1); assertNoGap(s); assertNoClick(s);
 });
 
 // 2 台目（p2）だけで鳴っている曲の大きさと、1 台目（main）に戻したあとの大きさ
