@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
 private const val AUTHOR = "ninjin0802"
+// PosIssue（GitHub アカウントなしで Issue を送れるフォーム）の projectKey。公開してよい値
+private const val POSISSUE_KEY = "pk_2Xd4KgBVSFpkcQfw9aITSdZR"
 private val Faint = Color(0x80FFFFFF)
 
 /** 設定の「このアプリについて」。アイコンと版、作者のクレジット、リンク、注意書き */
@@ -87,6 +89,9 @@ internal fun AboutPage(host: AppHost) {
     }
 
     Section(tr("リンク", "Links"))
+    SettingRow(tr("不具合の報告・要望", "Report a bug / Request a feature"), tr("GitHub アカウントなしで送れます", "No GitHub account needed")) {
+        uri.openUri("https://posissue.2nj.lol/r/$POSISSUE_KEY?app_version=${BuildConfig.VERSION_NAME}&os=android")
+    }
     SettingRow(tr("変更履歴", "Release notes"), tr("GitHub の Releases で見る", "View on GitHub Releases")) { uri.openUri("$repo/releases") }
     SettingRow(tr("ソースコード", "Source code"), repo.removePrefix("https://")) { uri.openUri(repo) }
     SettingRow(tr("ライセンス", "License"), "MIT License") { uri.openUri("$repo/blob/main/LICENSE") }
