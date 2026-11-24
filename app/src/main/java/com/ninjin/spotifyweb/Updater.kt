@@ -63,8 +63,6 @@ class Updater(private val context: Context, private val log: (String, String) ->
     }
 
     suspend fun check(manual: Boolean = true) {
-        // 必須のお知らせを、起動時の確認（「あとで」にした版は出さない）で消さない
-        @Suppress("NAME_SHADOWING") val manual = manual || required
         if (_state.value is State.Downloading) return
         _state.value = State.Checking
         _state.value = runCatching { fetchLatest() }.fold(
@@ -73,7 +71,8 @@ class Updater(private val context: Context, private val log: (String, String) ->
                 when {
                     r == null || !isNewer(r.version, BuildConfig.VERSION_NAME) -> { apk.delete(); State.UpToDate }
                     // 起動時の確認では「あとで」にした版をもう一度は出さない
-                    !manual && prefs.getString("skipped", null) == r.version -> State.Idle
+                    // 必須のときは出す（先に走っていた起動時の確認が、あとから必須のお知らせを消さないよう、ここで見る）
+                    !manual && !required && prefs.getString("skipped", null) == r.version -> State.Idle
                     else -> State.Available(r)
                 }
             },
