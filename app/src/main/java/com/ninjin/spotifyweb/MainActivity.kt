@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContentView(root)
+        lifecycleScope.launch { updater.checkRequired() }
         audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
         registerReceiver(noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
         runCatching { connectivity.registerDefaultNetworkCallback(networkCallback) }
@@ -318,10 +319,13 @@ class MainActivity : ComponentActivity() {
 
     /** ログイン済みで open.spotify.com を開いているときだけアプリの画面を出す（ログインページは Web のまま見せる） */
     @Volatile private var nativeUi = false
+    private var updateAsked = false
     private fun updateSurface(url: String? = webView.url) {
         val onSpotify = url == null || isSpotifyUrl(Uri.parse(url))
         nativeUi = isLoggedIn() && onSpotify
         composeView.visibility = if (nativeUi) View.VISIBLE else View.GONE
+        // ログインしていないと設定の「アップデート」まで行けない。ログインが壊れたときに直した版へ上がれるよう、ここで確かめて知らせる（「あとで」にした版も出す）
+        if (!isLoggedIn() && !updateAsked) { updateAsked = true; lifecycleScope.launch { updater.check() } }
     }
 
     /** アプリの画面から使う、端末側の機能と設定 */

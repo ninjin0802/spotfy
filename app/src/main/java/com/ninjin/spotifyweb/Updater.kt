@@ -48,6 +48,20 @@ class Updater(private val context: Context, private val log: (String, String) ->
         check(manual = false)
     }
 
+    /** 開発者からの合図で、更新が必須になっているか（お知らせから「あとで」をなくす） */
+    @Volatile var required = false
+        private set
+
+    /** 合図の確認。main の MIN_VERSION がいまの版より新しければ、すぐに新しい版を調べて必須のお知らせを出す。起動のたびに呼ぶ */
+    suspend fun checkRequired() {
+        val min = runCatching {
+            withContext(Dispatchers.IO) { open("https://raw.githubusercontent.com/$REPO/main/MIN_VERSION").inputStream.bufferedReader().use { it.readText() }.trim() }
+        }.getOrElse { log("update.min.failed", it.reason); return }
+        if (!isNewer(min, BuildConfig.VERSION_NAME)) return
+        required = true
+        check()
+    }
+
     suspend fun check(manual: Boolean = true) {
         if (_state.value is State.Downloading) return
         _state.value = State.Checking
@@ -57,7 +71,8 @@ class Updater(private val context: Context, private val log: (String, String) ->
                 when {
                     r == null || !isNewer(r.version, BuildConfig.VERSION_NAME) -> { apk.delete(); State.UpToDate }
                     // 起動時の確認では「あとで」にした版をもう一度は出さない
-                    !manual && prefs.getString("skipped", null) == r.version -> State.Idle
+                    // 必須のときは出す（先に走っていた起動時の確認が、あとから必須のお知らせを消さないよう、ここで見る）
+                    !manual && !required && prefs.getString("skipped", null) == r.version -> State.Idle
                     else -> State.Available(r)
                 }
             },

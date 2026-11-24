@@ -179,7 +179,7 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false }) { Text(tr("キャンセル", "Cancel"), color = Color.White) } },
             containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
         )
-        UpdateDialog(host.updater)
+        UpdateDialog(host.updater, loggedOut = !ready)
         if (devicesOpen) DevicesSheet(bridge, host) { devicesOpen = false }
         if (queueOpen) QueueSheet(bridge, player) { queueOpen = false }
         if (createOpen) CreateSheet(bridge, onCreated = { c -> open(c) }) { createOpen = false }
