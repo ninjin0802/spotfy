@@ -54,7 +54,7 @@ internal fun UpdateRow(updater: Updater) {
 
 /** 新しい版のお知らせ。「更新」で APK を落とし、終わったらインストーラーを開く */
 @Composable
-internal fun UpdateDialog(updater: Updater) {
+internal fun UpdateDialog(updater: Updater, loggedOut: Boolean = false) {
     val state by updater.state.collectAsState()
     val (release, progress) = when (val s = state) {
         is Updater.State.Available -> s.release to null
@@ -62,7 +62,7 @@ internal fun UpdateDialog(updater: Updater) {
         else -> return
     }
     AlertDialog(
-        onDismissRequest = { if (progress == null) updater.later(release) },
+        onDismissRequest = { if (progress == null && !updater.required) updater.later(release) },
         title = { Text(available(release.version)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -73,13 +73,15 @@ internal fun UpdateDialog(updater: Updater) {
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     )
                 } else {
+                    if (updater.required) Text(tr("この版には不具合があるため、更新が必要です。", "This version has a problem. Please update."), color = Color.White, modifier = Modifier.padding(bottom = 12.dp))
+                    else if (loggedOut) Text(tr("ログインできないときは、更新すると直ることがあります。", "If you can't log in, updating may fix it."), color = Color.White, modifier = Modifier.padding(bottom = 12.dp))
                     Text(currentVersion)
                     if (release.notes.isNotEmpty()) Text(plainNotes(release.notes), fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
                 }
             }
         },
         confirmButton = { if (progress == null) TextButton(onClick = { updater.download(release) }) { Text(tr("更新", "Update"), color = Accent) } },
-        dismissButton = { if (progress == null) TextButton(onClick = { updater.later(release) }) { Text(tr("あとで", "Later"), color = Color.White) } },
+        dismissButton = { if (progress == null && !updater.required) TextButton(onClick = { updater.later(release) }) { Text(tr("あとで", "Later"), color = Color.White) } },
         containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
     )
 }

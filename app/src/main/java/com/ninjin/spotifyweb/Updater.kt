@@ -48,7 +48,23 @@ class Updater(private val context: Context, private val log: (String, String) ->
         check(manual = false)
     }
 
+    /** 開発者からの合図で、更新が必須になっているか（お知らせから「あとで」をなくす） */
+    @Volatile var required = false
+        private set
+
+    /** 合図の確認。main の MIN_VERSION がいまの版より新しければ、すぐに新しい版を調べて必須のお知らせを出す。起動のたびに呼ぶ */
+    suspend fun checkRequired() {
+        val min = runCatching {
+            withContext(Dispatchers.IO) { open("https://raw.githubusercontent.com/$REPO/main/MIN_VERSION").inputStream.bufferedReader().use { it.readText() }.trim() }
+        }.getOrElse { log("update.min.failed", it.reason); return }
+        if (!isNewer(min, BuildConfig.VERSION_NAME)) return
+        required = true
+        check()
+    }
+
     suspend fun check(manual: Boolean = true) {
+        // 必須のお知らせを、起動時の確認（「あとで」にした版は出さない）で消さない
+        @Suppress("NAME_SHADOWING") val manual = manual || required
         if (_state.value is State.Downloading) return
         _state.value = State.Checking
         _state.value = runCatching { fetchLatest() }.fold(
