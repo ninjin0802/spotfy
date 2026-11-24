@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             bridge.ready.collect { ready ->
                 // ログインが切れていたら、アプリの画面は出さずにログインページへ
-                if (ready && !isLoggedIn()) { bridge.reset(); webView.loadUrl(LOGIN_URL); updateSurface(); return@collect }
+                if (ready && !isLoggedIn()) { bridge.reset(); open(LOGIN_URL); updateSurface(); return@collect }
                 if (ready) { applyQuality(); lifecycleScope.launch { runCatching { bridge.crossfade(settings.getString("crossfade", "0")?.toIntOrNull() ?: 0); bridge.gapless(settings.getString("gapless", "true") == "true") } }
                     if (settings.getString("prewarm", "true") == "true") lifecycleScope.launch { runCatching { bridge.prewarm() } }
                     if (DebugMode.on) lifecycleScope.launch { runCatching { bridge.debug(true) } }
@@ -119,7 +119,11 @@ class MainActivity : ComponentActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
-                if (uri.scheme == "http" || uri.scheme == "https") return false
+                if (uri.scheme == "http" || uri.scheme == "https") {
+                    // open.spotify.com とそれ以外（ログインなど）で名乗るブラウザが違う。行き来する所で名乗り直して、開き直す
+                    if (request.isForMainFrame && SpotifyWebView.setDesktop(view, isSpotifyUrl(uri))) { view.loadUrl(uri.toString()); return true }
+                    return false
+                }
                 // spotify: / intent: などの独自スキームは WebView では開けないので無視
                 return true
             }
@@ -189,7 +193,7 @@ class MainActivity : ComponentActivity() {
             webView.restoreState(savedInstanceState)
         } else {
             // ログインしていなければ、最初から Spotify のログインページを開く
-            webView.loadUrl(if (isLoggedIn()) initialUrl(intent) else LOGIN_URL)
+            open(if (isLoggedIn()) initialUrl(intent) else LOGIN_URL)
         }
     }
 
@@ -202,7 +206,7 @@ class MainActivity : ComponentActivity() {
     private fun retryFailedPage() {
         if (loadError.visibility != View.VISIBLE) return
         loadError.visibility = View.GONE
-        webView.loadUrl(failedUrl ?: if (isLoggedIn()) HOME_URL else LOGIN_URL)
+        open(failedUrl ?: if (isLoggedIn()) HOME_URL else LOGIN_URL)
     }
 
     private val loadError by lazy { messageView { retryFailedPage() }.apply { visibility = View.GONE } }
@@ -223,13 +227,16 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (dumpDebugLogIfAsked(intent)) return
-        intent.data?.takeIf(::isSpotifyUrl)?.let { webView.loadUrl(it.toString()) }
+        intent.data?.takeIf(::isSpotifyUrl)?.let { open(it.toString()) }
     }
 
     private fun initialUrl(intent: Intent?): String {
         val data: Uri? = intent?.data
         return if (data != null && isSpotifyUrl(data)) data.toString() else HOME_URL
     }
+
+    /** 開く先に合わせて名乗るブラウザを決めてから開く */
+    private fun open(url: String) { SpotifyWebView.setDesktop(webView, isSpotifyUrl(Uri.parse(url))); webView.loadUrl(url) }
 
     private fun isSpotifyUrl(uri: Uri) = uri.scheme == "https" && uri.host == "open.spotify.com"
 
