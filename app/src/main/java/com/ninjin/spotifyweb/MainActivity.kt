@@ -128,7 +128,11 @@ class MainActivity : ComponentActivity() {
                 return true
             }
 
-            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) { pageFailed = false; updateSurface(url) }
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                pageFailed = false; updateSurface(url)
+                // 「戻る」などは上を通らないので、名乗るブラウザが合っていなければ、名乗り直して開き直す
+                if (url != null && url.startsWith("http") && SpotifyWebView.setDesktop(view, isSpotifyUrl(Uri.parse(url)))) view.loadUrl(url)
+            }
 
             // 裏の Web Player は画面に出さないので、画像・動画（ジャケット・Canvas など）は読み込ませない。
             // 画面に出す画像はアプリ側で直接読み込む。これでページの読み込みと通信が軽くなる

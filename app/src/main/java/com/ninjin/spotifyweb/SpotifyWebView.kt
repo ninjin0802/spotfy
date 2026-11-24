@@ -60,7 +60,7 @@ object SpotifyWebView {
                     )
                     .setFullVersion("$major.0.0.0")
                     .setPlatform(if (desktop) "Windows" else "Android")
-                    .setPlatformVersion(if (desktop) "15.0.0" else "${Build.VERSION.RELEASE}.0.0")
+                    .setPlatformVersion(if (desktop) "15.0.0" else "${Build.VERSION.RELEASE.substringBefore('.').toIntOrNull() ?: 10}.0.0")
                     .setArchitecture(if (desktop) "x86" else "")
                     .setModel("")
                     .setMobile(!desktop)
@@ -72,10 +72,11 @@ object SpotifyWebView {
 
     // 同じサイトへの fetch / XHR に、普通のブラウザでも付く値で X-Requested-With を入れる
     private const val PLAIN_REQUESTED_WITH = """(function(){
-var same=function(u){try{return new URL(u,location.href).origin===location.origin}catch(e){return false}};
-var f=window.fetch;window.fetch=function(i,o){if(same(typeof i==='string'?i:i.url)){o=Object.assign({},o);var h=new Headers(o.headers||(typeof i!=='string'&&i.headers)||{});h.set('X-Requested-With','XMLHttpRequest');o.headers=h}return f.call(this,i,o)};
-var op=XMLHttpRequest.prototype.open,sd=XMLHttpRequest.prototype.send;
-XMLHttpRequest.prototype.open=function(m,u){this.__same=same(u);return op.apply(this,arguments)};
-XMLHttpRequest.prototype.send=function(){if(this.__same)try{this.setRequestHeader('X-Requested-With','XMLHttpRequest')}catch(e){}return sd.apply(this,arguments)};
+var N='X-Requested-With',same=function(u){try{return new URL(u,location.href).origin===location.origin}catch(e){return false}};
+var f=window.fetch;window.fetch=function(i,o){var r=i instanceof Request;if(i!=null&&same(r?i.url:String(i))){o=Object.assign({},o);var h=new Headers(o.headers||(r&&i.headers)||{});if(!h.has(N))h.set(N,'XMLHttpRequest');o.headers=h}return f.call(this,i,o)};
+var X=XMLHttpRequest.prototype,op=X.open,sh=X.setRequestHeader,sd=X.send;
+X.open=function(m,u){this.__same=same(u);this.__xrw=false;return op.apply(this,arguments)};
+X.setRequestHeader=function(k){if(String(k).toLowerCase()==='x-requested-with')this.__xrw=true;return sh.apply(this,arguments)};
+X.send=function(){if(this.__same&&!this.__xrw)try{sh.call(this,N,'XMLHttpRequest')}catch(e){}return sd.apply(this,arguments)};
 })()"""
 }
