@@ -338,7 +338,8 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
         .sortedByDescending { it.pinned }
     LazyColumn(Modifier.fillMaxSize().background(Bg), contentPadding = PaddingValues(bottom = 170.dp)) {
         item {
-            Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // 新しいテーマの見出しは、余白を GlassTitle の側で持つ（ほかの画面とそろえる）
+            Row(if (query == null && Theme.glass) Modifier else Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (query == null && Theme.glass) {
                     Box(Modifier.weight(1f)) {
                         GlassTitle(tr("ライブラリ", "Library"), user, onAvatar) {
