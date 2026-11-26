@@ -45,6 +45,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -90,13 +91,13 @@ import kotlinx.coroutines.launch
 /** 光を曲げる（lens）は角の丸い形にしか使えないので、四角い帯では [refract] を false にする */
 @Composable
 internal fun Modifier.glass(backdrop: Backdrop, shape: androidx.compose.ui.graphics.Shape = CircleShape, refract: Boolean = true): Modifier {
-    val tint = if (LocalLight.current) Color.White.copy(alpha = 0.55f) else Color(0xFF2C2C2E).copy(alpha = 0.55f)
+    val tint = if (LocalLight.current) Color.White.copy(alpha = 0.7f) else Color(0xFF2C2C2E).copy(alpha = 0.7f)
     val solid = if (LocalLight.current) Color(0xF2F7F7F7) else Color(0xF22C2C2E)
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            if (Build.VERSION.SDK_INT >= 31) { vibrancy(); blur(6.dp.toPx()) }
+            if (Build.VERSION.SDK_INT >= 31) { vibrancy(); blur(10.dp.toPx()) }
             if (refract && Build.VERSION.SDK_INT >= 33) lens(14.dp.toPx(), 28.dp.toPx())
         },
         highlight = { Highlight.Default },
@@ -254,11 +255,17 @@ private fun GlassTabPill(backdrop: Backdrop, current: Tab?, onSelect: (Tab) -> U
                     .drawBackdrop(
                         backdrop = backdrop,
                         shape = { CircleShape },
-                        effects = { if (Build.VERSION.SDK_INT >= 33) lens(10.dp.toPx() * jelly.press, 14.dp.toPx() * jelly.press, chromaticAberration = true) },
+                        // 印の下も、バーと同じくぼかしてから色を重ねる（ぼかさないと後ろのジャケットがそのまま見える）
+                        effects = {
+                            if (Build.VERSION.SDK_INT >= 31) { vibrancy(); blur(10.dp.toPx() * (1f - jelly.press)) }
+                            if (Build.VERSION.SDK_INT >= 33) lens(10.dp.toPx() * jelly.press, 14.dp.toPx() * jelly.press, chromaticAberration = true)
+                        },
                         highlight = { Highlight.Default.copy(alpha = jelly.press) },
                         shadow = { com.kyant.backdrop.shadow.Shadow(alpha = jelly.press) },
                         onDrawSurface = {
-                            drawRect(if (light) Color.Black.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.24f), alpha = 1f - jelly.press)
+                            val base = if (Build.VERSION.SDK_INT >= 31) 0.7f else 0.95f
+                            drawRect(if (light) Color.White.copy(alpha = base) else Color(0xFF2C2C2E).copy(alpha = base), alpha = 1f - jelly.press)
+                            drawRect(if (light) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.14f), alpha = 1f - jelly.press)
                             drawRect(Color.Black.copy(alpha = 0.03f * jelly.press))
                         },
                     ),
@@ -383,8 +390,11 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
     LaunchedEffect(p) { while (true) { if (dragging == null) now = p.positionNow(); delay(250) } }
     Box(Modifier.fillMaxSize().background(tint)) {
         // ぼかしは Android 12 から。それより古い端末はジャケットの色だけ
+        // 背景のぼかしたジャケットは、ゆっくり回って色が流れる（Apple Music と同じ）
+        val drift = androidx.compose.animation.core.rememberInfiniteTransition(label = "bg")
+        val turn by drift.animateFloat(0f, 360f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(60_000, easing = androidx.compose.animation.core.LinearEasing)), label = "turn")
         if (Build.VERSION.SDK_INT >= 31) AsyncImage(
-            p.image, null, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.6f; scaleY = 1.6f }.blur(90.dp), contentScale = ContentScale.Crop,
+            p.image, null, Modifier.fillMaxSize().graphicsLayer { scaleX = 2.2f; scaleY = 2.2f; rotationZ = turn }.blur(90.dp), contentScale = ContentScale.Crop,
         )
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)))
         Column(
@@ -407,8 +417,13 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
                     Text(p.title, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.basicMarquee())
                     Text(p.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Ico(if (p.liked) Icons.check else Icons.add, 26, if (p.liked) Accent else Color.White, 44) { scope.launch { runCatching { bridge.like(p.uri, !p.liked) } } }
-                Ico(Icons.more, 22, Color.White, 44, onClick = onMenu)
+                // お気に入り（星）と「…」は、薄い丸の上に（Apple Music と同じ）
+                Box(Modifier.padding(start = 8.dp).size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.14f))) {
+                    Ico(if (p.liked) GlassIcons.starFill else GlassIcons.star, 17, Color.White, 32) { scope.launch { runCatching { bridge.like(p.uri, !p.liked) } } }
+                }
+                Box(Modifier.padding(start = 12.dp).size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.14f))) {
+                    Ico(Icons.more, 18, Color.White, 32, onClick = onMenu)
+                }
             }
             Spacer(Modifier.height(14.dp))
             val dur = p.dur.coerceAtLeast(1)
