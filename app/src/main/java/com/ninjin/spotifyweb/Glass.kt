@@ -257,7 +257,7 @@ private fun GlassTabPill(backdrop: Backdrop, current: Tab?, onSelect: (Tab) -> U
                         highlight = { Highlight.Default.copy(alpha = jelly.press) },
                         shadow = { com.kyant.backdrop.shadow.Shadow(alpha = jelly.press) },
                         onDrawSurface = {
-                            drawRect(if (light) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.12f), alpha = 1f - jelly.press)
+                            drawRect(if (light) Color.Black.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.24f), alpha = 1f - jelly.press)
                             drawRect(Color.Black.copy(alpha = 0.03f * jelly.press))
                         },
                     ),
