@@ -68,12 +68,13 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
         if (error != null) Placeholder(tr("読み込めませんでした", "Couldn't load")) else Loading()
         return
     }
+    LaunchedEffect(Theme.glass) { if (Theme.glass) facet = "" }
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 170.dp)) {
         // 上のアイコンとタブはスクロールしても上に残す（公式アプリと同じ）
         // 新しいテーマは大きな見出しを上に置き、タブはその下（スクロールで流れる）
         if (Theme.glass) {
+            // Apple Music のホームには絞り込みのタブが無いので出さない（いつも「すべて」）
             item { GlassTitle(tr("ホーム", "Home"), user, onAvatar) }
-            item { Row(Modifier.padding(start = 16.dp, bottom = 8.dp)) { Chips(chips, facet) { facet = it } } }
         } else stickyHeader {
             Row(
                 Modifier.fillMaxWidth().background(Bg).windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 8.dp, bottom = 8.dp),

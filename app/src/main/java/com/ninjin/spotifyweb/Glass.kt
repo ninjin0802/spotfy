@@ -391,7 +391,7 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
     LaunchedEffect(p) { while (true) { if (dragging == null) now = p.positionNow(); delay(250) } }
     Box(Modifier.fillMaxSize().background(tint)) {
         GlassFlowBackground(p.image, tint)
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.12f)))
         Column(
             Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 28.dp),
         ) {
@@ -500,7 +500,9 @@ private fun rememberArtColors(url: String): List<Color> {
         val sw = listOfNotNull(p.vibrantSwatch, p.darkVibrantSwatch, p.mutedSwatch, p.lightVibrantSwatch, p.darkMutedSwatch, p.dominantSwatch).distinctBy { it.rgb }
         cs = sw.take(4).map {
             val hsv = FloatArray(3); android.graphics.Color.colorToHSV(it.rgb, hsv)
-            hsv[2] = hsv[2].coerceAtMost(0.7f)
+            // 鮮やかさは少し足し、白い文字が読める程度にだけ明るさを抑える
+            hsv[1] = (hsv[1] * 1.15f).coerceAtMost(1f)
+            hsv[2] = hsv[2].coerceAtMost(0.82f)
             Color(android.graphics.Color.HSVToColor(hsv))
         }.let { l -> if (l.isEmpty()) l else List(4) { l[it % l.size] } }
     }

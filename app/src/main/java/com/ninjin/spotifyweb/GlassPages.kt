@@ -320,13 +320,18 @@ internal fun GlassPicks(items: List<Card>, onPlay: (Card) -> Unit) {
     androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(items, key = { it.uri }) { c ->
             val color = rememberArtColor(c.image)
-            Column(
-                Modifier.width(230.dp).graphicsLayer { shadowElevation = 6.dp.toPx(); shape = RoundedCornerShape(14.dp); clip = true }
-                    .background(color).clickable { onPlay(c) },
-            ) {
-                AsyncImage(c.image, null, Modifier.fillMaxWidth().aspectRatio(1f).background(Card2), contentScale = ContentScale.Crop)
-                Text(c.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center, lineHeight = 19.sp, modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 12.dp, vertical = 12.dp))
+            // Apple Music のトップピック：カードの上に小さな説明、縦長のカードはジャケットが下の色帯へなめらかに溶ける
+            Column(Modifier.width(250.dp)) {
+                Text(c.subtitle.ifEmpty { " " }, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp, bottom = 6.dp))
+                Box(
+                    Modifier.fillMaxWidth().height(330.dp).graphicsLayer { shadowElevation = 6.dp.toPx(); shape = RoundedCornerShape(16.dp); clip = true }
+                        .background(color).clickable { onPlay(c) },
+                ) {
+                    AsyncImage(c.image, null, Modifier.fillMaxWidth().aspectRatio(1f).background(Card2), contentScale = ContentScale.Crop)
+                    Box(Modifier.fillMaxWidth().padding(top = 170.dp).height(80.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, color))))
+                    Text(c.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center, lineHeight = 21.sp, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp))
+                }
             }
         }
     }
