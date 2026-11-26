@@ -2,6 +2,9 @@ package com.ninjin.spotifyweb
 
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -58,7 +61,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -152,28 +157,142 @@ internal fun GlassBottom(
 private fun TabIcon(icon: ImageVector, on: Boolean, size: Dp = 24.dp) =
     Image(rememberVectorPainter(icon), null, Modifier.size(size), colorFilter = ColorFilter.tint(if (on) Accent else Fg))
 
-/** 3 つのタブのガラスのバー。選んだタブの下の丸い印は、替えるとばねのように伸びて移る */
+/**
+ * 選んだタブの下の印の動き（Apple Music の「ぷるぷる」）。
+ * 押すとふくらみ、縦と横を別々のばねで戻すので揺れる。動く速さに合わせて横に伸び縦に縮む。
+ * backdrop の見本アプリ（Kyant0/AndroidLiquidGlass の DampedDragAnimation、Apache 2.0）の値を参考にした
+ */
+private class JellyIndicator(private val scope: kotlinx.coroutines.CoroutineScope, initial: Float, private val last: Float) {
+    private val pos = Animatable(initial, 0.001f)
+    private val vel = Animatable(0f, 5f)
+    private val pressAnim = Animatable(0f, 0.001f)
+    private val sx = Animatable(1f, 0.001f)
+    private val sy = Animatable(1f, 0.001f)
+    private val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+    val value get() = pos.value
+    val target get() = pos.targetValue
+    val press get() = pressAnim.value
+    /** 速さで伸び縮みさせた横・縦の大きさ */
+    val scaleX get() = sx.value / (1f - (vel.value / 10f * 0.75f).coerceIn(-0.2f, 0.2f))
+    val scaleY get() = sy.value * (1f - (vel.value / 10f * 0.25f).coerceIn(-0.2f, 0.2f))
+
+    fun down() {
+        tracker.resetTracking()
+        scope.launch { pressAnim.animateTo(1f, spring(1f, 1000f)) }
+        scope.launch { sx.animateTo(78f / 56f, spring(0.6f, 250f)) }
+        scope.launch { sy.animateTo(78f / 56f, spring(0.7f, 250f)) }
+    }
+
+    fun up() {
+        scope.launch {
+            // 目的のタブの近くまで来てから縮める
+            if (pos.value != pos.targetValue) snapshotFlow { pos.value }.first { kotlin.math.abs(it - pos.targetValue) < last * 0.025f + 0.01f }
+            launch { pressAnim.animateTo(0f, spring(1f, 1000f)) }
+            launch { sx.animateTo(1f, spring(0.6f, 250f)) }
+            launch { sy.animateTo(1f, spring(0.7f, 250f)) }
+        }
+    }
+
+    /** 指について動かす */
+    fun follow(v: Float) {
+        scope.launch {
+            pos.animateTo(v.coerceIn(0f, last), spring(1f, 1000f)) {
+                tracker.addPosition(System.currentTimeMillis(), Offset(value, 0f))
+                val t = tracker.calculateVelocity().x / last.coerceAtLeast(1f)
+                scope.launch { vel.animateTo(t, spring(0.5f, 300f)) }
+            }
+        }
+    }
+
+    /** 押して替えたとき：ふくらんで移り、揺れながら戻る */
+    fun jump(v: Float) {
+        down()
+        scope.launch { pos.animateTo(v.coerceIn(0f, last), spring(1f, 1000f)) }
+        scope.launch { vel.animateTo(0f, spring(0.5f, 300f)) }
+        up()
+    }
+}
+
+/**
+ * 3 つのタブのガラスのバー。押しても、なぞっても替えられる（Apple Music と同じく、なぞるあいだ印が指についてきてふくらみ、
+ * 離したタブに替わる）。なぞるとバーごと少し引っぱられ、離すとばねで戻る
+ */
 @Composable
 private fun GlassTabPill(backdrop: Backdrop, current: Tab?, onSelect: (Tab) -> Unit, modifier: Modifier) {
-    BoxWithConstraints(modifier.fillMaxHeight().glass(backdrop).padding(4.dp)) {
-        val w = maxWidth / GlassTabs.size
+    BoxWithConstraints(modifier.fillMaxHeight()) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val pad = with(density) { 4.dp.toPx() }
+        val wPx = (constraints.maxWidth - 2 * pad) / GlassTabs.size
+        val last = (GlassTabs.size - 1).toFloat()
+        val scope = rememberCoroutineScope()
         val index = GlassTabs.indexOf(current).coerceAtLeast(0).toFloat()
-        val pos by animateFloatAsState(index, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow), label = "tab")
-        // 動いているあいだだけ横に伸ばす（止まると元の幅）
-        val stretch = 1f + 0.35f * kotlin.math.abs(index - pos).coerceAtMost(1f)
-        if (current != null) Box(
-            Modifier.offset(x = w * pos).width(w).fillMaxHeight().graphicsLayer { scaleX = stretch }
-                .clip(CircleShape).background(Fg.copy(alpha = if (LocalLight.current) 0.08f else 0.12f)),
-        )
-        Row(Modifier.fillMaxSize()) {
-            GlassTabs.forEach { t ->
-                val on = t == current
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().clip(CircleShape).clickable(remember { MutableInteractionSource() }, null) { onSelect(t) },
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-                ) {
-                    TabIcon(t.icon, on, 22.dp)
-                    Text(t.label, color = if (on) Accent else Fg, fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+        val jelly = remember { JellyIndicator(scope, index, last) }
+        val pull = remember { Animatable(0f) }
+        var dragging by remember { mutableStateOf(false) }
+        // ほかの所（Classic から戻る、戻るボタンなど）でタブが替わったときも印を動かす
+        LaunchedEffect(index) { if (!dragging && kotlin.math.round(jelly.target) != index) jelly.jump(index) }
+        val light = LocalLight.current
+        val pullX = { val f = (pull.value / constraints.maxWidth).coerceIn(-1f, 1f); pad * kotlin.math.sign(f) * androidx.compose.animation.core.EaseOut.transform(kotlin.math.abs(f)) }
+        val shown = if (dragging) GlassTabs[kotlin.math.round(jelly.target).toInt()] else current
+        Box(
+            Modifier.fillMaxSize()
+                .graphicsLayer {
+                    translationX = pullX()
+                    val s = 1f + 16.dp.toPx() / size.width * jelly.press
+                    scaleX = s; scaleY = s
+                }
+                .glass(backdrop)
+                .padding(4.dp),
+        ) {
+            // 印：ふだんは薄い面、押しているあいだはガラスのレンズになって後ろを曲げる
+            if (current != null || dragging) Box(
+                Modifier.graphicsLayer {
+                    translationX = jelly.value * wPx
+                    scaleX = jelly.scaleX; scaleY = jelly.scaleY
+                }.width(with(density) { wPx.toDp() }).fillMaxHeight()
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { CircleShape },
+                        effects = { if (Build.VERSION.SDK_INT >= 33) lens(10.dp.toPx() * jelly.press, 14.dp.toPx() * jelly.press, chromaticAberration = true) },
+                        highlight = { Highlight.Default.copy(alpha = jelly.press) },
+                        shadow = { com.kyant.backdrop.shadow.Shadow(alpha = jelly.press) },
+                        onDrawSurface = {
+                            drawRect(if (light) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.12f), alpha = 1f - jelly.press)
+                            drawRect(Color.Black.copy(alpha = 0.03f * jelly.press))
+                        },
+                    ),
+            )
+            Row(
+                Modifier.fillMaxSize().pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { o -> dragging = true; jelly.down(); jelly.follow(o.x / wPx - 0.5f) },
+                        onHorizontalDrag = { ch, dx ->
+                            ch.consume()
+                            jelly.follow(jelly.target + dx / wPx)
+                            scope.launch { pull.snapTo(pull.value + dx) }
+                        },
+                        onDragEnd = {
+                            val t = kotlin.math.round(jelly.target)
+                            jelly.follow(t); jelly.up(); dragging = false
+                            scope.launch { pull.animateTo(0f, spring(1f, 300f, 0.5f)) }
+                            GlassTabs[t.toInt()].let { if (it != current) onSelect(it) }
+                        },
+                        onDragCancel = { jelly.follow(index); jelly.up(); dragging = false; scope.launch { pull.animateTo(0f, spring(1f, 300f, 0.5f)) } },
+                    )
+                },
+            ) {
+                GlassTabs.forEachIndexed { i, t ->
+                    val on = t == shown
+                    // なぞっている印の下のアイコンは、印に合わせて少し大きく
+                    val near = (1f - kotlin.math.abs(jelly.value - i)).coerceIn(0f, 1f) * jelly.press
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight().graphicsLayer { val s = 1f + 0.2f * near; scaleX = s; scaleY = s }
+                            .clickable(remember { MutableInteractionSource() }, null) { if (t != current) { jelly.jump(i.toFloat()); onSelect(t) } else onSelect(t) },
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                    ) {
+                        TabIcon(t.icon, on, 22.dp)
+                        Text(t.label, color = if (on) Accent else Fg, fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+                    }
                 }
             }
         }
