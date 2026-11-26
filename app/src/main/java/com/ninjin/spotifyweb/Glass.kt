@@ -46,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -548,7 +549,7 @@ private fun GlassLyricsPane(p: PlayerState, lyrics: Bridge.Lyrics?) {
     val list = androidx.compose.foundation.lazy.rememberLazyListState()
     LaunchedEffect(cur) { if (cur > 0) list.animateScrollToItem((cur - 1).coerceAtLeast(0)) }
     val lines = lyrics?.lines ?: emptyList()
-    LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)) {
+    LazyColumn(Modifier.fillMaxSize().fadeEdges(), state = list, contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)) {
         items(lines.size) { i ->
             val on = lyrics?.synced != true || i == cur
             val a by animateFloatAsState(if (on) 1f else 0.35f, label = "line")
@@ -575,7 +576,7 @@ private fun GlassQueuePane(bridge: Bridge, p: PlayerState) {
             QueueToggle(ClassicIcons.repeat, p.repeat > 0, if (p.repeat == 2) "1" else null) { scope.launch { runCatching { bridge.repeat((p.repeat + 1) % 3) } } }
         }
         val items = (q?.queued ?: emptyList()) + (q?.next ?: emptyList())
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 6.dp, bottom = 16.dp)) {
+        LazyColumn(Modifier.weight(1f).fadeEdges(), contentPadding = PaddingValues(top = 6.dp, bottom = 16.dp)) {
             items(items.size) { i ->
                 val it = items[i]
                 Row(
@@ -592,6 +593,16 @@ private fun GlassQueuePane(bridge: Bridge, p: PlayerState) {
         }
     }
 }
+
+/** 一覧の上と下の端を、ぶつっと切らずにふわっと消す（Apple Music の歌詞と同じ） */
+private fun Modifier.fadeEdges(): Modifier = graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        drawRect(
+            androidx.compose.ui.graphics.Brush.verticalGradient(0f to Color.Transparent, 0.05f to Color.Black, 0.8f to Color.Black, 1f to Color.Transparent),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }
 
 /** シャッフル・リピートの四角いボタン（入っているときは白地） */
 @Composable
