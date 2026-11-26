@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.combinedClickable
 import coil.compose.AsyncImage
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -224,7 +225,7 @@ internal fun GlassPageScreen(bridge: Bridge, uri: String, playing: PlayerState, 
                     color = Sub, fontSize = 13.sp, modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 8.dp),
                 )
             }
-            items(p.shelves) { s -> GlassShelfRow(s, onOpen) }
+            items(p.shelves) { s -> GlassShelfRow(s, onOpen, onMenu) }
         }
         // 上：ガラスの丸い戻る、右に追加とその他。下へスクロールすると帯になり、名前が出る
         GlassTopBar(
@@ -248,7 +249,7 @@ internal fun GlassPageScreen(bridge: Bridge, uri: String, playing: PlayerState, 
 /** 曲の行（Apple Music と同じく、細い線で区切り、再生中の曲は赤い波の印） */
 @Composable
 private fun GlassTrackRow(t: Track, number: String?, current: Boolean, playing: Boolean, onMore: () -> Unit, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Column(Modifier.fillMaxWidth().longPress(onClick, onMore)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp).height(if (number != null) 48.dp else 60.dp), verticalAlignment = Alignment.CenterVertically) {
             if (number != null) Box(Modifier.width(30.dp)) {
                 if (current) NowPlayingBars(playing) else Text(number, color = Sub, fontSize = 15.sp)
@@ -298,12 +299,12 @@ internal fun GlassSectionTitle(title: String) {
 
 /** 横に流れる棚（角の丸いジャケット、下に名前と説明。アーティストは丸） */
 @Composable
-internal fun GlassShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
+internal fun GlassShelfRow(s: Shelf, onPlay: (Card) -> Unit, onMenu: (MenuTarget) -> Unit = {}) {
     if (s.items.isEmpty()) return
     if (s.title.isNotEmpty()) GlassSectionTitle(s.title)
     androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(s.items, key = { it.uri }) { c ->
-            Column(Modifier.width(165.dp).clickable(remember { MutableInteractionSource() }, null) { onPlay(c) }) {
+            Column(Modifier.width(165.dp).longPress({ onPlay(c) }, { onMenu(c.menuTarget()) }, ripple = false)) {
                 AsyncImage(c.image, null, Modifier.size(165.dp).clip(if (c.round) CircleShape else RoundedCornerShape(10.dp)).background(Card2), contentScale = ContentScale.Crop)
                 Text(c.title, color = Fg, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = if (c.round) TextAlign.Center else TextAlign.Start,
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
@@ -315,7 +316,7 @@ internal fun GlassShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
 
 /** 「あなたへのおすすめ」：大きな縦長のカード（上にジャケット、下にジャケットの色の帯と白い名前） */
 @Composable
-internal fun GlassPicks(items: List<Card>, onPlay: (Card) -> Unit) {
+internal fun GlassPicks(items: List<Card>, onPlay: (Card) -> Unit, onMenu: (MenuTarget) -> Unit = {}) {
     GlassSectionTitle(tr("あなたへのおすすめ", "Top Picks for You"))
     androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(items, key = { it.uri }) { c ->
@@ -325,7 +326,7 @@ internal fun GlassPicks(items: List<Card>, onPlay: (Card) -> Unit) {
                 Text(c.subtitle.ifEmpty { " " }, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp, bottom = 6.dp))
                 Box(
                     Modifier.fillMaxWidth().height(330.dp).graphicsLayer { shadowElevation = 6.dp.toPx(); shape = RoundedCornerShape(16.dp); clip = true }
-                        .background(color).clickable { onPlay(c) },
+                        .background(color).longPress({ onPlay(c) }, { onMenu(c.menuTarget()) }),
                 ) {
                     AsyncImage(c.image, null, Modifier.fillMaxWidth().aspectRatio(1f).background(Card2), contentScale = ContentScale.Crop)
                     Box(Modifier.fillMaxWidth().padding(top = 170.dp).height(80.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, color))))
@@ -337,9 +338,24 @@ internal fun GlassPicks(items: List<Card>, onPlay: (Card) -> Unit) {
     }
 }
 
+/** 押すと onClick、長押しすると軽く震えて onLong（Apple の長押しメニュー） */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+internal fun Modifier.longPress(onClick: () -> Unit, onLong: () -> Unit, ripple: Boolean = true): Modifier {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    return combinedClickable(
+        interactionSource = remember { MutableInteractionSource() }, indication = if (ripple) androidx.compose.material3.ripple() else null,
+        onLongClick = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onLong() }, onClick = onClick,
+    )
+}
+
+/** カードを長押ししたときのメニューの対象（曲なら曲のメニュー） */
+internal fun Card.menuTarget(): MenuTarget =
+    if (uri.startsWith("spotify:track:")) MenuTarget.OfTrack(Track(uri, title, subtitle, image, 0)) else MenuTarget.OfPage(uri, title, subtitle, image, "", "")
+
 /** メニューの項目をまとめる角の丸いカード（Apple のメニューと同じ。Classic はそのまま並べる） */
 @Composable
 internal fun MenuGroup(content: @Composable () -> Unit) {
     if (!Theme.glass) { Column { content() }; return }
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (LocalLight.current) Color.White else Surface2)) { content() }
+    Column(Modifier.padding(vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (LocalLight.current) Color.White else Surface2)) { content() }
 }

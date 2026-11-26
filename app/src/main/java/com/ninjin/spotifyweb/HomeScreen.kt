@@ -86,7 +86,7 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
             }
         }
         if (loading) { item { Box(Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) { LoadingDots() } }; return@LazyColumn }
-        if (f.shortcuts.isNotEmpty()) item { if (Theme.glass) GlassPicks(f.shortcuts, onPlay) else Shortcuts(f.shortcuts, onPlay) }
+        if (f.shortcuts.isNotEmpty()) item { if (Theme.glass) GlassPicks(f.shortcuts, onPlay, onMenu) else Shortcuts(f.shortcuts, onPlay) }
         // フォロー中のページなど、見出しのない 1 件ずつのカードが並ぶときは「最新リリース」の見出し
         val podcastFollow = facet == "podcasts-following-chip"
         if (podcastFollow || f.shelves.firstOrNull()?.let { it.feed && it.title.isEmpty() } == true) item {
@@ -111,7 +111,7 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
                 item { Box(Modifier.size(100.dp).clip(RoundedCornerShape(6.dp)).background(Card2).clickable { onBrowse() }, contentAlignment = Alignment.Center) { Image(rememberVectorPainter(Icons.close), null, Modifier.size(28.dp).rotate(45f), colorFilter = ColorFilter.tint(Sub)) } }
             }
         }
-        items(f.shelves) { s -> if (s.feed) FeedCard(bridge, s, onPlay, onMenu) else if (Theme.glass) GlassShelfRow(s, onPlay) else ShelfRow(s, onPlay) }
+        items(f.shelves) { s -> if (s.feed) FeedCard(bridge, s, onPlay, onMenu) else if (Theme.glass) GlassShelfRow(s, onPlay, onMenu) else ShelfRow(s, onPlay) }
     }
 }
 

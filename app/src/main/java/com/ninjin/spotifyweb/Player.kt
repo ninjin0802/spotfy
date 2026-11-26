@@ -123,7 +123,7 @@ internal fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Col
     ) {
         val h = maxHeight
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Box(Modifier.height(h).fillMaxWidth()) { PlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu, onLyrics = { lyricsOpen = true }) }
+            Box(Modifier.height(h).fillMaxWidth()) { PlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu, onLyrics = { lyricsOpen = true }, lyrics = lyrics) }
             PlayerExtras(bridge, p, tint, lyrics, onLyrics = { lyricsOpen = true }, onOpen = onOpen)
         }
         AnimatedVisibility(lyricsOpen, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
@@ -134,12 +134,12 @@ internal fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Col
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit, onLyrics: () -> Unit = {}) {
+internal fun PlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit, onLyrics: () -> Unit = {}, lyrics: Bridge.Lyrics? = null) {
     val scope = rememberCoroutineScope()
     var now by remember { mutableLongStateOf(p.positionNow()) }
     var dragging by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(p) { while (true) { if (dragging == null) now = p.positionNow(); delay(250) } }
-    if (Theme.glass) { GlassPlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu, onLyrics); return }
+    if (Theme.glass) { GlassPlayerMain(bridge, host, p, tint, onClose, onDevices, onMenu, lyrics); return }
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint, tint.copy(alpha = 0.85f).compositeOver(Bg), Bg)))
             .windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 24.dp),

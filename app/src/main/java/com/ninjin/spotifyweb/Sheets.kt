@@ -42,6 +42,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.ui.graphics.graphicsLayer
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 
@@ -68,14 +72,11 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     fun toast(t: String) = Toast.makeText(ctx, t, Toast.LENGTH_SHORT).show()
-    fun close(then: () -> Unit = {}) { scope.launch { state.hide() }.invokeOnCompletion { onDismiss(); then() } }
+    fun close(then: () -> Unit = {}) { if (Theme.glass) { onDismiss(); then() } else scope.launch { state.hide() }.invokeOnCompletion { onDismiss(); then() } }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
-        shape = if (Theme.glass) RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp) else androidx.compose.material3.BottomSheetDefaults.ExpandedShape,
-        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Sub)) },
-    ) {
-        Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 12.dp)) {
+    val glass = Theme.glass
+    MenuContainer(glass, state, onDismiss) {
+        Column(if (glass) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 12.dp)) {
             when (target) {
                 is MenuTarget.OfTrack -> {
                     val t = target.track
@@ -131,8 +132,55 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
     }
 }
 
+/** Classic は下から出るシート。Glass は Apple と同じく、後ろをぼかして真ん中に浮かぶメニュー */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MenuContainer(glass: Boolean, state: androidx.compose.material3.SheetState, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    if (!glass) {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
+            dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Sub)) },
+        ) { content() }
+        return
+    }
+    androidx.compose.ui.window.Dialog(onDismiss, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        // 後ろの画面をぼかす（Android 12 から。それより古い端末は暗くするだけ）
+        val w = (androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+        androidx.compose.runtime.SideEffect {
+            w?.setDimAmount(0.25f)
+            if (w != null && android.os.Build.VERSION.SDK_INT >= 31) {
+                w.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                w.attributes = w.attributes.apply { blurBehindRadius = 80 }
+            }
+        }
+        // 出るときは少し小さい所からふわっと広がる
+        val shown = remember { androidx.compose.animation.core.Animatable(0.85f) }
+        LaunchedEffect(Unit) { shown.animateTo(1f, androidx.compose.animation.core.spring(0.7f, 500f)) }
+        Box(
+            Modifier.fillMaxSize().clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null, onClick = onDismiss)
+                .windowInsetsPadding(WindowInsets.systemBars).padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                Modifier.widthIn(max = 320.dp).graphicsLayer { scaleX = shown.value; scaleY = shown.value; alpha = ((shown.value - 0.85f) / 0.15f).coerceIn(0f, 1f) }
+                    .clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {},
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) { content() }
+        }
+    }
+}
+
 @Composable
 private fun Header(image: String, title: String, sub: String, round: Boolean) {
+    // Glass：押した物を大きく浮かせ、その下にメニュー（Apple の長押しと同じ）
+    if (Theme.glass) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            AsyncImage(image, null, Modifier.size(200.dp).graphicsLayer { shadowElevation = 20.dp.toPx(); shape = if (round) CircleShape else RoundedCornerShape(14.dp); clip = true }.background(Card2), contentScale = ContentScale.Crop)
+            Text(title, color = Fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+            if (sub.isNotEmpty()) Text(sub, color = Sub, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        return
+    }
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(image, null, Modifier.size(52.dp).clip(if (round) CircleShape else RoundedCornerShape(if (Theme.glass) 8.dp else 2.dp)).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.padding(start = 12.dp)) {

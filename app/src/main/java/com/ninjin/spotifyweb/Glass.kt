@@ -384,7 +384,10 @@ internal fun GlassGenreTile(t: Card, m: Modifier, onClick: () -> Unit) {
 /** 全画面プレーヤー（Apple Music と同じく、ジャケットをぼかした背景に、大きなジャケットと白い操作） */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit, onLyrics: () -> Unit) {
+internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onMenu: () -> Unit, lyrics: Bridge.Lyrics?) {
+    // 0：大きなジャケット 1：歌詞 2：次に再生。Apple Music と同じく、歌詞とキューはプレーヤーの中に出し、ジャケットは左上に小さく
+    var pane by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.activity.compose.BackHandler(enabled = pane != 0) { pane = 0 }
     val scope = rememberCoroutineScope()
     var now by remember { mutableLongStateOf(p.positionNow()) }
     var dragging by remember { mutableStateOf<Float?>(null) }
@@ -399,25 +402,44 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
             Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(28.dp).clickable(remember { MutableInteractionSource() }, null, onClick = onClose), contentAlignment = Alignment.Center) {
                 Box(Modifier.width(40.dp).height(5.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.45f)))
             }
-            Spacer(Modifier.weight(1f))
-            val scale by animateFloatAsState(if (p.playing) 1f else 0.82f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow), label = "art")
-            AsyncImage(
-                p.image, null,
-                Modifier.fillMaxWidth().aspectRatio(1f).sharedArt(LocalPlayerScope.current).graphicsLayer { scaleX = scale; scaleY = scale; shadowElevation = 24.dp.toPx(); shape = RoundedCornerShape(14.dp); clip = true },
-                contentScale = ContentScale.Crop,
-            )
-            Spacer(Modifier.weight(1f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(p.title, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.basicMarquee())
-                    Text(p.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+            val actions: @Composable () -> Unit = {
                 // お気に入り（星）と「…」は、薄い丸の上に（Apple Music と同じ）
                 Box(Modifier.padding(start = 8.dp).size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.14f))) {
                     Ico(if (p.liked) GlassIcons.starFill else GlassIcons.star, 17, Color.White, 32) { scope.launch { runCatching { bridge.like(p.uri, !p.liked) } } }
                 }
                 Box(Modifier.padding(start = 12.dp).size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.14f))) {
                     Ico(Icons.more, 18, Color.White, 32, onClick = onMenu)
+                }
+            }
+            if (pane == 0) {
+                Spacer(Modifier.weight(1f))
+                val scale by animateFloatAsState(if (p.playing) 1f else 0.82f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow), label = "art")
+                AsyncImage(
+                    p.image, null,
+                    Modifier.fillMaxWidth().aspectRatio(1f).sharedArt(LocalPlayerScope.current).graphicsLayer { scaleX = scale; scaleY = scale; shadowElevation = 24.dp.toPx(); shape = RoundedCornerShape(14.dp); clip = true }
+                        .clickable(remember { MutableInteractionSource() }, null) {},
+                    contentScale = ContentScale.Crop,
+                )
+                Spacer(Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(p.title, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.basicMarquee())
+                        Text(p.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    actions()
+                }
+            } else {
+                // 上：小さなジャケットと曲名（押すと大きなジャケットに戻る）
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(p.image, null, Modifier.size(64.dp).graphicsLayer { shadowElevation = 8.dp.toPx(); shape = RoundedCornerShape(8.dp); clip = true }.clickable { pane = 0 }, contentScale = ContentScale.Crop)
+                    Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                        Text(p.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(p.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    actions()
+                }
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (pane == 1) GlassLyricsPane(p, lyrics) else GlassQueuePane(bridge, p)
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -451,11 +473,11 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
             GlassVolume()
             // 下：歌詞／再生先／キュー（シャッフルとリピートはキューの画面に。Apple Music と同じ）
             Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Ico(Icons.lyrics, 24, Color.White.copy(alpha = 0.7f), 48, onClick = onLyrics)
+                PaneButton(Icons.lyrics, pane == 1) { pane = if (pane == 1) 0 else 1 }
                 val out = if (p.device.isEmpty()) host.outputName() else ""
                 val on = p.device.isNotEmpty() || out.isNotEmpty()
                 Ico(if (p.device.isNotEmpty()) DevIcons.of(p.deviceType) else if (out.isNotEmpty()) DevIcons.headphones else DevIcons.phone, 24, if (on) Accent else Color.White.copy(alpha = 0.7f), 48, onClick = onDevices)
-                Ico(Icons.queue, 24, Color.White.copy(alpha = 0.7f), 48, onClick = onQueue)
+                PaneButton(Icons.queue, pane == 2) { pane = if (pane == 2) 0 else 2 }
             }
         }
     }
@@ -507,6 +529,77 @@ private fun rememberArtColors(url: String): List<Color> {
         }.let { l -> if (l.isEmpty()) l else List(4) { l[it % l.size] } }
     }
     return cs
+}
+
+/** 歌詞・キューのボタン。開いているときは白い丸の上に（Apple Music と同じ） */
+@Composable
+private fun PaneButton(icon: androidx.compose.ui.graphics.vector.ImageVector, on: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(40.dp).clip(CircleShape).background(if (on) Color.White.copy(alpha = 0.9f) else Color.Transparent).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Image(rememberVectorPainter(icon), null, Modifier.size(22.dp), colorFilter = ColorFilter.tint(if (on) Color.Black.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.7f)))
+    }
+}
+
+/** プレーヤーの中の歌詞（いまの行は白く、ほかは薄く。自動で送る） */
+@Composable
+private fun GlassLyricsPane(p: PlayerState, lyrics: Bridge.Lyrics?) {
+    var now by remember { mutableLongStateOf(p.positionNow()) }
+    LaunchedEffect(p) { while (true) { now = p.positionNow(); delay(200) } }
+    val cur = lyricsLine(lyrics, now)
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(cur) { if (cur > 0) list.animateScrollToItem((cur - 1).coerceAtLeast(0)) }
+    val lines = lyrics?.lines ?: emptyList()
+    LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)) {
+        items(lines.size) { i ->
+            val on = lyrics?.synced != true || i == cur
+            val a by animateFloatAsState(if (on) 1f else 0.35f, label = "line")
+            Text(lines[i].second, color = Color.White.copy(alpha = a), fontSize = 28.sp, fontWeight = FontWeight.Bold, lineHeight = 35.sp, modifier = Modifier.padding(vertical = 9.dp))
+        }
+        if (lines.isEmpty()) item { Text(if (lyrics == null) "" else tr("この曲の歌詞はありません", "No lyrics for this song"), color = Color.White.copy(alpha = 0.7f), fontSize = 17.sp, modifier = Modifier.padding(top = 24.dp)) }
+    }
+}
+
+/** プレーヤーの中の「次に再生」。上にシャッフルとリピート、押すとその曲へ */
+@Composable
+private fun GlassQueuePane(bridge: Bridge, p: PlayerState) {
+    val scope = rememberCoroutineScope()
+    var q by remember { mutableStateOf<Bridge.Queue?>(null) }
+    LaunchedEffect(p.uri) { q = runCatching { bridge.queue() }.getOrNull() ?: q }
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(tr("次に再生", "Playing Next"), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                q?.context?.takeIf { it.isNotEmpty() }?.let { Text(tr("再生元：$it", "From $it"), color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+            QueueToggle(ClassicIcons.shuffle, p.shuffle) { scope.launch { runCatching { bridge.shuffle(!p.shuffle) } } }
+            Spacer(Modifier.width(10.dp))
+            QueueToggle(ClassicIcons.repeat, p.repeat > 0, if (p.repeat == 2) "1" else null) { scope.launch { runCatching { bridge.repeat((p.repeat + 1) % 3) } } }
+        }
+        val items = (q?.queued ?: emptyList()) + (q?.next ?: emptyList())
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 6.dp, bottom = 16.dp)) {
+            items(items.size) { i ->
+                val it = items[i]
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { scope.launch { runCatching { bridge.skipTo(it) }; delay(300); q = runCatching { bridge.queue() }.getOrNull() ?: q } }.padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AsyncImage(it.image, null, Modifier.size(46.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.1f)), contentScale = ContentScale.Crop)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(it.title, color = Color.White, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(it.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** シャッフル・リピートの四角いボタン（入っているときは白地） */
+@Composable
+private fun QueueToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, on: Boolean, badge: String? = null, onClick: () -> Unit) {
+    Box(Modifier.size(width = 46.dp, height = 32.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = if (on) 0.9f else 0.14f)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Image(rememberVectorPainter(icon), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(if (on) Color.Black.copy(alpha = 0.75f) else Color.White))
+        if (badge != null) Text(badge, color = Color.Black.copy(alpha = 0.75f), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.TopEnd).padding(end = 6.dp, top = 2.dp))
+    }
 }
 
 /** 音量のバー（端末の音楽の音量。両端に小さいスピーカーと大きいスピーカー） */
