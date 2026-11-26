@@ -89,7 +89,7 @@ internal fun GlassTopBar(backdrop: Backdrop, title: String?, left: @Composable (
     Box(Modifier.fillMaxWidth()) {
         if (alpha > 0f) Box(
             Modifier.matchParentSize().graphicsLayer { this.alpha = alpha }
-                .glass(backdrop, androidx.compose.ui.graphics.RectangleShape),
+                .glass(backdrop, androidx.compose.ui.graphics.RectangleShape, refract = false),
         )
         Row(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(52.dp).padding(horizontal = 12.dp),

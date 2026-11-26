@@ -87,8 +87,9 @@ import kotlinx.coroutines.launch
  */
 
 /** Liquid Glass の面。光を曲げるのは Android 13 から、ぼかしは 12 から。それより古い端末は半透明の色だけ */
+/** 光を曲げる（lens）は角の丸い形にしか使えないので、四角い帯では [refract] を false にする */
 @Composable
-internal fun Modifier.glass(backdrop: Backdrop, shape: androidx.compose.ui.graphics.Shape = CircleShape): Modifier {
+internal fun Modifier.glass(backdrop: Backdrop, shape: androidx.compose.ui.graphics.Shape = CircleShape, refract: Boolean = true): Modifier {
     val tint = if (LocalLight.current) Color.White.copy(alpha = 0.55f) else Color(0xFF2C2C2E).copy(alpha = 0.55f)
     val solid = if (LocalLight.current) Color(0xF2F7F7F7) else Color(0xF22C2C2E)
     return drawBackdrop(
@@ -96,7 +97,7 @@ internal fun Modifier.glass(backdrop: Backdrop, shape: androidx.compose.ui.graph
         shape = { shape },
         effects = {
             if (Build.VERSION.SDK_INT >= 31) { vibrancy(); blur(6.dp.toPx()) }
-            if (Build.VERSION.SDK_INT >= 33) lens(14.dp.toPx(), 28.dp.toPx())
+            if (refract && Build.VERSION.SDK_INT >= 33) lens(14.dp.toPx(), 28.dp.toPx())
         },
         highlight = { Highlight.Default },
         onDrawSurface = { drawRect(if (Build.VERSION.SDK_INT >= 31) tint else solid) },

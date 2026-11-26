@@ -117,7 +117,7 @@ internal fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Col
         Modifier.fillMaxSize()
             .then(if (Theme.glass) Modifier.graphicsLayer {
                 translationY = swipe.dy
-                shape = RoundedCornerShape((swipe.dy / 8f).coerceAtMost(40f).dp); clip = swipe.dy > 0f
+                shape = RoundedCornerShape((swipe.dy / 8f).coerceIn(0f, 40f).dp); clip = swipe.dy > 0f
             }.nestedScroll(swipe) else Modifier)
             .background(Bg).clickable(remember { MutableInteractionSource() }, null) {},
     ) {
@@ -346,7 +346,7 @@ internal class SwipeToClose(private val onClose: () -> Unit) : androidx.compose.
     override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
         if (dy <= 0f) return androidx.compose.ui.unit.Velocity.Zero
         if (dy > 300f || available.y > 2000f) onClose()
-        else androidx.compose.animation.core.animate(dy, 0f, animationSpec = androidx.compose.animation.core.spring(0.8f, 400f)) { v, _ -> dy = v }
+        else androidx.compose.animation.core.animate(dy, 0f, animationSpec = androidx.compose.animation.core.spring(1f, 400f)) { v, _ -> dy = v.coerceAtLeast(0f) }
         return available
     }
 }
