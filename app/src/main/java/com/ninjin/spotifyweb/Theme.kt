@@ -53,7 +53,7 @@ internal fun icon(d: String): ImageVector = ImageVector.Builder(defaultWidth = 2
 internal fun line(d: String, w: Float = 1.8f): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
     .addPath(PathParser().parsePathString(d).toNodes(), stroke = SolidColor(Color.White), strokeLineWidth = w, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round).build()
 
-internal object Icons {
+internal object ClassicIcons {
     val home = icon("M12.5 3.25a.5.5 0 0 0-1 0L3 10.4V21h6.5v-6h5v6H21V10.4z")
     val search = icon("M10.5 3a7.5 7.5 0 0 1 5.96 12.06l4.24 4.24-1.4 1.4-4.24-4.24A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z")
     val browse = icon("M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z")
@@ -74,4 +74,53 @@ internal object Icons {
     val back = line("M15 5l-7 7 7 7", 2f)
     val close = line("M6 6l12 12M18 6 6 18", 2f)
     val gear = line("M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8 21h-4l-.3-2.4a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.3L4.6 10l2-3.4 1.9.7a7 7 0 0 1 2-1.2L10.8 3h4l.3 2.1a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.3z", 1.6f)
+}
+
+/** 新しいテーマのアイコン（Apple Music と同じく、角の丸い塗りと、太めの線） */
+internal object GlassIcons {
+    val home = icon("M12 3.2 3 10.5V20a1 1 0 0 0 1 1h5v-6h6v6h5a1 1 0 0 0 1-1v-9.5z")
+    val browse = icon("M4 6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm9 0a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2zM4 15a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm9 0a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2z")
+    val library = line("M8 3h11a2 2 0 0 1 2 2v11M5 7h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM12 18V11.5l-2.5.6M12 18a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0z", 1.9f)
+    val search = line("M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5 20 20", 2.3f)
+    val play = icon("M8 5.6v12.8c0 .8.9 1.3 1.6.9l10.2-6.4c.6-.4.6-1.4 0-1.8L9.6 4.7C8.9 4.3 8 4.8 8 5.6z")
+    val pause = icon("M7 5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1zm6 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1z")
+    val next = icon("M2.5 6.6v10.8c0 .7.8 1.1 1.4.7l7.6-5.4a.8.8 0 0 0 0-1.4L3.9 5.9c-.6-.4-1.4 0-1.4.7zm10 0v10.8c0 .7.8 1.1 1.4.7l7.6-5.4a.8.8 0 0 0 0-1.4l-7.6-5.4c-.6-.4-1.4 0-1.4.7z")
+    val prev = icon("M21.5 6.6v10.8c0 .7-.8 1.1-1.4.7l-7.6-5.4a.8.8 0 0 1 0-1.4l7.6-5.4c.6-.4 1.4 0 1.4.7zm-10 0v10.8c0 .7-.8 1.1-1.4.7l-7.6-5.4a.8.8 0 0 1 0-1.4l7.6-5.4c.6-.4 1.4 0 1.4.7z")
+    val more = icon("M5 13.6a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2zm7 0a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2zm7 0a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2z")
+    val add = line("M12 5v14M5 12h14", 2.2f)
+    val check = line("M5 12.5l4.5 4.5L19 7", 2.4f)
+    val back = line("M15 4.5 7.5 12l7.5 7.5", 2.4f)
+    val down = line("M5 9l7 7 7-7", 2.4f)
+    val queue = line("M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01", 2.2f)
+    val share = line("M12 3v12M8 7l4-4 4 4M7 10H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-1", 1.9f)
+    val close = line("M6 6l12 12M18 6 6 18", 2.4f)
+    val speakerLow = icon("M4 9h3.5L12 5v14l-4.5-4H4z")
+    val speakerHigh = line("M4 9h3.5L12 5v14l-4.5-4H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11", 1.8f)
+    val lyrics = line("M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v10a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h0A1.5 1.5 0 0 1 4 15.5zM9 9.5v2.2M9 9.5h0M14.5 9.5v2.2", 1.9f)
+}
+
+/** いまのテーマのアイコン。Glass に無いものは Classic と同じ */
+internal object Icons {
+    private val g get() = Theme.glass
+    val home get() = if (g) GlassIcons.home else ClassicIcons.home
+    val browse get() = if (g) GlassIcons.browse else ClassicIcons.browse
+    val search get() = if (g) GlassIcons.search else ClassicIcons.search
+    val library get() = if (g) GlassIcons.library else ClassicIcons.library
+    val play get() = if (g) GlassIcons.play else ClassicIcons.play
+    val pause get() = if (g) GlassIcons.pause else ClassicIcons.pause
+    val next get() = if (g) GlassIcons.next else ClassicIcons.next
+    val prev get() = if (g) GlassIcons.prev else ClassicIcons.prev
+    val down get() = if (g) GlassIcons.down else ClassicIcons.down
+    val more get() = if (g) GlassIcons.more else ClassicIcons.more
+    val shuffle get() = ClassicIcons.shuffle
+    val repeat get() = ClassicIcons.repeat
+    val add get() = if (g) GlassIcons.add else ClassicIcons.add
+    val check get() = if (g) GlassIcons.check else ClassicIcons.check
+    val device get() = ClassicIcons.device
+    val share get() = if (g) GlassIcons.share else ClassicIcons.share
+    val queue get() = if (g) GlassIcons.queue else ClassicIcons.queue
+    val back get() = if (g) GlassIcons.back else ClassicIcons.back
+    val close get() = if (g) GlassIcons.close else ClassicIcons.close
+    val gear get() = ClassicIcons.gear
+    val lyrics get() = GlassIcons.lyrics
 }

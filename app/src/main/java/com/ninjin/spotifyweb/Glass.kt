@@ -325,7 +325,7 @@ internal fun GlassTitle(title: String, user: Bridge.User?, onAvatar: () -> Unit,
         Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = Fg, fontSize = 34.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(title, color = Fg, fontSize = 34.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).reportTitle(title))
         actions()
         Spacer(Modifier.width(8.dp))
         Avatar(user, 34, onAvatar)
@@ -370,7 +370,7 @@ internal fun GlassGenreTile(t: Card, m: Modifier, onClick: () -> Unit) {
 /** 全画面プレーヤー（Apple Music と同じく、ジャケットをぼかした背景に、大きなジャケットと白い操作） */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit) {
+internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit, onLyrics: () -> Unit) {
     val scope = rememberCoroutineScope()
     var now by remember { mutableLongStateOf(p.positionNow()) }
     var dragging by remember { mutableStateOf<Float?>(null) }
@@ -432,18 +432,45 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
                 Ico(if (p.playing) Icons.pause else Icons.play, 52, Color.White, 80) { scope.launch { runCatching { bridge.toggle() } } }
                 Ico(Icons.next, 38, Color.White, 64) { scope.launch { runCatching { bridge.next() } } }
             }
-            // 下：シャッフル・リピート／再生先／キュー
-            Row(Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Ico(Icons.shuffle, 22, if (p.shuffle) Accent else Color.White.copy(alpha = 0.7f), 44) { scope.launch { runCatching { bridge.shuffle(!p.shuffle) } } }
+            GlassVolume()
+            // 下：歌詞／再生先／キュー（シャッフルとリピートはキューの画面に。Apple Music と同じ）
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Ico(Icons.lyrics, 24, Color.White.copy(alpha = 0.7f), 48, onClick = onLyrics)
                 val out = if (p.device.isEmpty()) host.outputName() else ""
                 val on = p.device.isNotEmpty() || out.isNotEmpty()
-                Ico(if (p.device.isNotEmpty()) DevIcons.of(p.deviceType) else if (out.isNotEmpty()) DevIcons.headphones else DevIcons.phone, 22, if (on) Accent else Color.White.copy(alpha = 0.7f), 44, onClick = onDevices)
-                Ico(Icons.queue, 22, Color.White.copy(alpha = 0.7f), 44, onClick = onQueue)
-                Box(contentAlignment = Alignment.Center) {
-                    Ico(Icons.repeat, 22, if (p.repeat > 0) Accent else Color.White.copy(alpha = 0.7f), 44) { scope.launch { runCatching { bridge.repeat((p.repeat + 1) % 3) } } }
-                    if (p.repeat == 2) Text("1", color = Accent, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-1).dp))
-                }
+                Ico(if (p.device.isNotEmpty()) DevIcons.of(p.deviceType) else if (out.isNotEmpty()) DevIcons.headphones else DevIcons.phone, 24, if (on) Accent else Color.White.copy(alpha = 0.7f), 48, onClick = onDevices)
+                Ico(Icons.queue, 24, Color.White.copy(alpha = 0.7f), 48, onClick = onQueue)
             }
         }
+    }
+}
+
+/** 音量のバー（端末の音楽の音量。両端に小さいスピーカーと大きいスピーカー） */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun GlassVolume() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val am = remember { ctx.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
+    val max = remember { am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
+    var vol by remember { mutableStateOf(am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() / max) }
+    var dragging by remember { mutableStateOf(false) }
+    // 音量ボタンで変えたときも追いかける
+    LaunchedEffect(Unit) { while (true) { if (!dragging) vol = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() / max; delay(500) } }
+    val thick by animateDpAsState(if (dragging) 10.dp else 6.dp, label = "vol")
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(rememberVectorPainter(GlassIcons.speakerLow), null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.55f)))
+        Slider(
+            value = vol,
+            onValueChange = { dragging = true; vol = it; am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, kotlin.math.round(it * max).toInt(), 0) },
+            onValueChangeFinished = { dragging = false },
+            thumb = {},
+            track = { st ->
+                BoxWithConstraints(Modifier.fillMaxWidth().height(thick).clip(CircleShape).background(Color.White.copy(alpha = 0.25f))) {
+                    Box(Modifier.fillMaxHeight().width(maxWidth * st.value).background(Color.White.copy(alpha = 0.85f)))
+                }
+            },
+            modifier = Modifier.weight(1f).height(24.dp).padding(horizontal = 10.dp),
+        )
+        Image(rememberVectorPainter(GlassIcons.speakerHigh), null, Modifier.size(20.dp), colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.55f)))
     }
 }

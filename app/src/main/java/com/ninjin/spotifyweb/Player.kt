@@ -49,6 +49,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -108,11 +110,20 @@ internal fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Col
     BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
     var lyrics by remember(p.uri) { mutableStateOf<Bridge.Lyrics?>(null) }
     LaunchedEffect(p.uri) { lyrics = null; if (p.uri.startsWith("spotify:track:")) lyrics = runCatching { bridge.lyrics(p.uri, p.image) }.getOrNull() }
+    // 新しいテーマは Apple Music と同じく、一番上で下へなぞると、角が丸くなって一緒に下がり、離すと閉じる
+    val swipe = remember { SwipeToClose(onClose) }
     // 公式アプリと同じく、プレーヤーの下にスクロールすると歌詞・アーティストについて・次に再生が続く
-    BoxWithConstraints(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}) {
+    BoxWithConstraints(
+        Modifier.fillMaxSize()
+            .then(if (Theme.glass) Modifier.graphicsLayer {
+                translationY = swipe.dy
+                shape = RoundedCornerShape((swipe.dy / 8f).coerceAtMost(40f).dp); clip = swipe.dy > 0f
+            }.nestedScroll(swipe) else Modifier)
+            .background(Bg).clickable(remember { MutableInteractionSource() }, null) {},
+    ) {
         val h = maxHeight
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Box(Modifier.height(h).fillMaxWidth()) { PlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu) }
+            Box(Modifier.height(h).fillMaxWidth()) { PlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu, onLyrics = { lyricsOpen = true }) }
             PlayerExtras(bridge, p, tint, lyrics, onLyrics = { lyricsOpen = true }, onOpen = onOpen)
         }
         AnimatedVisibility(lyricsOpen, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
@@ -123,12 +134,12 @@ internal fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Col
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit) {
+internal fun PlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Color, onClose: () -> Unit, onDevices: () -> Unit, onQueue: () -> Unit, onMenu: () -> Unit, onLyrics: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var now by remember { mutableLongStateOf(p.positionNow()) }
     var dragging by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(p) { while (true) { if (dragging == null) now = p.positionNow(); delay(250) } }
-    if (Theme.glass) { GlassPlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu); return }
+    if (Theme.glass) { GlassPlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu, onLyrics); return }
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint, tint.copy(alpha = 0.85f).compositeOver(Bg), Bg)))
             .windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 24.dp),
@@ -316,5 +327,26 @@ internal fun LyricsScreen(p: PlayerState, lyrics: Bridge.Lyrics?, tint: Color, o
             }
             if (lines.isEmpty()) item { Text(tr("この曲の歌詞はありません", "No lyrics for this song"), color = Color.White, fontSize = 16.sp) }
         }
+    }
+}
+
+/** 全画面プレーヤーを下へなぞって閉じる（一番上にいるときだけ。300px 以上下げるか、速く払うと閉じ、それ以外は戻る） */
+internal class SwipeToClose(private val onClose: () -> Unit) : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+    var dy by androidx.compose.runtime.mutableFloatStateOf(0f)
+    override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+        if (dy <= 0f || available.y >= 0f) return androidx.compose.ui.geometry.Offset.Zero
+        val c = maxOf(available.y, -dy); dy += c
+        return androidx.compose.ui.geometry.Offset(0f, c)
+    }
+    override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+        if (available.y <= 0f || source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) return androidx.compose.ui.geometry.Offset.Zero
+        dy += available.y
+        return androidx.compose.ui.geometry.Offset(0f, available.y)
+    }
+    override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+        if (dy <= 0f) return androidx.compose.ui.unit.Velocity.Zero
+        if (dy > 300f || available.y > 2000f) onClose()
+        else androidx.compose.animation.core.animate(dy, 0f, animationSpec = androidx.compose.animation.core.spring(0.8f, 400f)) { v, _ -> dy = v }
+        return available
     }
 }

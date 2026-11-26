@@ -58,12 +58,13 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-internal enum class Tab(private val ja: String, private val en: String, val icon: ImageVector) {
-    Home("ホーム", "Home", Icons.home), Search("検索", "Search", Icons.search), Library("ライブラリ", "Your Library", Icons.library),
+internal enum class Tab(private val ja: String, private val en: String) {
+    Home("ホーム", "Home"), Search("検索", "Search"), Library("ライブラリ", "Your Library"),
     // 新しいテーマだけのタブ
-    Browse("見つける", "New", Icons.browse);
+    Browse("見つける", "New");
 
     val label get() = tr(ja, en)
+    val icon: ImageVector get() = when (this) { Home -> Icons.home; Search -> Icons.search; Library -> Icons.library; Browse -> Icons.browse }
 }
 
 /** アプリの画面（Compose）。データと再生は [bridge] 経由で裏の Web Player に任せる */
@@ -154,6 +155,8 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
                 }
             }
         }
+        // 大きな見出しがスクロールで隠れたら、上にガラスの帯と小さな見出し（ページは自分の帯を持つ）。写し取る中身の外に置く
+        if (Theme.glass && stack.isEmpty()) GlassTopBar(backdrop, GlassChrome.smallTitle)
         // ミニプレーヤーの左右の余白も、裏の画面に押した判定が届かないようにする
         if (Theme.glass) Box(Modifier.align(Alignment.BottomCenter)) {
             GlassBottom(
