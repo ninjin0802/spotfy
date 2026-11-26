@@ -46,6 +46,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.kyant.backdrop.backdrops.layerBackdrop
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -140,7 +141,7 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
     }
 
 
-    Box(Modifier.fillMaxSize().background(Bg)) {
+    Box(Modifier.fillMaxSize().background(if (Theme.glass) Color.Black else Bg)) {
         // カードを押したら：アルバム・プレイリスト・アーティストはページを開き、曲は再生する
         val open: (Card) -> Unit = { c ->
             // ユーザーはプロフィールの画面で開く
@@ -149,30 +150,38 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
         }
         val stack = stacks[tab]!!
         // タブごとに開いたページを覚えておく（タブを切り替えて戻っても、そのまま）
-        Box(Modifier.fillMaxSize().then(if (Theme.glass) Modifier.layerBackdrop(backdrop).nestedScroll(collapse) else Modifier)) {
-            when (tab) {
-                Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open, onMenu = { menu = it }, onBrowse = { tab = Tab.Search })
-                Tab.Search -> SearchScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
-                Tab.Library -> LibraryScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open, onCreate = { createOpen = true })
-                Tab.Browse -> BrowseScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
-            }
-            stack.lastOrNull()?.let { uri ->
-                androidx.compose.runtime.key(uri, stack.size) {
-                    PageScreen(bridge, uri, player, onBack = { stack.removeAt(stack.lastIndex) }, onOpen = open, onMenu = { menu = it })
+        // 全画面プレーヤーを開くと、後ろの画面が少し縮んで角が丸くなり、奥に下がる（Apple Music と同じ）
+        val behind by androidx.compose.animation.core.animateFloatAsState(if (Theme.glass && playerOpen && player.has) 1f else 0f, tween(320), label = "behind")
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            val sc = 1f - 0.08f * behind
+            scaleX = sc; scaleY = sc
+            shape = RoundedCornerShape((28 * behind).dp); clip = behind > 0f
+        }.background(Bg)) {
+            Box(Modifier.fillMaxSize().then(if (Theme.glass) Modifier.layerBackdrop(backdrop).nestedScroll(collapse) else Modifier)) {
+                when (tab) {
+                    Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open, onMenu = { menu = it }, onBrowse = { tab = Tab.Search })
+                    Tab.Search -> SearchScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
+                    Tab.Library -> LibraryScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open, onCreate = { createOpen = true })
+                    Tab.Browse -> BrowseScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
+                }
+                stack.lastOrNull()?.let { uri ->
+                    androidx.compose.runtime.key(uri, stack.size) {
+                        PageScreen(bridge, uri, player, onBack = { stack.removeAt(stack.lastIndex) }, onOpen = open, onMenu = { menu = it })
+                    }
                 }
             }
-        }
-        // 大きな見出しがスクロールで隠れたら、上にガラスの帯と小さな見出し（ページは自分の帯を持つ）。写し取る中身の外に置く
-        if (Theme.glass && stack.isEmpty()) GlassTopBar(backdrop, GlassChrome.smallTitle)
-        // ミニプレーヤーの左右の余白も、裏の画面に押した判定が届かないようにする
-        if (Theme.glass) Box(Modifier.align(Alignment.BottomCenter)) {
-            GlassBottom(
-                backdrop, tab, collapse.collapsed, onSelect = select, onExpand = { collapse.collapsed = false },
-                mini = if (player.has) { compact, m -> GlassMiniPlayer(bridge, player, backdrop, compact, m, playerOpen) { playerOpen = true } } else null,
-            )
-        } else Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) {}) {
-            if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true }, onDevices = { devicesOpen = true })
-            TabBar(tab, select)
+            // 大きな見出しがスクロールで隠れたら、上にガラスの帯と小さな見出し（ページは自分の帯を持つ）。写し取る中身の外に置く
+            if (Theme.glass && stack.isEmpty()) GlassTopBar(backdrop, GlassChrome.smallTitle)
+            // ミニプレーヤーの左右の余白も、裏の画面に押した判定が届かないようにする
+            if (Theme.glass) Box(Modifier.align(Alignment.BottomCenter)) {
+                GlassBottom(
+                    backdrop, tab, collapse.collapsed, onSelect = select, onExpand = { collapse.collapsed = false },
+                    mini = if (player.has) { compact, m -> GlassMiniPlayer(bridge, player, backdrop, compact, m, playerOpen) { playerOpen = true } } else null,
+                )
+            } else Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) {}) {
+                if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true }, onDevices = { devicesOpen = true })
+                TabBar(tab, select)
+            }
         }
         AnimatedVisibility(newsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             WhatsNewScreen(bridge, onBack = { newsOpen = false }, onPlay = { c -> newsOpen = false; open(c) }, onMenu = { menu = it })

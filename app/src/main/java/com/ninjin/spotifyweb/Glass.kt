@@ -91,16 +91,17 @@ import kotlinx.coroutines.launch
 /** 光を曲げる（lens）は角の丸い形にしか使えないので、四角い帯では [refract] を false にする */
 @Composable
 internal fun Modifier.glass(backdrop: Backdrop, shape: androidx.compose.ui.graphics.Shape = CircleShape, refract: Boolean = true): Modifier {
-    val tint = if (LocalLight.current) Color.White.copy(alpha = 0.7f) else Color(0xFF2C2C2E).copy(alpha = 0.7f)
+    val tint = if (LocalLight.current) Color.White.copy(alpha = 0.6f) else Color(0xFF2C2C2E).copy(alpha = 0.6f)
     val solid = if (LocalLight.current) Color(0xF2F7F7F7) else Color(0xF22C2C2E)
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            if (Build.VERSION.SDK_INT >= 31) { vibrancy(); blur(10.dp.toPx()) }
+            if (Build.VERSION.SDK_INT >= 31) { vibrancy(); blur(16.dp.toPx()) }
             if (refract && Build.VERSION.SDK_INT >= 33) lens(14.dp.toPx(), 28.dp.toPx())
         },
-        highlight = { Highlight.Default },
+        // 縁の光を太く（Apple の Liquid Glass は縁がはっきり光る）
+        highlight = { Highlight.Default.copy(width = 1.2.dp, blurRadius = 1.dp) },
         onDrawSurface = { drawRect(if (Build.VERSION.SDK_INT >= 31) tint else solid) },
     )
 }
@@ -257,13 +258,13 @@ private fun GlassTabPill(backdrop: Backdrop, current: Tab?, onSelect: (Tab) -> U
                         shape = { CircleShape },
                         // 印の下も、バーと同じくぼかしてから色を重ねる（ぼかさないと後ろのジャケットがそのまま見える）
                         effects = {
-                            if (Build.VERSION.SDK_INT >= 31) { vibrancy(); blur(10.dp.toPx() * (1f - jelly.press)) }
+                            if (Build.VERSION.SDK_INT >= 31) { vibrancy(); blur(16.dp.toPx() * (1f - jelly.press)) }
                             if (Build.VERSION.SDK_INT >= 33) lens(10.dp.toPx() * jelly.press, 14.dp.toPx() * jelly.press, chromaticAberration = true)
                         },
                         highlight = { Highlight.Default.copy(alpha = jelly.press) },
                         shadow = { com.kyant.backdrop.shadow.Shadow(alpha = jelly.press) },
                         onDrawSurface = {
-                            val base = if (Build.VERSION.SDK_INT >= 31) 0.7f else 0.95f
+                            val base = if (Build.VERSION.SDK_INT >= 31) 0.6f else 0.95f
                             drawRect(if (light) Color.White.copy(alpha = base) else Color(0xFF2C2C2E).copy(alpha = base), alpha = 1f - jelly.press)
                             drawRect(if (light) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.14f), alpha = 1f - jelly.press)
                             drawRect(Color.Black.copy(alpha = 0.03f * jelly.press))
@@ -389,11 +390,8 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
     var dragging by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(p) { while (true) { if (dragging == null) now = p.positionNow(); delay(250) } }
     Box(Modifier.fillMaxSize().background(tint)) {
-        // ぼかしは Android 12 から。それより古い端末はジャケットの色だけ
-        if (Build.VERSION.SDK_INT >= 31) AsyncImage(
-            p.image, null, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.6f; scaleY = 1.6f }.blur(90.dp), contentScale = ContentScale.Crop,
-        )
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)))
+        GlassFlowBackground(p.image, tint)
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
         Column(
             Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 28.dp),
         ) {
@@ -461,6 +459,52 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
             }
         }
     }
+}
+
+/**
+ * 全画面プレーヤーの背景（Apple Music と同じく、ジャケットの色がゆっくり流れて混ざる）。
+ * ジャケットから色を 4 つ取り、それぞれを大きなぼんやりした丸にして、画面の中をゆっくり別々の道すじで動かす
+ */
+@Composable
+private fun GlassFlowBackground(url: String, base: Color) {
+    val colors = rememberArtColors(url)
+    val t by androidx.compose.animation.core.rememberInfiniteTransition(label = "flow").animateFloat(
+        0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(40_000, easing = androidx.compose.animation.core.LinearEasing)), label = "t",
+    )
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+        drawRect(base)
+        val tau = 2f * Math.PI.toFloat()
+        colors.forEachIndexed { i, c ->
+            // 1 周で必ず元の位置に戻るよう、速さは整数倍にする
+            val k = i + 1
+            val x = size.width * (0.5f + 0.4f * kotlin.math.sin(tau * t * k + i * 1.7f))
+            val y = size.height * (0.5f + 0.35f * kotlin.math.cos(tau * t * (4 - i) + i * 2.3f))
+            val r = size.maxDimension * 0.6f
+            drawCircle(androidx.compose.ui.graphics.Brush.radialGradient(listOf(c, c.copy(alpha = 0f)), androidx.compose.ui.geometry.Offset(x, y), r), r, androidx.compose.ui.geometry.Offset(x, y))
+        }
+    }
+}
+
+/** ジャケットから、目立つ色を 4 つ取る（明るすぎる色は少し落とす） */
+@Composable
+private fun rememberArtColors(url: String): List<Color> {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var cs by remember { mutableStateOf(emptyList<Color>()) }
+    LaunchedEffect(url) {
+        if (url.isEmpty()) return@LaunchedEffect
+        val bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val r = coil.Coil.imageLoader(ctx).execute(coil.request.ImageRequest.Builder(ctx).data(url).size(64).allowHardware(false).build())
+            ((r as? coil.request.SuccessResult)?.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+        } ?: return@LaunchedEffect
+        val p = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { androidx.palette.graphics.Palette.from(bmp).generate() }
+        val sw = listOfNotNull(p.vibrantSwatch, p.darkVibrantSwatch, p.mutedSwatch, p.lightVibrantSwatch, p.darkMutedSwatch, p.dominantSwatch).distinctBy { it.rgb }
+        cs = sw.take(4).map {
+            val hsv = FloatArray(3); android.graphics.Color.colorToHSV(it.rgb, hsv)
+            hsv[2] = hsv[2].coerceAtMost(0.7f)
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }.let { l -> if (l.isEmpty()) l else List(4) { l[it % l.size] } }
+    }
+    return cs
 }
 
 /** 音量のバー（端末の音楽の音量。両端に小さいスピーカーと大きいスピーカー） */
