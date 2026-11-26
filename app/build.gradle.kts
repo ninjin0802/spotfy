@@ -65,5 +65,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // 新しいテーマの Liquid Glass（後ろの画面を写してぼかし・光の曲がりを描く）
+    implementation("io.github.kyant0:backdrop:2.0.1")
     implementation("androidx.palette:palette:1.1.0")
 }

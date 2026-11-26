@@ -48,7 +48,7 @@ import java.time.format.FormatStyle
 private fun DrawerHeader(title: String, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(end = 16.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Ico(Icons.back, 22, onClick = onBack)
-        Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
+        Text(title, color = Fg, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
     }
 }
 
@@ -96,7 +96,7 @@ internal fun RecentsScreen(bridge: Bridge, onBack: () -> Unit, onOpen: (Card) ->
             list.isEmpty() -> Placeholder(tr("最近再生したものはありません", "Nothing played recently"))
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 170.dp)) {
                 list.groupBy { dayLabel(it.at) }.forEach { (day, entries) ->
-                    item(key = "day-$day") { Text(day, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp)) }
+                    item(key = "day-$day") { Text(day, color = Fg, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp)) }
                     items(entries, key = { it.uri }) { RecentRow(it, onOpen) }
                 }
             }
@@ -113,10 +113,10 @@ private fun RecentRow(r: Bridge.Recent, onOpen: (Card) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val shape = if (round) CircleShape else RoundedCornerShape(4.dp)
-        if (liked) Box(Modifier.size(56.dp).clip(shape).background(Color(0xFF5038A0)), contentAlignment = Alignment.Center) { Text("♥", color = Color.White, fontSize = 22.sp) }
+        if (liked) Box(Modifier.size(56.dp).clip(shape).background(Color(0xFF5038A0)), contentAlignment = Alignment.Center) { Text("♥", color = Fg, fontSize = 22.sp) }
         else AsyncImage(r.image, null, Modifier.size(56.dp).clip(shape).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
-            Text(r.title, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(r.title, color = Fg, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(kindLabel(r.uri) + (r.artist.takeIf { it.isNotEmpty() }?.let { " • $it" } ?: ""), color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -143,7 +143,7 @@ private fun dayLabel(at: Long): String {
 @Composable
 private fun FilterChip(label: String, on: Boolean, onClick: () -> Unit) {
     Text(
-        label, color = if (on) Color.Black else Color.White, fontSize = 14.sp,
+        label, color = if (on) OnAccent else Fg, fontSize = 14.sp,
         modifier = Modifier.clip(CircleShape).background(if (on) Accent else Card2).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 7.dp),
     )
 }

@@ -128,6 +128,7 @@ internal fun PlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint: Col
     var now by remember { mutableLongStateOf(p.positionNow()) }
     var dragging by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(p) { while (true) { if (dragging == null) now = p.positionNow(); delay(250) } }
+    if (Theme.glass) { GlassPlayerMain(bridge, host, p, tint, onClose, onDevices, onQueue, onMenu); return }
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(tint, tint.copy(alpha = 0.85f).compositeOver(Bg), Bg)))
             .windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 24.dp),

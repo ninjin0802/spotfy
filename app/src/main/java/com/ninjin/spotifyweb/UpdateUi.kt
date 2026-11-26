@@ -69,19 +69,19 @@ internal fun UpdateDialog(updater: Updater, loggedOut: Boolean = false) {
                 if (progress != null) {
                     Text(downloading(progress))
                     LinearProgressIndicator(
-                        progress = { progress }, color = Accent, trackColor = Color(0x4DFFFFFF),
+                        progress = { progress }, color = Accent, trackColor = Fg.copy(alpha = 0.3f),
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     )
                 } else {
-                    if (updater.required) Text(tr("この版には不具合があるため、更新が必要です。", "This version has a problem. Please update."), color = Color.White, modifier = Modifier.padding(bottom = 12.dp))
-                    else if (loggedOut) Text(tr("ログインできないときは、更新すると直ることがあります。", "If you can't log in, updating may fix it."), color = Color.White, modifier = Modifier.padding(bottom = 12.dp))
+                    if (updater.required) Text(tr("この版には不具合があるため、更新が必要です。", "This version has a problem. Please update."), color = Fg, modifier = Modifier.padding(bottom = 12.dp))
+                    else if (loggedOut) Text(tr("ログインできないときは、更新すると直ることがあります。", "If you can't log in, updating may fix it."), color = Fg, modifier = Modifier.padding(bottom = 12.dp))
                     Text(currentVersion)
                     if (release.notes.isNotEmpty()) Text(plainNotes(release.notes), fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
                 }
             }
         },
         confirmButton = { if (progress == null) TextButton(onClick = { updater.download(release) }) { Text(tr("更新", "Update"), color = Accent) } },
-        dismissButton = { if (progress == null && !updater.required) TextButton(onClick = { updater.later(release) }) { Text(tr("あとで", "Later"), color = Color.White) } },
-        containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
+        dismissButton = { if (progress == null && !updater.required) TextButton(onClick = { updater.later(release) }) { Text(tr("あとで", "Later"), color = Fg) } },
+        containerColor = Surface, titleContentColor = Fg, textContentColor = Sub,
     )
 }

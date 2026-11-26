@@ -70,7 +70,11 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
     }
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 170.dp)) {
         // 上のアイコンとタブはスクロールしても上に残す（公式アプリと同じ）
-        stickyHeader {
+        // 新しいテーマは大きな見出しを上に置き、タブはその下（スクロールで流れる）
+        if (Theme.glass) {
+            item { GlassTitle(tr("ホーム", "Home"), user, onAvatar) }
+            item { Row(Modifier.padding(start = 16.dp, bottom = 8.dp)) { Chips(chips, facet) { facet = it } } }
+        } else stickyHeader {
             Row(
                 Modifier.fillMaxWidth().background(Bg).windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -85,18 +89,18 @@ internal fun HomeScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAv
         // フォロー中のページなど、見出しのない 1 件ずつのカードが並ぶときは「最新リリース」の見出し
         val podcastFollow = facet == "podcasts-following-chip"
         if (podcastFollow || f.shelves.firstOrNull()?.let { it.feed && it.title.isEmpty() } == true) item {
-            Text(if (podcastFollow) tr("最新エピソード", "New episodes") else tr("最新リリース", "New releases"), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+            Text(if (podcastFollow) tr("最新エピソード", "New episodes") else tr("最新リリース", "New releases"), color = Fg, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
         }
         // 公式アプリと同じ、フォローしている番組がないときの案内
         if (podcastFollow && f.emptyPodcasts) item {
             Column(
-                Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF242424)).padding(24.dp),
+                Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Surface).padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(tr("フォローしているポッドキャストはありません", "No podcasts followed yet"), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text(tr("フォローしているポッドキャストはありません", "No podcasts followed yet"), color = Fg, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Text(tr("お気に入りをフォローして、最新情報を逃さずチェックしましょう。", "Follow your favorites so you never miss a new episode."), color = Sub, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
-                Text(tr("ポッドキャストをブラウズ", "Browse podcasts"), color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 20.dp).clip(CircleShape).background(Color.White).clickable { onBrowse() }.padding(horizontal = 22.dp, vertical = 11.dp))
+                Text(tr("ポッドキャストをブラウズ", "Browse podcasts"), color = OnFg, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 20.dp).clip(CircleShape).background(Fg).clickable { onBrowse() }.padding(horizontal = 22.dp, vertical = 11.dp))
             }
         }
         // ポッドキャストのタブの上：視聴番組の小さいタイルと「＋」
@@ -134,7 +138,7 @@ internal fun Chips(chips: List<Chip>, facet: String, onSelect: (String) -> Unit)
 @Composable
 internal fun ChipText(t: String, on: Boolean, onColor: Color = Accent, onClick: () -> Unit) {
     Text(
-        t, color = if (on) Color.Black else Color.White, fontSize = 14.sp,
+        t, color = if (on) OnAccent else Fg, fontSize = 14.sp,
         modifier = Modifier.clip(CircleShape).background(if (on) onColor else Card2).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 7.dp),
     )
 }
@@ -151,7 +155,7 @@ internal fun Shortcuts(items: List<Card>, onPlay: (Card) -> Unit) {
                     ) {
                         AsyncImage(c.image, null, Modifier.size(48.dp), contentScale = ContentScale.Crop)
                         Text(
-                            c.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2,
+                            c.title, color = Fg, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2,
                             overflow = TextOverflow.Ellipsis, lineHeight = 16.sp, modifier = Modifier.padding(horizontal = 8.dp),
                         )
                     }
@@ -185,7 +189,7 @@ internal fun FeedCard(bridge: Bridge, s: Shelf, onPlay: (Card) -> Unit, onMenu: 
     // ジャケットの濃い色をさらに少し暗くした色（公式アプリと同じ見え方）
     val bg = runCatching { Color(android.graphics.Color.parseColor(c.color)) }.getOrNull()?.let { Color(it.red * 0.62f, it.green * 0.62f, it.blue * 0.62f) } ?: Card2
     Column(Modifier.padding(horizontal = 16.dp).padding(top = 16.dp)) {
-        if (s.title.isNotEmpty()) Text(s.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 12.dp))
+        if (s.title.isNotEmpty()) Text(s.title, color = Fg, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 12.dp))
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(bg).clickable { onPlay(c) }.padding(16.dp)) {
             Row {
                 AsyncImage(c.image, null, Modifier.size(88.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
@@ -230,7 +234,7 @@ internal fun FeedCard(bridge: Bridge, s: Shelf, onPlay: (Card) -> Unit, onMenu: 
 internal fun ShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
     Column(Modifier.padding(top = 20.dp)) {
         if (s.title.isNotEmpty()) Text(
-            s.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+            s.title, color = Fg, fontSize = 22.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -241,7 +245,7 @@ internal fun ShelfRow(s: Shelf, onPlay: (Card) -> Unit) {
                         Modifier.size(150.dp).clip(if (c.round) CircleShape else RoundedCornerShape(4.dp)).background(Card2),
                         contentScale = ContentScale.Crop,
                     )
-                    Text(c.title, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+                    Text(c.title, color = Fg, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                     if (c.subtitle.isNotEmpty()) Text(c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp)
                 }
             }

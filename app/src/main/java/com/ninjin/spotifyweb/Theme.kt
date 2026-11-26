@@ -1,6 +1,8 @@
 package com.ninjin.spotifyweb
 
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
@@ -16,16 +18,32 @@ object Theme {
     val accents = listOf("green" to Color(0xFF1ED760), "blue" to Color(0xFF509BF5), "purple" to Color(0xFFAF7AF6), "pink" to Color(0xFFF573A0), "orange" to Color(0xFFFF9E3D), "red" to Color(0xFFF15E6C), "yellow" to Color(0xFFFFC864), "cyan" to Color(0xFF4CC9E0), "mint" to Color(0xFF7FE7C4))
     var accent by mutableStateOf(accents[0].second)
     var amoled by mutableStateOf(false)
+    /** 新しいテーマ（Apple Music の見た目）。false は Classic */
+    var glass by mutableStateOf(false)
     fun load(host: AppHost) {
+        glass = host.setting("theme", "classic") == "glass"
         accent = accents.firstOrNull { it.first == host.setting("accent", "green") }?.second ?: accents[0].second
         amoled = host.setting("amoled", "false") == "true"
     }
 }
 
-internal val Bg: Color get() = if (Theme.amoled) Color.Black else Color(0xFF121212)
-internal val Card2 = Color(0xFF2A2A2A)
-internal val Sub = Color(0xFFB3B3B3)
-internal val Accent: Color get() = Theme.accent
+/** 明るい背景で描くか（新しいテーマで、端末がライトのとき）。全画面プレーヤーはジャケットの色の上なので、いつも暗い側で描く */
+internal val LocalLight = androidx.compose.runtime.compositionLocalOf { false }
+
+private val light: Boolean @Composable @ReadOnlyComposable get() = LocalLight.current
+
+internal val Bg: Color @Composable @ReadOnlyComposable get() = when { light -> Color.White; Theme.glass || Theme.amoled -> Color.Black; else -> Color(0xFF121212) }
+/** 文字とアイコンの色、その色を背景にしたときの上の色 */
+internal val Fg: Color @Composable @ReadOnlyComposable get() = if (light) Color.Black else Color.White
+internal val OnFg: Color @Composable @ReadOnlyComposable get() = if (light) Color.White else Color.Black
+internal val Sub: Color @Composable @ReadOnlyComposable get() = when { light -> Color(0xFF8A8A8E); Theme.glass -> Color(0xFF98989F); else -> Color(0xFFB3B3B3) }
+/** カード・シートの面と、その上の一段濃い面（区切り線・入力欄など） */
+internal val Surface: Color @Composable @ReadOnlyComposable get() = when { light -> Color(0xFFF2F2F7); Theme.glass -> Color(0xFF1C1C1E); else -> Color(0xFF242424) }
+internal val Surface2: Color @Composable @ReadOnlyComposable get() = when { light -> Color(0xFFE5E5EA); Theme.glass -> Color(0xFF2C2C2E); else -> Color(0xFF3A3A3A) }
+internal val Card2: Color @Composable @ReadOnlyComposable get() = when { light -> Color(0xFFE5E5EA); Theme.glass -> Color(0xFF2C2C2E); else -> Color(0xFF2A2A2A) }
+/** 新しいテーマは Apple Music と同じ赤 */
+internal val Accent: Color get() = if (Theme.glass) Color(0xFFFA2D48) else Theme.accent
+internal val OnAccent: Color get() = if (Theme.glass) Color.White else Color.Black
 
 /** 24x24 の塗りのアイコン */
 internal fun icon(d: String): ImageVector = ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
@@ -38,6 +56,7 @@ internal fun line(d: String, w: Float = 1.8f): ImageVector = ImageVector.Builder
 internal object Icons {
     val home = icon("M12.5 3.25a.5.5 0 0 0-1 0L3 10.4V21h6.5v-6h5v6H21V10.4z")
     val search = icon("M10.5 3a7.5 7.5 0 0 1 5.96 12.06l4.24 4.24-1.4 1.4-4.24-4.24A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z")
+    val browse = icon("M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z")
     val library = icon("M4 3h2v18H4zM9 3h2v18H9zm4.6.6 1.9-.6 5.6 17.4-1.9.6z")
     val play = icon("M7 4.5v15l12.5-7.5z")
     val pause = icon("M6 4h4v16H6zm8 0h4v16h-4z")

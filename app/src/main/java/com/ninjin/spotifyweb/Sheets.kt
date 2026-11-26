@@ -71,8 +71,8 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
     fun close(then: () -> Unit = {}) { scope.launch { state.hide() }.invokeOnCompletion { onDismiss(); then() } }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424),
-        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Color(0xFF6A6A6A))) },
+        onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
+        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Sub)) },
     ) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 12.dp)) {
             when (target) {
@@ -131,18 +131,18 @@ private fun Header(image: String, title: String, sub: String, round: Boolean) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(image, null, Modifier.size(52.dp).clip(if (round) CircleShape else RoundedCornerShape(2.dp)).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.padding(start = 12.dp)) {
-            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = Fg, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub.isNotEmpty()) Text(sub, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
-    Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
+    Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Surface2))
 }
 
 @Composable
 private fun Item(icon: ImageVector, label: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Image(rememberVectorPainter(icon), null, Modifier.size(26.dp), colorFilter = ColorFilter.tint(Sub))
-        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
+        Text(label, color = Fg, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
     }
 }
 
@@ -152,8 +152,8 @@ private fun LikedItem(label: String, onClick: () -> Unit) {
         Box(
             Modifier.size(26.dp).clip(RoundedCornerShape(3.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))),
             contentAlignment = Alignment.Center,
-        ) { Text("♥", color = Color.White, fontSize = 12.sp) }
-        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
+        ) { Text("♥", color = Fg, fontSize = 12.sp) }
+        Text(label, color = Fg, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
     }
 }
 
@@ -183,11 +183,11 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { while (true) { devs = runCatching { bridge.devices() }.getOrNull() ?: devs; kotlinx.coroutines.delay(2000) } }
     fun close() { scope.launch { state.hide() }.invokeOnCompletion { onDismiss() } }
     ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424),
-        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Color(0xFF6A6A6A))) },
+        onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
+        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Sub)) },
     ) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 16.dp)) {
-            Text(tr("デバイスに接続", "Connect to a device"), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Text(tr("デバイスに接続", "Connect to a device"), color = Fg, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             val d = devs
             if (d == null) {
                 Text(tr("デバイスを探しています…", "Looking for devices…"), color = Sub, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
@@ -202,7 +202,7 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
                     if (d.active == d.self) close() else { busy = d.self; scope.launch { val ok = runCatching { bridge.transfer(d.self) }.getOrDefault(false); busy = null; if (ok) close() else failed = d.self } }
                 }
                 DeviceRow(if (out.isNotEmpty()) DevIcons.headphones else DevIcons.speaker, out.ifEmpty { tr("スマホのスピーカー", "Phone speaker") }, tr("タップしてスピーカー／イヤホンを切り替え", "Tap to switch between speaker and earphones"), false) { close(); host.outputSwitch() }
-                Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
+                Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Surface2))
                 val others = d.list.filter { it.id != d.self }
                 if (others.isEmpty()) Text(tr("ほかのデバイスは見つかりませんでした", "No other devices found"), color = Sub, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 others.forEach { dev ->
@@ -225,7 +225,7 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
 
 @Composable
 private fun DeviceRow(icon: ImageVector, name: String, sub: String, on: Boolean, onClick: () -> Unit) {
-    val c = if (on) Accent else Color.White
+    val c = if (on) Accent else Fg
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Image(rememberVectorPainter(icon), null, Modifier.size(32.dp), colorFilter = ColorFilter.tint(c))
         Column(Modifier.padding(start = 16.dp)) {

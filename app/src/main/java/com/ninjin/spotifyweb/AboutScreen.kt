@@ -36,7 +36,7 @@ import coil.compose.AsyncImage
 private const val AUTHOR = "ninjin0802"
 // PosIssue（GitHub アカウントなしで Issue を送れるフォーム）の projectKey。公開してよい値
 private const val POSISSUE_KEY = "pk_2Xd4KgBVSFpkcQfw9aITSdZR"
-private val Faint = Color(0x80FFFFFF)
+private val Faint: Color @Composable get() = Fg.copy(alpha = 0.5f)
 
 /** 設定の「このアプリについて」。アイコンと版、作者のクレジット、リンク、注意書き */
 @Composable
@@ -60,7 +60,7 @@ internal fun AboutPage(host: AppHost) {
         }) {
             Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize())
         }
-        Text("spotfy", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
+        Text("spotfy", color = Fg, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
         Text(
             tr("バージョン ${BuildConfig.VERSION_NAME}", "Version ${BuildConfig.VERSION_NAME}"),
             color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold,
@@ -76,13 +76,13 @@ internal fun AboutPage(host: AppHost) {
     // 作者のカード（GitHub のアイコンと名前。押すとプロフィールを開く）
     Row(
         Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF1F1F1F)).clickable { uri.openUri("https://github.com/$AUTHOR") }.padding(16.dp),
+            .background(Surface).clickable { uri.openUri("https://github.com/$AUTHOR") }.padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage("https://github.com/$AUTHOR.png?size=128", null, Modifier.size(52.dp).clip(CircleShape).background(Color(0xFF333333)))
+        AsyncImage("https://github.com/$AUTHOR.png?size=128", null, Modifier.size(52.dp).clip(CircleShape).background(Surface2))
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
             Text(tr("作者", "Created by"), color = Sub, fontSize = 12.sp)
-            Text(AUTHOR, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+            Text(AUTHOR, color = Fg, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
             Text(tr("設計・開発・デザイン", "Design & development"), color = Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
         }
         Text("GitHub ›", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)

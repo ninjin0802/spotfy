@@ -42,6 +42,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import com.kyant.backdrop.backdrops.layerBackdrop
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -57,7 +59,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 internal enum class Tab(private val ja: String, private val en: String, val icon: ImageVector) {
-    Home("ホーム", "Home", Icons.home), Search("検索", "Search", Icons.search), Library("ライブラリ", "Your Library", Icons.library);
+    Home("ホーム", "Home", Icons.home), Search("検索", "Search", Icons.search), Library("ライブラリ", "Your Library", Icons.library),
+    // 新しいテーマだけのタブ
+    Browse("見つける", "New", Icons.browse);
 
     val label get() = tr(ja, en)
 }
@@ -66,6 +70,13 @@ internal enum class Tab(private val ja: String, private val en: String, val icon
 @Composable
 fun NativeApp(bridge: Bridge, host: AppHost) {
     remember { Theme.load(host); true }
+    // 新しいテーマは、端末のライト／ダークに合わせる
+    val light = Theme.glass && !androidx.compose.foundation.isSystemInDarkTheme()
+    androidx.compose.runtime.CompositionLocalProvider(LocalLight provides light) { AppContent(bridge, host) }
+}
+
+@Composable
+private fun AppContent(bridge: Bridge, host: AppHost) {
     var tab by remember { mutableStateOf(Tab.Home) }
     var playerOpen by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
@@ -104,6 +115,23 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     BackHandler(enabled = !playerOpen && !settingsOpen && !drawerOpen && stacks[tab]!!.isNotEmpty()) { stacks[tab]!!.removeAt(stacks[tab]!!.lastIndex) }
     BackHandler(enabled = !playerOpen && !settingsOpen && !drawerOpen && stacks[tab]!!.isEmpty() && tab != Tab.Home) { tab = Tab.Home }
 
+    // 時計や電池のアイコンは、明るい背景のときだけ黒（全画面プレーヤーはいつも暗い）
+    val view = androidx.compose.ui.platform.LocalView.current
+    val lightBars = LocalLight.current && !playerOpen
+    androidx.compose.runtime.SideEffect {
+        (view.context as? android.app.Activity)?.window?.let { w ->
+            androidx.core.view.WindowCompat.getInsetsController(w, view).run { isAppearanceLightStatusBars = lightBars; isAppearanceLightNavigationBars = lightBars }
+        }
+    }
+    val bg = Bg
+    // 下のタブのガラスに写すため、画面の中身を写し取っておく
+    val backdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop(onDraw = { drawRect(bg); drawContent() })
+    val collapse = remember { CollapseOnScroll() }
+    // Classic に戻したら、Classic に無い「見つける」タブからホームへ
+    LaunchedEffect(Theme.glass) { if (!Theme.glass && tab == Tab.Browse) tab = Tab.Home; collapse.collapsed = false }
+    val select: (Tab) -> Unit = { if (it == tab) stacks[it]!!.clear() else tab = it; collapse.collapsed = false }
+
+
     Box(Modifier.fillMaxSize().background(Bg)) {
         // カードを押したら：アルバム・プレイリスト・アーティストはページを開き、曲は再生する
         val open: (Card) -> Unit = { c ->
@@ -113,11 +141,12 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
         }
         val stack = stacks[tab]!!
         // タブごとに開いたページを覚えておく（タブを切り替えて戻っても、そのまま）
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().then(if (Theme.glass) Modifier.layerBackdrop(backdrop).nestedScroll(collapse) else Modifier)) {
             when (tab) {
                 Tab.Home -> HomeScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onPlay = open, onMenu = { menu = it }, onBrowse = { tab = Tab.Search })
                 Tab.Search -> SearchScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
                 Tab.Library -> LibraryScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open, onCreate = { createOpen = true })
+                Tab.Browse -> BrowseScreen(bridge, ready, user, onAvatar = { drawerOpen = true }, onOpen = open)
             }
             stack.lastOrNull()?.let { uri ->
                 androidx.compose.runtime.key(uri, stack.size) {
@@ -126,9 +155,14 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             }
         }
         // ミニプレーヤーの左右の余白も、裏の画面に押した判定が届かないようにする
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) {}) {
+        if (Theme.glass) Box(Modifier.align(Alignment.BottomCenter)) {
+            GlassBottom(
+                backdrop, tab, collapse.collapsed, onSelect = select, onExpand = { collapse.collapsed = false },
+                mini = if (player.has) { compact, m -> GlassMiniPlayer(bridge, player, backdrop, compact, m) { playerOpen = true } } else null,
+            )
+        } else Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) {}) {
             if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true }, onDevices = { devicesOpen = true })
-            TabBar(tab) { if (it == tab) stacks[it]!!.clear() else tab = it }
+            TabBar(tab, select)
         }
         AnimatedVisibility(newsOpen, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             WhatsNewScreen(bridge, onBack = { newsOpen = false }, onPlay = { c -> newsOpen = false; open(c) }, onMenu = { menu = it })
@@ -166,9 +200,12 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             visible = playerOpen && player.has,
             enter = slideInVertically(tween(280)) { it }, exit = slideOutVertically(tween(240)) { it },
         ) {
-            FullPlayer(bridge, host, player, tint, onClose = { playerOpen = false }, onDevices = { devicesOpen = true }, onQueue = { queueOpen = true },
-                onMenu = { menu = MenuTarget.OfTrack(Track(player.uri, player.title, player.artist, player.image, player.dur)) },
-                onOpen = { c -> playerOpen = false; open(c) })
+            // ジャケットの色の上なので、いつも暗い側の色で描く
+            androidx.compose.runtime.CompositionLocalProvider(LocalLight provides false) {
+                FullPlayer(bridge, host, player, tint, onClose = { playerOpen = false }, onDevices = { devicesOpen = true }, onQueue = { queueOpen = true },
+                    onMenu = { menu = MenuTarget.OfTrack(Track(player.uri, player.title, player.artist, player.image, player.dur)) },
+                    onOpen = { c -> playerOpen = false; open(c) })
+            }
         }
         // 別のアカウントを使うには、いまのアカウントからログアウトしてログインし直す（確認してから）
         if (confirmSwitch) androidx.compose.material3.AlertDialog(
@@ -176,8 +213,8 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
             title = { Text(tr("アカウントを追加する", "Add account")) },
             text = { Text(tr("いまのアカウントからログアウトして、別のアカウントでログインします。", "You'll be logged out of this account so you can log in with another one.")) },
             confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false; host.logout() }) { Text(tr("ログアウトして続ける", "Log out and continue"), color = Accent) } },
-            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false }) { Text(tr("キャンセル", "Cancel"), color = Color.White) } },
-            containerColor = Color(0xFF282828), titleContentColor = Color.White, textContentColor = Sub,
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false }) { Text(tr("キャンセル", "Cancel"), color = Fg) } },
+            containerColor = Surface, titleContentColor = Fg, textContentColor = Sub,
         )
         UpdateDialog(host.updater, loggedOut = !ready)
         if (devicesOpen) DevicesSheet(bridge, host) { devicesOpen = false }
@@ -193,20 +230,20 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
 internal fun TabBar(tab: Tab, onSelect: (Tab) -> Unit) {
     Row(
         Modifier.fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color(0x99121212), Color(0xF2121212), Color(0xFF121212))))
+            .background(Brush.verticalGradient(listOf(Bg.copy(alpha = 0.6f), Bg.copy(alpha = 0.95f), Bg)))
             // タブのすき間やジェスチャーバーの上を押しても、裏の画面に届かないようにする
             .clickable(remember { MutableInteractionSource() }, null) {}
             .windowInsetsPadding(WindowInsets.navigationBars),
     ) {
-        Tab.entries.forEach { t ->
+        listOf(Tab.Home, Tab.Search, Tab.Library).forEach { t ->
             val on = t == tab
             Column(
                 // 当たり判定はタブの上下の余白まで含める
                 Modifier.weight(1f).clickable(remember { MutableInteractionSource() }, null) { onSelect(t) }.padding(top = 12.dp, bottom = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Image(rememberVectorPainter(t.icon), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(if (on) Color.White else Sub))
-                Text(t.label, color = if (on) Color.White else Sub, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))
+                Image(rememberVectorPainter(t.icon), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(if (on) Fg else Sub))
+                Text(t.label, color = if (on) Fg else Sub, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))
             }
         }
     }
@@ -222,24 +259,24 @@ internal object DrawerIcons {
 @Composable
 internal fun Drawer(user: Bridge.User?, onProfile: () -> Unit, onAddAccount: () -> Unit, onRecent: () -> Unit, onNews: () -> Unit, onSettings: () -> Unit) {
     Column(
-        Modifier.fillMaxHeight().width(310.dp).background(Color(0xFF1F1F1F))
+        Modifier.fillMaxHeight().width(310.dp).background(Surface)
             .clickable(remember { MutableInteractionSource() }, null) {}
             .windowInsetsPadding(WindowInsets.statusBars).padding(top = 8.dp),
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF2A2A2A))) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Surface2)) {
             Row(Modifier.fillMaxWidth().clickable(onClick = onProfile).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Avatar(user, 52)
                 Column(Modifier.padding(start = 12.dp)) {
-                    Text(user?.name ?: "", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(user?.name ?: "", color = Fg, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(tr("プロフィールを表示", "View profile"), color = Sub, fontSize = 13.sp)
                 }
             }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x1FFFFFFF)))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Fg.copy(alpha = 0.12f)))
             Row(Modifier.fillMaxWidth().clickable(onClick = onAddAccount).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(32.dp).clip(CircleShape).background(Color(0xFF3E3E3E)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(32.dp).clip(CircleShape).background(Surface2), contentAlignment = Alignment.Center) {
                     Image(rememberVectorPainter(DrawerIcons.plus), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Sub))
                 }
-                Text(tr("アカウントを追加する", "Add account"), color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp))
+                Text(tr("アカウントを追加する", "Add account"), color = Fg, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp))
             }
         }
         DrawerItem(DrawerIcons.history, tr("最近", "Recents"), onRecent)
@@ -251,7 +288,7 @@ internal fun Drawer(user: Bridge.User?, onProfile: () -> Unit, onAddAccount: () 
 @Composable
 internal fun DrawerItem(icon: ImageVector, label: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Image(rememberVectorPainter(icon), null, Modifier.size(26.dp))
-        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 16.dp))
+        Image(rememberVectorPainter(icon), null, Modifier.size(26.dp), colorFilter = ColorFilter.tint(Fg))
+        Text(label, color = Fg, fontSize = 16.sp, modifier = Modifier.padding(start = 16.dp))
     }
 }
