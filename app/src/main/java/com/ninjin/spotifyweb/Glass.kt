@@ -390,21 +390,9 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
     LaunchedEffect(p) { while (true) { if (dragging == null) now = p.positionNow(); delay(250) } }
     Box(Modifier.fillMaxSize().background(tint)) {
         // ぼかしは Android 12 から。それより古い端末はジャケットの色だけ
-        // 背景：ぼかしたジャケットを 2 枚、逆向きに回しながら円を描いて動かし、色が流れて混ざるように見せる（Apple Music と同じ）
-        val drift = androidx.compose.animation.core.rememberInfiniteTransition(label = "bg")
-        val t by drift.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(24_000, easing = androidx.compose.animation.core.LinearEasing)), label = "t")
-        if (Build.VERSION.SDK_INT >= 31) {
-            AsyncImage(p.image, null, Modifier.fillMaxSize().graphicsLayer {
-                val a = t * 2f * Math.PI.toFloat()
-                scaleX = 1.9f; scaleY = 1.9f; rotationZ = t * 360f
-                translationX = kotlin.math.cos(a) * size.width * 0.18f; translationY = kotlin.math.sin(a) * size.height * 0.12f
-            }.blur(70.dp), contentScale = ContentScale.Crop)
-            AsyncImage(p.image, null, Modifier.fillMaxSize().graphicsLayer {
-                val a = t * 2f * Math.PI.toFloat()
-                scaleX = 1.4f; scaleY = 1.4f; rotationZ = 180f - t * 360f; alpha = 0.65f
-                translationX = -kotlin.math.sin(a) * size.width * 0.22f; translationY = kotlin.math.cos(a) * size.height * 0.15f
-            }.blur(70.dp), contentScale = ContentScale.Crop)
-        }
+        if (Build.VERSION.SDK_INT >= 31) AsyncImage(
+            p.image, null, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.6f; scaleY = 1.6f }.blur(90.dp), contentScale = ContentScale.Crop,
+        )
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)))
         Column(
             Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 28.dp),
