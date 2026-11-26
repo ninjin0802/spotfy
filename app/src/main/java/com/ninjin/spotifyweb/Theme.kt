@@ -94,6 +94,8 @@ internal object GlassIcons {
     val queue = line("M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01", 2.2f)
     val share = line("M12 3v12M8 7l4-4 4 4M7 10H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-1", 1.9f)
     val close = line("M6 6l12 12M18 6 6 18", 2.4f)
+    val heart = line("M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z", 1.9f)
+    val chevron = line("M9 5l7 7-7 7", 2.4f)
     val speakerLow = icon("M4 9h3.5L12 5v14l-4.5-4H4z")
     val speakerHigh = line("M4 9h3.5L12 5v14l-4.5-4H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11", 1.8f)
     val lyrics = line("M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v10a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h0A1.5 1.5 0 0 1 4 15.5zM9 9.5v2.2M9 9.5h0M14.5 9.5v2.2", 1.9f)

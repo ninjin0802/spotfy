@@ -72,6 +72,7 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
 
     ModalBottomSheet(
         onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
+        shape = if (Theme.glass) RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp) else androidx.compose.material3.BottomSheetDefaults.ExpandedShape,
         dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Sub)) },
     ) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 12.dp)) {
@@ -88,6 +89,7 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
                         info.complete(i2)
                     }
                     Header(t.image, t.title, t.artist, false)
+                    MenuGroup {
                     Item(MenuIcons.share, tr("シェア", "Share")) { close { host.share("https://open.spotify.com/track/" + t.uri.substringAfterLast(':'), t.title) } }
                     LikedItem(if (liked == true) tr("お気に入りの曲から削除", "Remove from Liked Songs") else tr("お気に入りの曲に追加", "Add to Liked Songs")) {
                         val was = liked == true
@@ -102,12 +104,14 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
                     Item(MenuIcons.artist, tr("アーティストに移動", "Go to artist")) {
                         scope.launch { info.await()?.takeIf { it.artist.isNotEmpty() }?.let { i2 -> close { onOpen(Card(i2.artist, i2.artistName, "", "", true)) } } ?: toast(tr("アーティストが見つかりませんでした", "Couldn't find the artist")) }
                     }
+                    }
                 }
                 is MenuTarget.OfPage -> {
                     var inLib by remember(target.uri) { mutableStateOf<Boolean?>(null) }
                     LaunchedEffect(target.uri) { inLib = runCatching { bridge.inLibrary(target.uri) }.getOrNull() }
                     val kind = target.uri.split(':').getOrNull(1)
                     Header(target.image, target.title, target.subtitle, kind == "artist")
+                    MenuGroup {
                     Item(MenuIcons.share, tr("シェア", "Share")) { close { host.share("https://open.spotify.com/$kind/" + target.uri.substringAfterLast(':'), target.title) } }
                     if (inLib != null) {
                         val on = inLib == true
@@ -120,6 +124,7 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
                         close { scope.launch { runCatching { bridge.addToQueue(target.uri) }.onSuccess { toast(tr("[次に再生] に追加しました", "Added to queue")) } } }
                     }
                     if (target.artistUri.isNotEmpty()) Item(MenuIcons.artist, tr("アーティストに移動", "Go to artist")) { close { onOpen(Card(target.artistUri, target.artist, "", "", true)) } }
+                    }
                 }
             }
         }
@@ -129,17 +134,26 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
 @Composable
 private fun Header(image: String, title: String, sub: String, round: Boolean) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        AsyncImage(image, null, Modifier.size(52.dp).clip(if (round) CircleShape else RoundedCornerShape(2.dp)).background(Card2), contentScale = ContentScale.Crop)
+        AsyncImage(image, null, Modifier.size(52.dp).clip(if (round) CircleShape else RoundedCornerShape(if (Theme.glass) 8.dp else 2.dp)).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.padding(start = 12.dp)) {
             Text(title, color = Fg, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub.isNotEmpty()) Text(sub, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
-    Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Surface2))
+    if (!Theme.glass) Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Surface2))
 }
 
 @Composable
 private fun Item(icon: ImageVector, label: String, onClick: () -> Unit) {
+    // Glass は Apple のメニューと同じく、左に名前、右にアイコン、項目のあいだに細い線
+    if (Theme.glass) {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Image(rememberVectorPainter(icon), null, Modifier.size(22.dp), colorFilter = ColorFilter.tint(Fg))
+        }
+        Box(Modifier.padding(start = 16.dp).fillMaxWidth().height(0.5.dp).background(Fg.copy(alpha = 0.12f)))
+        return
+    }
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Image(rememberVectorPainter(icon), null, Modifier.size(26.dp), colorFilter = ColorFilter.tint(Sub))
         Text(label, color = Fg, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
@@ -148,6 +162,7 @@ private fun Item(icon: ImageVector, label: String, onClick: () -> Unit) {
 
 @Composable
 private fun LikedItem(label: String, onClick: () -> Unit) {
+    if (Theme.glass) return Item(GlassIcons.heart, label, onClick)
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(26.dp).clip(RoundedCornerShape(3.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))),

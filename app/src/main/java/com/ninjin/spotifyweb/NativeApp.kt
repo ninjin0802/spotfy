@@ -73,7 +73,9 @@ fun NativeApp(bridge: Bridge, host: AppHost) {
     remember { Theme.load(host); true }
     // 新しいテーマは、端末のライト／ダークに合わせる
     val light = Theme.glass && !androidx.compose.foundation.isSystemInDarkTheme()
-    androidx.compose.runtime.CompositionLocalProvider(LocalLight provides light) { AppContent(bridge, host) }
+    androidx.compose.animation.SharedTransitionLayout {
+        androidx.compose.runtime.CompositionLocalProvider(LocalLight provides light, LocalShared provides this) { AppContent(bridge, host) }
+    }
 }
 
 @Composable
@@ -161,7 +163,7 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
         if (Theme.glass) Box(Modifier.align(Alignment.BottomCenter)) {
             GlassBottom(
                 backdrop, tab, collapse.collapsed, onSelect = select, onExpand = { collapse.collapsed = false },
-                mini = if (player.has) { compact, m -> GlassMiniPlayer(bridge, player, backdrop, compact, m) { playerOpen = true } } else null,
+                mini = if (player.has) { compact, m -> GlassMiniPlayer(bridge, player, backdrop, compact, m, playerOpen) { playerOpen = true } } else null,
             )
         } else Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) {}) {
             if (player.has) MiniPlayer(bridge, host, player, tint, onOpen = { playerOpen = true }, onDevices = { devicesOpen = true })
@@ -204,7 +206,7 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
             enter = slideInVertically(tween(280)) { it }, exit = slideOutVertically(tween(240)) { it },
         ) {
             // ジャケットの色の上なので、いつも暗い側の色で描く
-            androidx.compose.runtime.CompositionLocalProvider(LocalLight provides false) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalLight provides false, LocalPlayerScope provides this) {
                 FullPlayer(bridge, host, player, tint, onClose = { playerOpen = false }, onDevices = { devicesOpen = true }, onQueue = { queueOpen = true },
                     onMenu = { menu = MenuTarget.OfTrack(Track(player.uri, player.title, player.artist, player.image, player.dur)) },
                     onOpen = { c -> playerOpen = false; open(c) })

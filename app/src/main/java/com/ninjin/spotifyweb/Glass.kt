@@ -302,14 +302,19 @@ private fun GlassTabPill(backdrop: Backdrop, current: Tab?, onSelect: (Tab) -> U
 
 /** ガラスのミニプレーヤー：ジャケット、曲名とアーティスト、再生／次へ。縮んだときは再生だけ */
 @Composable
-internal fun GlassMiniPlayer(bridge: Bridge, p: PlayerState, backdrop: Backdrop, compact: Boolean, modifier: Modifier, onOpen: () -> Unit) {
+internal fun GlassMiniPlayer(bridge: Bridge, p: PlayerState, backdrop: Backdrop, compact: Boolean, modifier: Modifier, playerOpen: Boolean, onOpen: () -> Unit) {
     val scope = rememberCoroutineScope()
     Row(
         modifier.height(if (compact) 62.dp else 58.dp).glass(backdrop).clickable(remember { MutableInteractionSource() }, null, onClick = onOpen)
             .padding(start = 10.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(p.image, null, Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Card2), contentScale = ContentScale.Crop)
+        // 全画面プレーヤーが開いているあいだは隠す（ジャケットは全画面の側へ移る）
+        Box(Modifier.size(40.dp)) {
+            androidx.compose.animation.AnimatedVisibility(!playerOpen, enter = fadeIn(), exit = fadeOut()) {
+                AsyncImage(p.image, null, Modifier.size(40.dp).sharedArt(this).clip(RoundedCornerShape(8.dp)).background(Card2), contentScale = ContentScale.Crop)
+            }
+        }
         Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
             Text(p.title, color = Fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE))
             if (!compact) Text(p.artist, color = Sub, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -345,7 +350,7 @@ internal fun BrowseScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
     }
     LazyColumn(Modifier.fillMaxSize().background(Bg), contentPadding = PaddingValues(bottom = 170.dp)) {
         item { GlassTitle(tr("見つける", "New"), user, onAvatar) }
-        if (fresh.isNotEmpty()) item { ShelfRow(Shelf(tr("新着", "New releases"), fresh), onOpen) }
+        if (fresh.isNotEmpty()) item { GlassShelfRow(Shelf(tr("新着", "New releases"), fresh), onOpen) }
         if (tiles.isNotEmpty()) item {
             Text(tr("ジャンル", "Browse by category"), color = Fg, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 12.dp))
         }
@@ -393,7 +398,7 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
             val scale by animateFloatAsState(if (p.playing) 1f else 0.82f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow), label = "art")
             AsyncImage(
                 p.image, null,
-                Modifier.fillMaxWidth().aspectRatio(1f).graphicsLayer { scaleX = scale; scaleY = scale; shadowElevation = 24.dp.toPx(); shape = RoundedCornerShape(14.dp); clip = true },
+                Modifier.fillMaxWidth().aspectRatio(1f).sharedArt(LocalPlayerScope.current).graphicsLayer { scaleX = scale; scaleY = scale; shadowElevation = 24.dp.toPx(); shape = RoundedCornerShape(14.dp); clip = true },
                 contentScale = ContentScale.Crop,
             )
             Spacer(Modifier.weight(1f))
@@ -474,4 +479,21 @@ private fun GlassVolume() {
         )
         Image(rememberVectorPainter(GlassIcons.speakerHigh), null, Modifier.size(20.dp), colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.55f)))
     }
+}
+
+/*
+ * ミニプレーヤーのジャケットが、そのまま大きくなって全画面プレーヤーのジャケットになる動き（Apple Music と同じ）。
+ * 両方のジャケットに同じ名前を付け、開け閉めのあいだ Compose が位置と大きさをつなぐ
+ */
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+internal val LocalShared = androidx.compose.runtime.compositionLocalOf<androidx.compose.animation.SharedTransitionScope?> { null }
+/** 全画面プレーヤーの出入りのアニメーション（ジャケットをつなぐのに使う） */
+internal val LocalPlayerScope = androidx.compose.runtime.compositionLocalOf<androidx.compose.animation.AnimatedVisibilityScope?> { null }
+
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@Composable
+internal fun Modifier.sharedArt(vis: androidx.compose.animation.AnimatedVisibilityScope?): Modifier {
+    val s = LocalShared.current
+    if (s == null || vis == null || !Theme.glass) return this
+    return with(s) { this@sharedArt.sharedElement(rememberSharedContentState("player-art"), vis) }
 }
