@@ -35,6 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -62,7 +65,7 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
     var page by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     BackHandler(enabled = page != null) { page = null }
-    Column(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
+    Column(Modifier.fillMaxSize().background(if (Theme.glass) GroupedBg else Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 24) { if (page != null) page = null else onBack() }
             Text(
@@ -177,11 +180,22 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
 
 @Composable
 internal fun Section(t: String) {
+    if (Theme.glass) { Text(t, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(start = 32.dp, top = 24.dp, bottom = 6.dp)); return }
     Text(t, color = Fg, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp))
 }
 
 @Composable
 internal fun SettingRow(title: String, detail: String, onClick: () -> Unit) {
+    if (Theme.glass) {
+        Row(Modifier.groupedCard().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Fg, fontSize = 17.sp)
+                if (detail.isNotEmpty()) Text(detail, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Image(rememberVectorPainter(GlassIcons.chevron), null, Modifier.padding(start = 8.dp).size(14.dp), colorFilter = ColorFilter.tint(Sub))
+        }
+        return
+    }
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
         Text(title, color = Fg, fontSize = 16.sp)
         if (detail.isNotEmpty()) Text(detail, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
@@ -190,12 +204,13 @@ internal fun SettingRow(title: String, detail: String, onClick: () -> Unit) {
 
 @Composable
 internal fun SwitchRow(title: String, detail: String, on: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable { onChange(!on) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row((if (Theme.glass) Modifier.groupedCard() else Modifier.fillMaxWidth()).clickable { onChange(!on) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, color = Fg, fontSize = 16.sp)
             Text(detail, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
         }
-        Switch(on, onChange, colors = SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = Fg))
+        Switch(on, onChange, colors = if (Theme.glass) SwitchDefaults.colors(checkedTrackColor = Color(0xFF34C759), checkedThumbColor = Color.White, checkedBorderColor = Color.Transparent, uncheckedTrackColor = Surface2, uncheckedThumbColor = Color.White, uncheckedBorderColor = Color.Transparent)
+            else SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = Fg))
     }
 }
 
@@ -203,7 +218,7 @@ internal fun SwitchRow(title: String, detail: String, on: Boolean, onChange: (Bo
 internal fun RadioRow(q: Triple<String, String, String>, selected: Boolean, onClick: () -> Unit) {
     val premium = q.first == "very_high"
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = !premium, onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        (if (Theme.glass) Modifier.groupedCard() else Modifier.fillMaxWidth()).clickable(enabled = !premium, onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -220,3 +235,12 @@ internal fun RadioRow(q: Triple<String, String, String>, selected: Boolean, onCl
         }
     }
 }
+
+/** iOS の設定の地の色（明るいときは薄い灰色、暗いときは黒） */
+internal val GroupedBg: Color @Composable get() = if (LocalLight.current) Color(0xFFF2F2F7) else Color.Black
+
+/** iOS の設定と同じ、角の丸い白い（暗いときは濃い灰色の）カード */
+@Composable
+internal fun Modifier.groupedCard(): Modifier =
+    padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+        .background(if (LocalLight.current) Color.White else Color(0xFF1C1C1E))

@@ -301,6 +301,7 @@ internal fun PlayerExtras(bridge: Bridge, p: PlayerState, tint: Color, lyrics: B
 /** 歌詞の全画面（再生に合わせて今の行が白くなり、自動で送られる） */
 @Composable
 internal fun LyricsScreen(p: PlayerState, lyrics: Bridge.Lyrics?, tint: Color, onClose: () -> Unit) {
+    if (Theme.glass) { GlassLyrics(p, lyrics, tint, onClose); return }
     var now by remember { mutableLongStateOf(p.positionNow()) }
     LaunchedEffect(p) { while (true) { now = p.positionNow(); delay(200) } }
     val cur = lyricsLine(lyrics, now)

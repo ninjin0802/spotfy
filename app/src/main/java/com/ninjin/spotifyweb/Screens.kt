@@ -226,10 +226,10 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
                 Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = Sub, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
             }
         }
-        if (tiles.isNotEmpty()) item { Spacer(Modifier.height(16.dp)) }
+        if (tiles.isNotEmpty()) item { if (Theme.glass) GlassSectionTitle(tr("カテゴリーをブラウズ", "Browse Categories")) else Spacer(Modifier.height(16.dp)) }
         items(tiles.chunked(2)) { row ->
             Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { t -> GenreTile(t, Modifier.weight(1f)) { onOpen(t) } }
+                row.forEach { t -> if (Theme.glass) GlassGenreTile(t, Modifier.weight(1f)) { onOpen(t) } else GenreTile(t, Modifier.weight(1f)) { onOpen(t) } }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
@@ -321,6 +321,7 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
 /** マイライブラリ（公式アプリと同じ：絞り込み・並べ替え・リスト／グリッド、ピン留め） */
 @Composable
 internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onOpen: (Card) -> Unit, onCreate: () -> Unit) {
+    if (Theme.glass) { GlassLibraryScreen(bridge, ready, user, onAvatar, onOpen, onCreate); return }
     var items by remember { mutableStateOf(bridge.cachedLibrary()) }
     var query by remember { mutableStateOf<String?>(null) }
     androidx.activity.compose.BackHandler(enabled = query != null) { query = null }
@@ -420,12 +421,12 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
 }
 
 @Composable
-private fun LibCover(c: Card, m: Modifier) {
-    if (c.kind == "your-episodes") Box(m.clip(RoundedCornerShape(4.dp)).background(Color(0xFF006450)), contentAlignment = Alignment.Center) {
+internal fun LibCover(c: Card, m: Modifier, corner: androidx.compose.ui.unit.Dp = 4.dp) {
+    if (c.kind == "your-episodes") Box(m.clip(RoundedCornerShape(corner)).background(Color(0xFF006450)), contentAlignment = Alignment.Center) {
         Image(rememberVectorPainter(LibIcons.bookmark), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Accent))
-    } else if (c.kind == "liked") Box(m.clip(RoundedCornerShape(4.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))), contentAlignment = Alignment.Center) {
+    } else if (c.kind == "liked") Box(m.clip(RoundedCornerShape(corner)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))), contentAlignment = Alignment.Center) {
         Text("♥", color = Fg, fontSize = 24.sp)
-    } else AsyncImage(c.image, null, m.clip(if (c.round) CircleShape else RoundedCornerShape(4.dp)).background(Card2), contentScale = ContentScale.Crop)
+    } else AsyncImage(c.image, null, m.clip(if (c.round) CircleShape else RoundedCornerShape(corner)).background(Card2), contentScale = ContentScale.Crop)
 }
 
 private object LibIcons {

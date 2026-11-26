@@ -497,3 +497,37 @@ internal fun Modifier.sharedArt(vis: androidx.compose.animation.AnimatedVisibili
     if (s == null || vis == null || !Theme.glass) return this
     return with(s) { this@sharedArt.sharedElement(rememberSharedContentState("player-art"), vis) }
 }
+
+/** 歌詞（Apple Music と同じく、ジャケットをぼかした背景に、左寄せの大きな太字。いまの行は白く、ほかは薄く） */
+@Composable
+internal fun GlassLyrics(p: PlayerState, lyrics: Bridge.Lyrics?, tint: Color, onClose: () -> Unit) {
+    var now by remember { mutableLongStateOf(p.positionNow()) }
+    LaunchedEffect(p) { while (true) { now = p.positionNow(); delay(200) } }
+    val cur = lyricsLine(lyrics, now)
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(cur) { if (cur > 0) list.animateScrollToItem((cur - 1).coerceAtLeast(0)) }
+    Box(Modifier.fillMaxSize().background(tint).clickable(remember { MutableInteractionSource() }, null) {}) {
+        if (Build.VERSION.SDK_INT >= 31) AsyncImage(p.image, null, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.6f; scaleY = 1.6f }.blur(90.dp), contentScale = ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars)) {
+            // 上：小さなジャケットと曲名、右に閉じる
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(p.image, null, Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text(p.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(p.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Ico(GlassIcons.close, 18, Color.White, 36, onClick = onClose)
+            }
+            val lines = lyrics?.lines ?: emptyList()
+            LazyColumn(state = list, contentPadding = PaddingValues(start = 24.dp, end = 32.dp, top = 24.dp, bottom = 200.dp)) {
+                items(lines.size) { i ->
+                    val on = lyrics?.synced != true || i == cur
+                    val a by animateFloatAsState(if (on) 1f else 0.35f, label = "line")
+                    Text(lines[i].second, color = Color.White.copy(alpha = a), fontSize = 30.sp, fontWeight = FontWeight.Bold, lineHeight = 38.sp, modifier = Modifier.padding(vertical = 10.dp))
+                }
+                if (lines.isEmpty()) item { Text(tr("この曲の歌詞はありません", "No lyrics for this song"), color = Color.White, fontSize = 18.sp) }
+            }
+        }
+    }
+}

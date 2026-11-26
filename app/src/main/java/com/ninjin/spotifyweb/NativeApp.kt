@@ -132,7 +132,12 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
     val collapse = remember { CollapseOnScroll() }
     // Classic に戻したら、Classic に無い「見つける」タブからホームへ
     LaunchedEffect(Theme.glass) { if (!Theme.glass && tab == Tab.Browse) tab = Tab.Home; collapse.collapsed = false }
-    val select: (Tab) -> Unit = { if (it == tab) stacks[it]!!.clear() else tab = it; collapse.collapsed = false }
+    // タブを替えたら、Apple Music と同じく軽く震わせる
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val select: (Tab) -> Unit = {
+        if (Theme.glass && it != tab) haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick)
+        if (it == tab) stacks[it]!!.clear() else tab = it; collapse.collapsed = false
+    }
 
 
     Box(Modifier.fillMaxSize().background(Bg)) {
