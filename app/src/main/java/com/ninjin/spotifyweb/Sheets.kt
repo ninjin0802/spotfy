@@ -42,6 +42,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 
@@ -68,13 +74,11 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     fun toast(t: String) = Toast.makeText(ctx, t, Toast.LENGTH_SHORT).show()
-    fun close(then: () -> Unit = {}) { scope.launch { state.hide() }.invokeOnCompletion { onDismiss(); then() } }
+    fun close(then: () -> Unit = {}) { if (Theme.glass) { onDismiss(); then() } else scope.launch { state.hide() }.invokeOnCompletion { onDismiss(); then() } }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424),
-        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Color(0xFF6A6A6A))) },
-    ) {
-        Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 12.dp)) {
+    val glass = Theme.glass
+    MenuContainer(glass, state, onDismiss) {
+        Column(if (glass) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 12.dp)) {
             when (target) {
                 is MenuTarget.OfTrack -> {
                     val t = target.track
@@ -88,6 +92,7 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
                         info.complete(i2)
                     }
                     Header(t.image, t.title, t.artist, false)
+                    MenuGroup {
                     Item(MenuIcons.share, tr("シェア", "Share")) { close { host.share("https://open.spotify.com/track/" + t.uri.substringAfterLast(':'), t.title) } }
                     LikedItem(if (liked == true) tr("お気に入りの曲から削除", "Remove from Liked Songs") else tr("お気に入りの曲に追加", "Add to Liked Songs")) {
                         val was = liked == true
@@ -102,12 +107,14 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
                     Item(MenuIcons.artist, tr("アーティストに移動", "Go to artist")) {
                         scope.launch { info.await()?.takeIf { it.artist.isNotEmpty() }?.let { i2 -> close { onOpen(Card(i2.artist, i2.artistName, "", "", true)) } } ?: toast(tr("アーティストが見つかりませんでした", "Couldn't find the artist")) }
                     }
+                    }
                 }
                 is MenuTarget.OfPage -> {
                     var inLib by remember(target.uri) { mutableStateOf<Boolean?>(null) }
                     LaunchedEffect(target.uri) { inLib = runCatching { bridge.inLibrary(target.uri) }.getOrNull() }
                     val kind = target.uri.split(':').getOrNull(1)
                     Header(target.image, target.title, target.subtitle, kind == "artist")
+                    MenuGroup {
                     Item(MenuIcons.share, tr("シェア", "Share")) { close { host.share("https://open.spotify.com/$kind/" + target.uri.substringAfterLast(':'), target.title) } }
                     if (inLib != null) {
                         val on = inLib == true
@@ -120,40 +127,98 @@ fun MenuSheet(bridge: Bridge, host: AppHost, target: MenuTarget, onOpen: (Card) 
                         close { scope.launch { runCatching { bridge.addToQueue(target.uri) }.onSuccess { toast(tr("[次に再生] に追加しました", "Added to queue")) } } }
                     }
                     if (target.artistUri.isNotEmpty()) Item(MenuIcons.artist, tr("アーティストに移動", "Go to artist")) { close { onOpen(Card(target.artistUri, target.artist, "", "", true)) } }
+                    }
                 }
             }
         }
     }
 }
 
+/** Classic は下から出るシート。Glass は Apple と同じく、後ろをぼかして真ん中に浮かぶメニュー */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MenuContainer(glass: Boolean, state: androidx.compose.material3.SheetState, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    if (!glass) {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
+            dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(classic(0xFF6A6A6A, Sub))) },
+        ) { content() }
+        return
+    }
+    androidx.compose.ui.window.Dialog(onDismiss, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        // 後ろの画面をぼかす（Android 12 から。それより古い端末は暗くするだけ）
+        val w = (androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+        androidx.compose.runtime.SideEffect {
+            w?.setDimAmount(0.25f)
+            if (w != null && android.os.Build.VERSION.SDK_INT >= 31) {
+                w.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                w.attributes = w.attributes.apply { blurBehindRadius = 80 }
+            }
+        }
+        // 出るときは少し小さい所からふわっと広がる
+        val shown = remember { androidx.compose.animation.core.Animatable(0.85f) }
+        LaunchedEffect(Unit) { shown.animateTo(1f, androidx.compose.animation.core.spring(0.7f, 500f)) }
+        Box(
+            Modifier.fillMaxSize().clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null, onClick = onDismiss)
+                .windowInsetsPadding(WindowInsets.systemBars).padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                Modifier.widthIn(max = 320.dp).verticalScroll(rememberScrollState()).graphicsLayer { scaleX = shown.value; scaleY = shown.value; alpha = ((shown.value - 0.85f) / 0.15f).coerceIn(0f, 1f) }
+                    .clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {},
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) { content() }
+        }
+    }
+}
+
 @Composable
 private fun Header(image: String, title: String, sub: String, round: Boolean) {
+    // Glass：押した物を大きく浮かせ、その下にメニュー（Apple の長押しと同じ）
+    if (Theme.glass) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            AsyncImage(image, null, Modifier.size(200.dp).graphicsLayer { shadowElevation = 20.dp.toPx(); shape = if (round) CircleShape else RoundedCornerShape(14.dp); clip = true }.background(Card2), contentScale = ContentScale.Crop)
+            Text(title, color = Fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+            if (sub.isNotEmpty()) Text(sub, color = Sub, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        return
+    }
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        AsyncImage(image, null, Modifier.size(52.dp).clip(if (round) CircleShape else RoundedCornerShape(2.dp)).background(Card2), contentScale = ContentScale.Crop)
+        AsyncImage(image, null, Modifier.size(52.dp).clip(if (round) CircleShape else RoundedCornerShape(if (Theme.glass) 8.dp else 2.dp)).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.padding(start = 12.dp)) {
-            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = Fg, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub.isNotEmpty()) Text(sub, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
-    Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
+    if (!Theme.glass) Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Surface2))
 }
 
 @Composable
 private fun Item(icon: ImageVector, label: String, onClick: () -> Unit) {
+    // Glass は Apple のメニューと同じく、左に名前、右にアイコン、項目のあいだに細い線
+    if (Theme.glass) {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Image(rememberVectorPainter(icon), null, Modifier.size(22.dp), colorFilter = ColorFilter.tint(Fg))
+        }
+        Box(Modifier.padding(start = 16.dp).fillMaxWidth().height(0.5.dp).background(Fg.copy(alpha = 0.12f)))
+        return
+    }
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Image(rememberVectorPainter(icon), null, Modifier.size(26.dp), colorFilter = ColorFilter.tint(Sub))
-        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
+        Text(label, color = Fg, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
     }
 }
 
 @Composable
 private fun LikedItem(label: String, onClick: () -> Unit) {
+    if (Theme.glass) return Item(GlassIcons.heart, label, onClick)
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(26.dp).clip(RoundedCornerShape(3.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))),
             contentAlignment = Alignment.Center,
         ) { Text("♥", color = Color.White, fontSize = 12.sp) }
-        Text(label, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
+        Text(label, color = Fg, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
     }
 }
 
@@ -183,11 +248,11 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { while (true) { devs = runCatching { bridge.devices() }.getOrNull() ?: devs; kotlinx.coroutines.delay(2000) } }
     fun close() { scope.launch { state.hide() }.invokeOnCompletion { onDismiss() } }
     ModalBottomSheet(
-        onDismissRequest = onDismiss, sheetState = state, containerColor = Color(0xFF242424),
-        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Color(0xFF6A6A6A))) },
+        onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
+        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(classic(0xFF6A6A6A, Sub))) },
     ) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 16.dp)) {
-            Text(tr("デバイスに接続", "Connect to a device"), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Text(tr("デバイスに接続", "Connect to a device"), color = Fg, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             val d = devs
             if (d == null) {
                 Text(tr("デバイスを探しています…", "Looking for devices…"), color = Sub, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
@@ -202,7 +267,7 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
                     if (d.active == d.self) close() else { busy = d.self; scope.launch { val ok = runCatching { bridge.transfer(d.self) }.getOrDefault(false); busy = null; if (ok) close() else failed = d.self } }
                 }
                 DeviceRow(if (out.isNotEmpty()) DevIcons.headphones else DevIcons.speaker, out.ifEmpty { tr("スマホのスピーカー", "Phone speaker") }, tr("タップしてスピーカー／イヤホンを切り替え", "Tap to switch between speaker and earphones"), false) { close(); host.outputSwitch() }
-                Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
+                Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(Surface2))
                 val others = d.list.filter { it.id != d.self }
                 if (others.isEmpty()) Text(tr("ほかのデバイスは見つかりませんでした", "No other devices found"), color = Sub, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 others.forEach { dev ->
@@ -225,7 +290,7 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
 
 @Composable
 private fun DeviceRow(icon: ImageVector, name: String, sub: String, on: Boolean, onClick: () -> Unit) {
-    val c = if (on) Accent else Color.White
+    val c = if (on) Accent else Fg
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Image(rememberVectorPainter(icon), null, Modifier.size(32.dp), colorFilter = ColorFilter.tint(c))
         Column(Modifier.padding(start = 16.dp)) {

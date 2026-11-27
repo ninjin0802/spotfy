@@ -96,7 +96,7 @@ internal fun LoadingDots() {
             )
             Box(
                 Modifier.size(10.dp).graphicsLayer { scaleX = 0.7f + 0.3f * p; scaleY = 0.7f + 0.3f * p; alpha = 0.35f + 0.65f * p }
-                    .clip(CircleShape).background(Color.White)
+                    .clip(CircleShape).background(Fg)
             )
         }
     }
@@ -112,7 +112,7 @@ internal fun Avatar(user: Bridge.User?, size: Int, onClick: (() -> Unit)? = null
 }
 
 @Composable
-internal fun Ico(icon: ImageVector, size: Int, tint: Color = Color.White, box: Int = 40, onClick: () -> Unit) {
+internal fun Ico(icon: ImageVector, size: Int, tint: Color = Fg, box: Int = 40, onClick: () -> Unit) {
     Box(Modifier.size(box.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Image(rememberVectorPainter(icon), null, Modifier.size(size.dp), colorFilter = ColorFilter.tint(tint))
     }

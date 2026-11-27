@@ -35,6 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -62,12 +65,12 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
     var page by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     BackHandler(enabled = page != null) { page = null }
-    Column(Modifier.fillMaxSize().background(Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
+    Column(Modifier.fillMaxSize().background(if (Theme.glass) GroupedBg else Bg).clickable(remember { MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 24) { if (page != null) page = null else onBack() }
             Text(
                 when (page) { "quality" -> tr("メディアの音質", "Media quality"); "playback" -> tr("再生", "Playback"); "account" -> tr("アカウント", "Account"); "look" -> tr("コンテンツと表示", "Content and display"); "about" -> tr("このアプリについて", "About"); "language" -> tr("言語", "Language"); else -> tr("設定", "Settings") },
-                color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp),
+                color = Fg, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp),
             )
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 160.dp)) {
@@ -103,7 +106,20 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     SettingRow(tr("ログアウト", "Log out"), tr("このアプリからログアウトします", "Log out of this app")) { host.logout() }
                 }
                 "look" -> {
-                    Section(tr("テーマカラー", "Theme color"))
+                    // テーマ：Classic（いままでの見た目）／Glass（Apple Music の見た目。タブの並び・プレーヤーも変わり、背景は端末のライト／ダークに合わせる）
+                    Section(tr("テーマ", "Theme"))
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(false to "Classic", true to "Glass").forEach { (g, label) ->
+                            ChipText(label, Theme.glass == g) { Theme.glass = g; host.setSetting("theme", if (g) "glass" else "classic") }
+                        }
+                    }
+                    Text(
+                        if (Theme.glass) tr("Apple Music のような見た目。背景は端末のライト／ダークに合わせます", "Looks like Apple Music. Follows your phone's light/dark setting")
+                        else tr("いままでの見た目", "The original look"),
+                        color = Sub, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    if (!Theme.glass) Section(tr("テーマカラー", "Theme color"))
+                    if (!Theme.glass)
                     // 1 段に 5 色まで（スマホの幅に収まるように折り返す）
                     androidx.compose.foundation.layout.FlowRow(
                         Modifier.padding(horizontal = 16.dp, vertical = 12.dp), maxItemsInEachRow = 5,
@@ -111,12 +127,12 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                     ) {
                         Theme.accents.forEach { (key, color) ->
                             Box(
-                                Modifier.size(44.dp).clip(CircleShape).background(if (Theme.accent == color) Color.White else Color.Transparent).padding(3.dp)
+                                Modifier.size(44.dp).clip(CircleShape).background(if (Theme.accent == color) Fg else Color.Transparent).padding(3.dp)
                                     .clip(CircleShape).background(color).clickable { Theme.accent = color; host.setSetting("accent", key) },
                             )
                         }
                     }
-                    SwitchRow(tr("AMOLED ブラック", "AMOLED black"), tr("背景を真っ黒にして電池を節約", "Pure black background to save battery"), Theme.amoled) { Theme.amoled = it; host.setSetting("amoled", it.toString()) }
+                    if (!Theme.glass) SwitchRow(tr("AMOLED ブラック", "AMOLED black"), tr("背景を真っ黒にして電池を節約", "Pure black background to save battery"), Theme.amoled) { Theme.amoled = it; host.setSetting("amoled", it.toString()) }
                 }
                 "playback" -> {
                     var bg by remember { mutableStateOf(host.setting("background", "true") == "true") }
@@ -134,12 +150,12 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
                         xf = if (on) xfLast else 0; host.setSetting("crossfade", xf.toString())
                     }
                     if (xf > 0) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(tr("${xf} 秒", "${xf} s"), color = Color.White, fontSize = 14.sp, modifier = Modifier.width(48.dp))
+                        Text(tr("${xf} 秒", "${xf} s"), color = Fg, fontSize = 14.sp, modifier = Modifier.width(48.dp))
                         Slider(
                             value = xf.toFloat(), valueRange = 1f..12f, steps = 10,
                             onValueChange = { xf = it.toInt().coerceIn(1, 12); xfLast = xf },
                             onValueChangeFinished = { host.setSetting("crossfade", xf.toString()) },
-                            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Accent, inactiveTrackColor = Color(0x4DFFFFFF)),
+                            colors = SliderDefaults.colors(thumbColor = Fg, activeTrackColor = Accent, inactiveTrackColor = Fg.copy(alpha = 0.3f)),
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -164,25 +180,37 @@ internal fun SettingsScreen(bridge: Bridge, host: AppHost, user: Bridge.User?, o
 
 @Composable
 internal fun Section(t: String) {
-    Text(t, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp))
+    if (Theme.glass) { Text(t, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(start = 32.dp, top = 24.dp, bottom = 6.dp)); return }
+    Text(t, color = Fg, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp))
 }
 
 @Composable
 internal fun SettingRow(title: String, detail: String, onClick: () -> Unit) {
+    if (Theme.glass) {
+        Row(Modifier.groupedCard().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Fg, fontSize = 17.sp)
+                if (detail.isNotEmpty()) Text(detail, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Image(rememberVectorPainter(GlassIcons.chevron), null, Modifier.padding(start = 8.dp).size(14.dp), colorFilter = ColorFilter.tint(Sub))
+        }
+        return
+    }
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(title, color = Color.White, fontSize = 16.sp)
+        Text(title, color = Fg, fontSize = 16.sp)
         if (detail.isNotEmpty()) Text(detail, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
 @Composable
 internal fun SwitchRow(title: String, detail: String, on: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable { onChange(!on) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row((if (Theme.glass) Modifier.groupedCard() else Modifier.fillMaxWidth()).clickable { onChange(!on) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 16.sp)
+            Text(title, color = Fg, fontSize = 16.sp)
             Text(detail, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
         }
-        Switch(on, onChange, colors = SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = Color.White))
+        Switch(on, onChange, colors = if (Theme.glass) SwitchDefaults.colors(checkedTrackColor = Color(0xFF34C759), checkedThumbColor = Color.White, checkedBorderColor = Color.Transparent, uncheckedTrackColor = Surface2, uncheckedThumbColor = Color.White, uncheckedBorderColor = Color.Transparent)
+            else SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = Fg))
     }
 }
 
@@ -190,12 +218,12 @@ internal fun SwitchRow(title: String, detail: String, on: Boolean, onChange: (Bo
 internal fun RadioRow(q: Triple<String, String, String>, selected: Boolean, onClick: () -> Unit) {
     val premium = q.first == "very_high"
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = !premium, onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        (if (Theme.glass) Modifier.groupedCard() else Modifier.fillMaxWidth()).clickable(enabled = !premium, onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(q.second, color = if (premium) Color(0x66FFFFFF) else if (selected) Accent else Color.White, fontSize = 16.sp)
-            Text(q.third, color = if (premium) Color(0x55B3B3B3) else Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+            Text(q.second, color = if (premium) Fg.copy(alpha = 0.4f) else if (selected) Accent else Fg, fontSize = 16.sp)
+            Text(q.third, color = if (premium) Sub.copy(alpha = 0.33f) else Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
         }
         Box(
             Modifier.size(22.dp).clip(CircleShape).background(if (selected) Accent else Color.Transparent)
@@ -203,7 +231,16 @@ internal fun RadioRow(q: Triple<String, String, String>, selected: Boolean, onCl
             contentAlignment = Alignment.Center,
         ) {
             if (selected) Box(Modifier.size(9.dp).clip(CircleShape).background(Bg))
-            else Box(Modifier.size(22.dp).clip(CircleShape).background(Color(0xFF7C7C7C)).padding(2.dp)) { Box(Modifier.fillMaxSize().clip(CircleShape).background(Bg)) }
+            else Box(Modifier.size(22.dp).clip(CircleShape).background(classic(0xFF7C7C7C, Sub)).padding(2.dp)) { Box(Modifier.fillMaxSize().clip(CircleShape).background(Bg)) }
         }
     }
 }
+
+/** iOS の設定の地の色（明るいときは薄い灰色、暗いときは黒） */
+internal val GroupedBg: Color @Composable get() = if (LocalLight.current) Color(0xFFF2F2F7) else Color.Black
+
+/** iOS の設定と同じ、角の丸い白い（暗いときは濃い灰色の）カード */
+@Composable
+internal fun Modifier.groupedCard(): Modifier =
+    padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+        .background(if (LocalLight.current) Color.White else Color(0xFF1C1C1E))

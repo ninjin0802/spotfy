@@ -65,6 +65,8 @@ internal fun isPage(uri: String) = uri.split(':').getOrNull(1) in setOf("album",
 /** アルバム・プレイリスト・アーティスト・お気に入りの曲のページ */
 @Composable
 internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBack: () -> Unit, onOpen: (Card) -> Unit, onMenu: (MenuTarget) -> Unit) {
+    // ジャンルのページは Classic と同じ形
+    if (Theme.glass && uri.split(':').getOrNull(1) != "genre") { GlassPageScreen(bridge, uri, playing, onBack, onOpen, onMenu); return }
     var page by remember(uri) { mutableStateOf(bridge.cachedPage(uri)) }
     var failed by remember(uri) { mutableStateOf(false) }
     var saved by remember(uri) { mutableStateOf(page?.saved ?: false) }
@@ -87,7 +89,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                 if (p.kind == "artist" && p.header) {
                     Box(Modifier.fillMaxWidth().aspectRatio(1.25f)) {
                         AsyncImage(p.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC121212)))))
+                        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Bg.copy(alpha = 0.8f)))))
                         Text2(p.title, 44, FontWeight.Black, Modifier.align(Alignment.BottomStart).padding(16.dp))
                     }
                 } else {
@@ -105,7 +107,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                         Text2(p.title, 24, FontWeight.Bold)
                         if (p.description.isNotEmpty()) Text(p.description, color = Sub, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
                         if (p.artist.isNotEmpty()) Text(
-                            p.artist, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)
+                            p.artist, color = Fg, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)
                                 .let { m -> if (p.artistUri.isNotEmpty()) m.clickable { onOpen(Card(p.artistUri, p.artist, "", "", true)) } else m },
                         )
                     }
@@ -116,10 +118,10 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
                     if (p.subtitle.isNotEmpty()) Text(p.subtitle, color = Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (p.kind == "artist") Text(
-                            if (saved) tr("フォロー中", "Following") else tr("フォローする", "Follow"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            if (saved) tr("フォロー中", "Following") else tr("フォローする", "Follow"), color = Fg, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.clip(CircleShape).background(Color.Transparent).clickable {
                                 saved = !saved; scope.launch { runCatching { bridge.follow(p.uri, saved) } }
-                            }.padding(1.dp).clip(CircleShape).background(Color(0x22FFFFFF)).padding(horizontal = 16.dp, vertical = 7.dp),
+                            }.padding(1.dp).clip(CircleShape).background(Fg.copy(alpha = 0.13f)).padding(horizontal = 16.dp, vertical = 7.dp),
                         ) else if (!p.uri.contains(":collection")) Ico(if (saved) Icons.check else Icons.add, 28, if (saved) Accent else Sub, 44) {
                             saved = !saved; scope.launch { runCatching { bridge.follow(p.uri, saved) } }
                         }
@@ -163,7 +165,7 @@ internal fun PageScreen(bridge: Bridge, uri: String, playing: PlayerState, onBac
 
 @Composable
 private fun Text2(t: String, size: Int, w: FontWeight, m: Modifier = Modifier) {
-    Text(t, color = Color.White, fontSize = size.sp, fontWeight = w, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = (size * 1.15).sp, modifier = m)
+    Text(t, color = Fg, fontSize = size.sp, fontWeight = w, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = (size * 1.15).sp, modifier = m)
 }
 
 @Composable
@@ -179,7 +181,7 @@ internal fun TrackRow(t: Track, number: String?, current: Boolean, onMore: () ->
             Spacer(Modifier.width(12.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(t.title, color = if (current) Accent else Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(t.title, color = if (current) Accent else Fg, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(t.artist, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Ico(Icons.more, 18, Sub, 36, onClick = onMore)
@@ -191,7 +193,7 @@ private fun ResultRow(c: Card, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(c.image, null, Modifier.size(56.dp).clip(if (c.round) CircleShape else RoundedCornerShape(2.dp)).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(c.title, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(c.title, color = Fg, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (c.subtitle.isNotEmpty()) Text(c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -206,28 +208,33 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
     androidx.activity.compose.BackHandler(enabled = typing) { typing = false }
     LazyColumn(Modifier.fillMaxSize().background(Bg), contentPadding = PaddingValues(bottom = 170.dp)) {
         item {
-            Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (Theme.glass) GlassTitle(tr("検索", "Search"), user, onAvatar)
+            else Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Avatar(user, 32, onAvatar)
                 Text2(tr("検索", "Search"), 24, FontWeight.Bold, Modifier.padding(start = 12.dp))
             }
         }
         item {
+            // 新しいテーマは灰色の角の丸い入力欄（Apple Music と同じ）
+            val glass = Theme.glass
             Row(
-                Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(46.dp).clip(RoundedCornerShape(6.dp)).background(Color.White).clickable { typing = true }.padding(horizontal = 12.dp),
+                Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(if (glass) 40.dp else 46.dp).clip(RoundedCornerShape(if (glass) 12.dp else 6.dp))
+                    .background(if (glass) Surface2 else Fg).clickable { typing = true }.padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Image(rememberVectorPainter(Icons.search), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color.Black))
-                Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = Color(0xFF6A6A6A), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
+                Image(rememberVectorPainter(Icons.search), null, Modifier.size(if (glass) 20.dp else 24.dp), colorFilter = ColorFilter.tint(if (glass) Sub else OnFg))
+                Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = classic(0xFF6A6A6A, Sub), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
             }
         }
-        if (tiles.isNotEmpty()) item { Spacer(Modifier.height(16.dp)) }
+        if (tiles.isNotEmpty()) item { if (Theme.glass) GlassSectionTitle(tr("カテゴリーをブラウズ", "Browse Categories")) else Spacer(Modifier.height(16.dp)) }
         items(tiles.chunked(2)) { row ->
             Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { t -> GenreTile(t, Modifier.weight(1f)) { onOpen(t) } }
+                row.forEach { t -> if (Theme.glass) GlassGenreTile(t, Modifier.weight(1f)) { onOpen(t) } else GenreTile(t, Modifier.weight(1f)) { onOpen(t) } }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
+    androidx.compose.runtime.DisposableEffect(typing) { GlassChrome.overlay = typing; onDispose { GlassChrome.overlay = false } }
     if (typing) SearchTyping(bridge, onClose = { typing = false }, onOpen = onOpen)
 }
 
@@ -270,12 +277,12 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
     }
     fun pick(c: Card) { focus.clearFocus(); scope.launch { runCatching { bridge.saveRecent(c.uri) } }; onOpen(c) }
     Column(Modifier.fillMaxSize().background(Bg).clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {}.windowInsetsPadding(WindowInsets.statusBars)) {
-        Row(Modifier.fillMaxWidth().background(Color(0xFF242424)).padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().background(Surface).padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 22, onClick = onClose)
             Box(Modifier.weight(1f).padding(start = 4.dp)) {
-                if (q.isEmpty()) Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = Sub, fontSize = 16.sp)
+                if (q.isEmpty()) Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = classic(0xFF6A6A6A, Sub), fontSize = 16.sp)
                 BasicTextField(
-                    q, { q = it }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    q, { q = it }, singleLine = true, textStyle = TextStyle(color = Fg, fontSize = 16.sp),
                     cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().focusRequester(req),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { focus.clearFocus() }),
@@ -298,7 +305,7 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
                 items(FILTERS) { (k, label) ->
                     val on = filter == k
                     Text(
-                        label, color = if (on) Color.Black else Color.White, fontSize = 14.sp,
+                        label, color = if (on) OnAccent else Fg, fontSize = 14.sp,
                         modifier = Modifier.clip(CircleShape).background(if (on) Accent else Card2).clickable { filter = k }.padding(horizontal = 14.dp, vertical = 7.dp),
                     )
                 }
@@ -315,6 +322,7 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
 /** マイライブラリ（公式アプリと同じ：絞り込み・並べ替え・リスト／グリッド、ピン留め） */
 @Composable
 internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, onAvatar: () -> Unit, onOpen: (Card) -> Unit, onCreate: () -> Unit) {
+    if (Theme.glass) { GlassLibraryScreen(bridge, ready, user, onAvatar, onOpen, onCreate); return }
     var items by remember { mutableStateOf(bridge.cachedLibrary()) }
     var query by remember { mutableStateOf<String?>(null) }
     androidx.activity.compose.BackHandler(enabled = query != null) { query = null }
@@ -334,8 +342,16 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
         .sortedByDescending { it.pinned }
     LazyColumn(Modifier.fillMaxSize().background(Bg), contentPadding = PaddingValues(bottom = 170.dp)) {
         item {
-            Row(Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (query == null) {
+            // 新しいテーマの見出しは、余白を GlassTitle の側で持つ（ほかの画面とそろえる）
+            Row(if (query == null && Theme.glass) Modifier else Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (query == null && Theme.glass) {
+                    Box(Modifier.weight(1f)) {
+                        GlassTitle(tr("ライブラリ", "Library"), user, onAvatar) {
+                            Ico(Icons.search, 22, Accent) { query = "" }
+                            Ico(Icons.add, 24, Accent, onClick = onCreate)
+                        }
+                    }
+                } else if (query == null) {
                     Avatar(user, 32, onAvatar)
                     Text2(tr("マイライブラリ", "Your Library"), 24, FontWeight.Bold, Modifier.padding(start = 12.dp).weight(1f))
                     Ico(Icons.search, 24) { query = "" }
@@ -345,33 +361,33 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
                     val req = remember { androidx.compose.ui.focus.FocusRequester() }
                     LaunchedEffect(Unit) { req.requestFocus() }
                     Row(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(6.dp)).background(Card2).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Image(rememberVectorPainter(Icons.search), null, Modifier.size(18.dp))
+                        Image(rememberVectorPainter(Icons.search), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Fg))
                         Box(Modifier.weight(1f).padding(start = 8.dp)) {
                             if (query!!.isEmpty()) Text(tr("マイライブラリを検索", "Search Your Library"), color = Sub, fontSize = 14.sp)
-                            BasicTextField(query!!, { query = it }, singleLine = true, textStyle = TextStyle(color = Color.White, fontSize = 14.sp), cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().focusRequester(req))
+                            BasicTextField(query!!, { query = it }, singleLine = true, textStyle = TextStyle(color = Fg, fontSize = 14.sp), cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().focusRequester(req))
                         }
                     }
-                    Text(tr("キャンセル", "Cancel"), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { query = null }.padding(12.dp))
+                    Text(tr("キャンセル", "Cancel"), color = Fg, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { query = null }.padding(12.dp))
                 }
             }
         }
         item {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (filter.isNotEmpty()) Ico(Icons.close, 16, Color.White, 34) { filter = "" }
+                if (filter.isNotEmpty()) Ico(Icons.close, 16, Fg, 34) { filter = "" }
                 listOf("playlist" to tr("プレイリスト", "Playlists"), "show" to tr("ポッドキャスト", "Podcasts"), "album" to tr("アルバム", "Albums"), "artist" to tr("アーティスト", "Artists")).forEach { (k, label) ->
                     if (filter.isEmpty() || filter == k) Text(
-                        label, color = if (filter == k) Color.Black else Color.White, fontSize = 14.sp,
+                        label, color = if (filter == k) OnAccent else Fg, fontSize = 14.sp,
                         modifier = Modifier.clip(CircleShape).background(if (filter == k) Accent else Card2).clickable { filter = if (filter == k) "" else k }.padding(horizontal = 14.dp, vertical = 7.dp),
                     )
                 }
             }
         }
         item {
-            Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(1.dp).background(Color(0xFF2A2A2A)))
+            Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(1.dp).background(classic(0xFF2A2A2A, Surface2)))
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.clip(CircleShape).clickable { sort = (sort + 1) % 3 }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Image(rememberVectorPainter(LibIcons.sort), null, Modifier.size(18.dp))
-                    Text(listOf(tr("再生履歴", "Recents"), tr("アルファベット順", "Alphabetical"), tr("クリエーター", "Creator"))[sort], color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
+                    Image(rememberVectorPainter(LibIcons.sort), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Fg))
+                    Text(listOf(tr("再生履歴", "Recents"), tr("アルファベット順", "Alphabetical"), tr("クリエーター", "Creator"))[sort], color = Fg, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
                 }
                 Spacer(Modifier.weight(1f))
                 Ico(if (grid) LibIcons.list else LibIcons.grid, 20) { grid = !grid }
@@ -383,7 +399,7 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
                     row.forEach { c ->
                         Column(Modifier.weight(1f).clickable { onOpen(c) }) {
                             LibCover(c, Modifier.fillMaxWidth().aspectRatio(1f))
-                            Text(c.title, color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                            Text(c.title, color = Fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
                             Text(c.subtitle.substringBefore(" • "), color = Sub, fontSize = 12.sp, maxLines = 1)
                         }
                     }
@@ -394,7 +410,7 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
             Row(Modifier.fillMaxWidth().clickable { onOpen(c) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 LibCover(c, Modifier.size(56.dp))
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text(c.title, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(c.title, color = Fg, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (c.pinned) Image(rememberVectorPainter(LibIcons.pin), null, Modifier.size(13.dp).padding(end = 2.dp), colorFilter = ColorFilter.tint(Accent))
                         Text(if (c.kind == "liked") tr("プレイリスト", "Playlist") + " • ${user?.name ?: ""}" else if (c.kind == "your-episodes") tr("プレイリスト • 保存済み＆ダウンロード済みのエピソード", "Playlist • Saved and downloaded episodes") else c.subtitle, color = Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = if (c.pinned) 4.dp else 0.dp))
@@ -406,12 +422,12 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
 }
 
 @Composable
-private fun LibCover(c: Card, m: Modifier) {
-    if (c.kind == "your-episodes") Box(m.clip(RoundedCornerShape(4.dp)).background(Color(0xFF006450)), contentAlignment = Alignment.Center) {
+internal fun LibCover(c: Card, m: Modifier, corner: androidx.compose.ui.unit.Dp = 4.dp) {
+    if (c.kind == "your-episodes") Box(m.clip(RoundedCornerShape(corner)).background(Color(0xFF006450)), contentAlignment = Alignment.Center) {
         Image(rememberVectorPainter(LibIcons.bookmark), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Accent))
-    } else if (c.kind == "liked") Box(m.clip(RoundedCornerShape(4.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))), contentAlignment = Alignment.Center) {
+    } else if (c.kind == "liked") Box(m.clip(RoundedCornerShape(corner)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))), contentAlignment = Alignment.Center) {
         Text("♥", color = Color.White, fontSize = 24.sp)
-    } else AsyncImage(c.image, null, m.clip(if (c.round) CircleShape else RoundedCornerShape(4.dp)).background(Card2), contentScale = ContentScale.Crop)
+    } else AsyncImage(c.image, null, m.clip(if (c.round) CircleShape else RoundedCornerShape(corner)).background(Card2), contentScale = ContentScale.Crop)
 }
 
 private object LibIcons {
