@@ -76,7 +76,7 @@ internal fun AboutPage(host: AppHost) {
     // 作者のカード（GitHub のアイコンと名前。押すとプロフィールを開く）
     Row(
         Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(Surface).clickable { uri.openUri("https://github.com/$AUTHOR") }.padding(16.dp),
+            .background(classic(0xFF1F1F1F, Surface)).clickable { uri.openUri("https://github.com/$AUTHOR") }.padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage("https://github.com/$AUTHOR.png?size=128", null, Modifier.size(52.dp).clip(CircleShape).background(Surface2))

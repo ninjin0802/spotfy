@@ -133,6 +133,11 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
     val collapse = remember { CollapseOnScroll() }
     // Classic に戻したら、Classic に無い「見つける」タブからホームへ
     LaunchedEffect(Theme.glass) { if (!Theme.glass && tab == Tab.Browse) tab = Tab.Home; collapse.collapsed = false }
+    // 上の帯の見出しは、タブを替えたら一度消す（前のタブの名前が残らないように）
+    LaunchedEffect(tab) { GlassChrome.smallTitle = null }
+    androidx.compose.runtime.SideEffect {
+        GlassChrome.covered = stacks[tab]!!.isNotEmpty() || playerOpen || settingsOpen || drawerOpen || profileOpen || newsOpen || recentsOpen || otherUser != null
+    }
     // タブを替えたら、Apple Music と同じく軽く震わせる
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val select: (Tab) -> Unit = {
@@ -171,7 +176,7 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
                 }
             }
             // 大きな見出しがスクロールで隠れたら、上にガラスの帯と小さな見出し（ページは自分の帯を持つ）。写し取る中身の外に置く
-            if (Theme.glass && stack.isEmpty()) GlassTopBar(backdrop, GlassChrome.smallTitle)
+            if (Theme.glass && stack.isEmpty() && !GlassChrome.overlay) GlassTopBar(backdrop, GlassChrome.smallTitle)
             // ミニプレーヤーの左右の余白も、裏の画面に押した判定が届かないようにする
             if (Theme.glass) Box(Modifier.align(Alignment.BottomCenter)) {
                 GlassBottom(
@@ -233,7 +238,7 @@ private fun AppContent(bridge: Bridge, host: AppHost) {
             text = { Text(tr("いまのアカウントからログアウトして、別のアカウントでログインします。", "You'll be logged out of this account so you can log in with another one.")) },
             confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false; host.logout() }) { Text(tr("ログアウトして続ける", "Log out and continue"), color = Accent) } },
             dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmSwitch = false }) { Text(tr("キャンセル", "Cancel"), color = Fg) } },
-            containerColor = Surface, titleContentColor = Fg, textContentColor = Sub,
+            containerColor = classic(0xFF282828, Surface), titleContentColor = Fg, textContentColor = Sub,
         )
         UpdateDialog(host.updater, loggedOut = !ready)
         if (devicesOpen) DevicesSheet(bridge, host) { devicesOpen = false }
@@ -278,11 +283,11 @@ internal object DrawerIcons {
 @Composable
 internal fun Drawer(user: Bridge.User?, onProfile: () -> Unit, onAddAccount: () -> Unit, onRecent: () -> Unit, onNews: () -> Unit, onSettings: () -> Unit) {
     Column(
-        Modifier.fillMaxHeight().width(310.dp).background(Surface)
+        Modifier.fillMaxHeight().width(310.dp).background(classic(0xFF1F1F1F, Surface))
             .clickable(remember { MutableInteractionSource() }, null) {}
             .windowInsetsPadding(WindowInsets.statusBars).padding(top = 8.dp),
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Surface2)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(classic(0xFF2A2A2A, Surface2))) {
             Row(Modifier.fillMaxWidth().clickable(onClick = onProfile).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Avatar(user, 52)
                 Column(Modifier.padding(start = 12.dp)) {

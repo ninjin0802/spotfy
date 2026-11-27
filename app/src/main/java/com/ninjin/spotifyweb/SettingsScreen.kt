@@ -231,7 +231,7 @@ internal fun RadioRow(q: Triple<String, String, String>, selected: Boolean, onCl
             contentAlignment = Alignment.Center,
         ) {
             if (selected) Box(Modifier.size(9.dp).clip(CircleShape).background(Bg))
-            else Box(Modifier.size(22.dp).clip(CircleShape).background(Sub).padding(2.dp)) { Box(Modifier.fillMaxSize().clip(CircleShape).background(Bg)) }
+            else Box(Modifier.size(22.dp).clip(CircleShape).background(classic(0xFF7C7C7C, Sub)).padding(2.dp)) { Box(Modifier.fillMaxSize().clip(CircleShape).background(Bg)) }
         }
     }
 }

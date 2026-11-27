@@ -223,7 +223,7 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(rememberVectorPainter(Icons.search), null, Modifier.size(if (glass) 20.dp else 24.dp), colorFilter = ColorFilter.tint(if (glass) Sub else OnFg))
-                Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = Sub, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
+                Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = classic(0xFF6A6A6A, Sub), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
             }
         }
         if (tiles.isNotEmpty()) item { if (Theme.glass) GlassSectionTitle(tr("カテゴリーをブラウズ", "Browse Categories")) else Spacer(Modifier.height(16.dp)) }
@@ -234,6 +234,7 @@ internal fun SearchScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, on
             }
         }
     }
+    androidx.compose.runtime.DisposableEffect(typing) { GlassChrome.overlay = typing; onDispose { GlassChrome.overlay = false } }
     if (typing) SearchTyping(bridge, onClose = { typing = false }, onOpen = onOpen)
 }
 
@@ -279,7 +280,7 @@ private fun SearchTyping(bridge: Bridge, onClose: () -> Unit, onOpen: (Card) -> 
         Row(Modifier.fillMaxWidth().background(Surface).padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Ico(Icons.back, 22, onClick = onClose)
             Box(Modifier.weight(1f).padding(start = 4.dp)) {
-                if (q.isEmpty()) Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = Sub, fontSize = 16.sp)
+                if (q.isEmpty()) Text(tr("何を聴きたいですか？", "What do you want to listen to?"), color = classic(0xFF6A6A6A, Sub), fontSize = 16.sp)
                 BasicTextField(
                     q, { q = it }, singleLine = true, textStyle = TextStyle(color = Fg, fontSize = 16.sp),
                     cursorBrush = SolidColor(Accent), modifier = Modifier.fillMaxWidth().focusRequester(req),
@@ -382,7 +383,7 @@ internal fun LibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.User?, o
             }
         }
         item {
-            Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(1.dp).background(Surface2))
+            Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(1.dp).background(classic(0xFF2A2A2A, Surface2)))
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.clip(CircleShape).clickable { sort = (sort + 1) % 3 }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Image(rememberVectorPainter(LibIcons.sort), null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(Fg))
@@ -425,7 +426,7 @@ internal fun LibCover(c: Card, m: Modifier, corner: androidx.compose.ui.unit.Dp 
     if (c.kind == "your-episodes") Box(m.clip(RoundedCornerShape(corner)).background(Color(0xFF006450)), contentAlignment = Alignment.Center) {
         Image(rememberVectorPainter(LibIcons.bookmark), null, Modifier.size(24.dp), colorFilter = ColorFilter.tint(Accent))
     } else if (c.kind == "liked") Box(m.clip(RoundedCornerShape(corner)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))), contentAlignment = Alignment.Center) {
-        Text("♥", color = Fg, fontSize = 24.sp)
+        Text("♥", color = Color.White, fontSize = 24.sp)
     } else AsyncImage(c.image, null, m.clip(if (c.round) CircleShape else RoundedCornerShape(corner)).background(Card2), contentScale = ContentScale.Crop)
 }
 

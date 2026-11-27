@@ -42,6 +42,9 @@ internal val Surface: Color @Composable @ReadOnlyComposable get() = when { light
 internal val Surface2: Color @Composable @ReadOnlyComposable get() = when { light -> Color(0xFFE5E5EA); Theme.glass -> Color(0xFF2C2C2E); else -> Color(0xFF3A3A3A) }
 internal val Card2: Color @Composable @ReadOnlyComposable get() = when { light -> Color(0xFFE5E5EA); Theme.glass -> Color(0xFF2C2C2E); else -> Color(0xFF2A2A2A) }
 /** 新しいテーマは Apple Music と同じ赤 */
+/** Classic は前からの色のまま、Glass は新しい色 */
+@Composable @ReadOnlyComposable internal fun classic(old: Long, glass: Color): Color = if (Theme.glass) glass else Color(old)
+
 internal val Accent: Color get() = if (Theme.glass) Color(0xFFFA2D48) else Theme.accent
 internal val OnAccent: Color get() = if (Theme.glass) Color.White else Color.Black
 

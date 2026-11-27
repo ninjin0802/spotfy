@@ -82,6 +82,6 @@ internal fun UpdateDialog(updater: Updater, loggedOut: Boolean = false) {
         },
         confirmButton = { if (progress == null) TextButton(onClick = { updater.download(release) }) { Text(tr("更新", "Update"), color = Accent) } },
         dismissButton = { if (progress == null && !updater.required) TextButton(onClick = { updater.later(release) }) { Text(tr("あとで", "Later"), color = Fg) } },
-        containerColor = Surface, titleContentColor = Fg, textContentColor = Sub,
+        containerColor = classic(0xFF282828, Surface), titleContentColor = Fg, textContentColor = Sub,
     )
 }

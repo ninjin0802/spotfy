@@ -70,6 +70,10 @@ import kotlinx.coroutines.launch
 /** 大きな見出しがスクロールで隠れたら、上のガラスの帯に小さく出す見出し（null なら帯を出さない） */
 internal object GlassChrome {
     var smallTitle by mutableStateOf<String?>(null)
+    /** 検索の入力画面など、帯を出さない画面が上に開いている */
+    var overlay by mutableStateOf(false)
+    /** タブの画面の上に、ページ・設定・プレーヤーなどが重なっている（タブの画面の戻るボタンの処理を止める） */
+    var covered by mutableStateOf(false)
 }
 
 /** 大きな見出しの位置を見張り、隠れたら上の帯に名前を出す。リストの外へ流れて消えたときも隠れたとみなす */
@@ -145,8 +149,9 @@ internal fun GlassPageScreen(bridge: Bridge, uri: String, playing: PlayerState, 
     val collection = uri.contains(":collection")
     val playAll: (Boolean) -> Unit = { shuffle ->
         scope.launch {
+            // シャッフルの切り替えに失敗しても、再生はする
+            runCatching { bridge.shuffle(shuffle) }
             runCatching {
-                bridge.shuffle(shuffle)
                 if (p == null) return@runCatching
                 if (p.kind == "artist") p.tracks.firstOrNull()?.let { bridge.play(it.uri) }
                 else if (collection) p.tracks.firstOrNull()?.let { bridge.play(uri, it.uri) } else bridge.play(uri)

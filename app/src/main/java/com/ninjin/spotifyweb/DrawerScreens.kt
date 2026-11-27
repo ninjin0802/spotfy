@@ -113,7 +113,7 @@ private fun RecentRow(r: Bridge.Recent, onOpen: (Card) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val shape = if (round) CircleShape else RoundedCornerShape(4.dp)
-        if (liked) Box(Modifier.size(56.dp).clip(shape).background(Color(0xFF5038A0)), contentAlignment = Alignment.Center) { Text("♥", color = Fg, fontSize = 22.sp) }
+        if (liked) Box(Modifier.size(56.dp).clip(shape).background(Color(0xFF5038A0)), contentAlignment = Alignment.Center) { Text("♥", color = Color.White, fontSize = 22.sp) }
         else AsyncImage(r.image, null, Modifier.size(56.dp).clip(shape).background(Card2), contentScale = ContentScale.Crop)
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
             Text(r.title, color = Fg, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

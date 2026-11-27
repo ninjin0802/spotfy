@@ -66,7 +66,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-private fun Grip() = Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Sub))
+private fun Grip() = Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(classic(0xFF6A6A6A, Sub)))
 
 /** おやすみタイマー（アプリ全体で 1 つ） */
 object SleepTimer {
@@ -245,7 +245,7 @@ fun CreateSheet(bridge: Bridge, onCreated: (Card) -> Unit, onDismiss: () -> Unit
                 )
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
-                        tr("作成", "Create"), color = OnFg, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                        tr("作成", "Create"), color = OnAccent, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.clip(CircleShape).background(Accent).clickable {
                             val n = name.trim().ifEmpty { return@clickable }
                             val kind = naming

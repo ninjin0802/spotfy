@@ -46,6 +46,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 
@@ -139,7 +141,7 @@ private fun MenuContainer(glass: Boolean, state: androidx.compose.material3.Shee
     if (!glass) {
         ModalBottomSheet(
             onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
-            dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Sub)) },
+            dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(classic(0xFF6A6A6A, Sub))) },
         ) { content() }
         return
     }
@@ -162,7 +164,7 @@ private fun MenuContainer(glass: Boolean, state: androidx.compose.material3.Shee
             contentAlignment = Alignment.Center,
         ) {
             Column(
-                Modifier.widthIn(max = 320.dp).graphicsLayer { scaleX = shown.value; scaleY = shown.value; alpha = ((shown.value - 0.85f) / 0.15f).coerceIn(0f, 1f) }
+                Modifier.widthIn(max = 320.dp).verticalScroll(rememberScrollState()).graphicsLayer { scaleX = shown.value; scaleY = shown.value; alpha = ((shown.value - 0.85f) / 0.15f).coerceIn(0f, 1f) }
                     .clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {},
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) { content() }
@@ -215,7 +217,7 @@ private fun LikedItem(label: String, onClick: () -> Unit) {
         Box(
             Modifier.size(26.dp).clip(RoundedCornerShape(3.dp)).background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EFD9)))),
             contentAlignment = Alignment.Center,
-        ) { Text("♥", color = Fg, fontSize = 12.sp) }
+        ) { Text("♥", color = Color.White, fontSize = 12.sp) }
         Text(label, color = Fg, fontSize = 16.sp, modifier = Modifier.padding(start = 18.dp))
     }
 }
@@ -247,7 +249,7 @@ fun DevicesSheet(bridge: Bridge, host: AppHost, onDismiss: () -> Unit) {
     fun close() { scope.launch { state.hide() }.invokeOnCompletion { onDismiss() } }
     ModalBottomSheet(
         onDismissRequest = onDismiss, sheetState = state, containerColor = Surface,
-        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(Sub)) },
+        dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).width(36.dp).height(4.dp).clip(CircleShape).background(classic(0xFF6A6A6A, Sub))) },
     ) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 16.dp)) {
             Text(tr("デバイスに接続", "Connect to a device"), color = Fg, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))

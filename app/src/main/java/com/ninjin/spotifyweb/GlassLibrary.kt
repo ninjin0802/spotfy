@@ -55,7 +55,8 @@ internal fun GlassLibraryScreen(bridge: Bridge, ready: Boolean, user: Bridge.Use
     LaunchedEffect(bridge.libraryVersion.value) { if (ready && bridge.libraryVersion.value > 0) runCatching { bridge.library() }.onSuccess { items = it } }
     LaunchedEffect(ready) { if (ready) runCatching { bridge.library() }.onSuccess { items = it } }
     var kind by remember { mutableStateOf<String?>(null) }
-    BackHandler(enabled = kind != null) { kind = null }
+    BackHandler(enabled = kind != null && !GlassChrome.covered) { kind = null }
+    LaunchedEffect(kind) { GlassChrome.smallTitle = null }
     val liked = Card("spotify:collection:tracks", tr("お気に入りの曲", "Liked Songs"), tr("プレイリスト", "Playlist"), "", false, "liked", true)
     val all = listOf(liked) + items.filter { !it.uri.contains(":collection") && it.kind != "liked-songs" }
     val k = libKinds.firstOrNull { it.key == kind }

@@ -112,6 +112,9 @@ internal fun FullPlayer(bridge: Bridge, host: AppHost, p: PlayerState, tint: Col
     LaunchedEffect(p.uri) { lyrics = null; if (p.uri.startsWith("spotify:track:")) lyrics = runCatching { bridge.lyrics(p.uri, p.image) }.getOrNull() }
     // 新しいテーマは Apple Music と同じく、一番上で下へなぞると、角が丸くなって一緒に下がり、離すと閉じる
     val swipe = remember { SwipeToClose(onClose) }
+    // 閉じる途中ですぐ開き直したとき、下がったまま残らないように戻す
+    val vis = LocalPlayerScope.current
+    LaunchedEffect(vis?.transition?.targetState) { if (vis?.transition?.targetState == androidx.compose.animation.EnterExitState.Visible) swipe.dy = 0f }
     // 公式アプリと同じく、プレーヤーの下にスクロールすると歌詞・アーティストについて・次に再生が続く
     BoxWithConstraints(
         Modifier.fillMaxSize()

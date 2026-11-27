@@ -273,7 +273,7 @@ private fun GlassTabPill(backdrop: Backdrop, current: Tab?, onSelect: (Tab) -> U
                     ),
             )
             Row(
-                Modifier.fillMaxSize().pointerInput(Unit) {
+                Modifier.fillMaxSize().pointerInput(current, wPx) {
                     detectHorizontalDragGestures(
                         onDragStart = { o -> dragging = true; jelly.down(); jelly.follow(o.x / wPx - 0.5f) },
                         onHorizontalDrag = { ch, dx ->
@@ -471,7 +471,8 @@ internal fun GlassPlayerMain(bridge: Bridge, host: AppHost, p: PlayerState, tint
                 Ico(if (p.playing) Icons.pause else Icons.play, 52, Color.White, 80) { scope.launch { runCatching { bridge.toggle() } } }
                 Ico(Icons.next, 38, Color.White, 64) { scope.launch { runCatching { bridge.next() } } }
             }
-            GlassVolume()
+            // 別の機器で再生しているときは、この端末の音量を変えても意味がないので出さない
+            if (p.device.isEmpty()) GlassVolume()
             // 下：歌詞／再生先／キュー（シャッフルとリピートはキューの画面に。Apple Music と同じ）
             Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 PaneButton(Icons.lyrics, pane == 1) { pane = if (pane == 1) 0 else 1 }
